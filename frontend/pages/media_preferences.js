@@ -3,37 +3,7 @@
    ═══════════════════════════════════════════════════════════ */
 
 const MediaPreferencesPage = {
-    defaultPreferences: {
-        "covers": [
-            {"source": "vpinmediadb",  "key": "wheel.png"},
-            {"source": "screenscraper", "key": "wheel-tarcisios"},
-            {"source": "screenscraper", "key": "wheel"}
-        ],
-        "fanart": [
-            {"source": "vpinmediadb",  "key": "1k/bg.png"},
-            {"source": "vpinmediadb",  "key": "4k/table.png"},
-            {"source": "vpinmediadb",  "key": "1k/table.png"}
-        ],
-        "manuals": [
-            {"source": "screenscraper", "key": "manuel"}
-        ],
-        "marquees": [
-            {"source": "screenscraper", "key": "wheel"},
-            {"source": "vpinmediadb",  "key": "wheel.png"}
-        ],
-        "screenshots": [
-            {"source": "vpinmediadb",  "key": "1k/table.png"},
-            {"source": "vpinmediadb",  "key": "4k/table.png"},
-            {"source": "screenscraper", "key": "ss"}
-        ],
-        "videos": [
-            { "source": "vpinmediadb", "key": "1k/table.mp4" },
-            { "source": "vpinmediadb", "key": "4k/table.mp4" },
-            { "source": "vpinmediadb", "key": "1k/video.mp4" },
-            { "source": "screenscraper", "key": "videotable" },
-            { "source": "screenscraper", "key": "video-normalized" }
-        ]
-    },
+    defaultPreferences: null, // Fetched from backend
 
     categories: [
         { id: "covers", name: "Covers" },
@@ -44,14 +14,7 @@ const MediaPreferencesPage = {
         { id: "videos", name: "Videos" }
     ],
 
-    sources: [
-        { id: "vpinmediadb", name: "VPinMediaDB", keys: [
-            "wheel.png", "1k/table.png", "4k/table.png", "1k/bg.png", "1k/video.mp4"
-        ]},
-        { id: "screenscraper", name: "ScreenScraper", keys: [
-            "wheel-tarcisios", "wheel", "manuel", "ss", "videotable", "video-normalized"
-        ]}
-    ],
+    sources: [], // Fetched from backend
 
     currentPreferences: {},
 
@@ -93,18 +56,29 @@ const MediaPreferencesPage = {
 
     async loadPreferences() {
         try {
-            const res = await fetch('/api/settings');
-            const data = await res.json();
+            // Fetch current settings, defaults, and source definitions
+            const [settingsRes, defaultsRes, sourcesRes] = await Promise.all([
+                fetch('/api/settings'),
+                fetch('/api/settings/defaults'),
+                fetch('/api/scraper/sources')
+            ]);
+            
+            const settingsData = await settingsRes.json();
+            const defaultsData = await defaultsRes.json();
+            const sourcesData = await sourcesRes.json();
+            
+            this.sources = sourcesData;
+            this.defaultPreferences = defaultsData.media_preferences;
 
             // Deep copy to avoid reference issues
-            if (data.media_preferences && Object.keys(data.media_preferences).length > 0) {
-                this.currentPreferences = JSON.parse(JSON.stringify(data.media_preferences));
+            if (settingsData.media_preferences && Object.keys(settingsData.media_preferences).length > 0) {
+                this.currentPreferences = JSON.parse(JSON.stringify(settingsData.media_preferences));
             } else {
                 this.currentPreferences = JSON.parse(JSON.stringify(this.defaultPreferences));
             }
         } catch (e) {
             console.error("Failed to load settings:", e);
-            this.currentPreferences = JSON.parse(JSON.stringify(this.defaultPreferences));
+            this.currentPreferences = this.currentPreferences || {};
         }
     },
 

@@ -44,6 +44,12 @@ async def get_settings():
     return data
 
 
+@router.get("/settings/defaults")
+async def get_defaults():
+    """Return hardcoded defaults from AppConfig."""
+    return AppConfig().model_dump()
+
+
 @router.put("/settings")
 async def update_settings(update: SettingsUpdate):
     update_dict = update.model_dump(exclude_none=True)
@@ -160,4 +166,17 @@ async def migrate_media():
     asyncio.create_task(migrate_media_strategy(config.media_storage_mode))
     
     return {"success": True, "message": f"Migration to {config.media_storage_mode} started in background. Check global progress."}
+
+
+@router.get("/scraper/sources")
+async def get_scraper_sources():
+    """Return available scraper sources and their valid keys."""
+    from services.vpinmediadb import SOURCES_TO_CHECK as vpmdb_keys
+    # ScreenScraper keys are somewhat dynamic but we have a standard set we use
+    ss_keys = ["wheel-tarcisios", "wheel", "manuel", "ss", "videotable", "video-normalized", "fanart", "box-2d"]
+    
+    return [
+        {"id": "vpinmediadb", "name": "VPinMediaDB", "keys": vpmdb_keys},
+        {"id": "screenscraper", "name": "ScreenScraper", "keys": ss_keys}
+    ]
 
