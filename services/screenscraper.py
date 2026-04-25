@@ -446,8 +446,8 @@ async def download_media_for_table(
                     with open(temp_path, "wb") as f:
                         f.write(resp.content)
                         
-                    # Apply specific user rotation rules
-                    if rel_folder in ["fanart", "screenshots", "playfield", "marquees", "covers"]:
+                    # Apply specific user rotation rules (applies to any category except videos)
+                    if rel_folder != "videos":
                         from services.media_processor import process_downloaded_image
                         import asyncio
                         await asyncio.to_thread(process_downloaded_image, str(temp_path), "screenscraper", key)

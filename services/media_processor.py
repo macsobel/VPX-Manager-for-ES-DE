@@ -53,6 +53,11 @@ def process_downloaded_image(file_path: str, source: str, key: str):
     2. ScreenScraper "Table Screenshot" -> rotate right 90 degrees IF wider than height.
     """
     try:
+        # Only process images
+        ext = Path(file_path).suffix.lower()
+        if ext not in (".png", ".jpg", ".jpeg", ".webp"):
+            return
+
         if source == "vpinmediadb" and key in ("1k/table.png", "4k/table.png", "table.png"):
             logger.info(f"Applying VPinMediaDB table.png rotation rule to {file_path}")
             rotate_image(file_path, 90)

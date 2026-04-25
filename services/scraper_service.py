@@ -161,8 +161,8 @@ async def trigger_media_download(table_id: int, vps_id: Optional[str], table_nam
                     with open(temp_path, "wb") as f:
                         f.write(resp.content)
                         
-                    # Apply specific user rotation rules
-                    if category in ["fanart", "screenshots", "playfield", "marquees", "covers"]: # Broaden categories just in case, logic handles specifics
+                    # Apply specific user rotation rules (applies to any category except videos)
+                    if category != "videos":
                         from services.media_processor import process_downloaded_image
                         await asyncio.to_thread(process_downloaded_image, str(temp_path), info["source"], info["key"])
                     
