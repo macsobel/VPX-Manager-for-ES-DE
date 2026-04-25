@@ -232,6 +232,12 @@ osascript -e 'tell application "EmulationStation Desktop Edition" to activate'
 
         tree.write(xml_file, encoding="utf-8", xml_declaration=True)
 
+        # 3. Create flatten.txt in the ROMs directory
+        flatten_file = Path(config.expanded_tables_dir) / "flatten.txt"
+        if not flatten_file.exists():
+            with open(flatten_file, "w") as f:
+                f.write("")
+
         return ESDEIntegrationResponse(success=True, message="ES-DE Integration applied successfully.")
     except Exception as e:
         return ESDEIntegrationResponse(success=False, message=str(e))

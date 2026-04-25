@@ -73,26 +73,7 @@ class GamelistManager:
             
         self._set_metadata(game_elem, metadata)
 
-        # 2. Dual-sync <folder> if nested
-        rel_path = rom_path.replace("./", "").replace("\\", "/")
-        if "/" in rel_path:
-            folder_path = str(Path(rel_path).parent).replace("\\", "/")
-            norm_folder_path = self._normalize_path(folder_path)
-                
-            folder_elem = None
-            for fol in root.findall("folder"):
-                fpath_elem = fol.find("path")
-                if fpath_elem is not None and self._normalize_path(fpath_elem.text) == norm_folder_path:
-                    folder_elem = fol
-                    break
-                    
-            if folder_elem is None:
-                logger.info(f"Creating new <folder> entry for {folder_path}")
-                folder_elem = ET.SubElement(root, "folder")
-                fpath_elem = ET.SubElement(folder_elem, "path")
-                fpath_elem.text = folder_path if folder_path.startswith("./") else f"./{folder_path.lstrip('./')}"
-                
-            self._set_metadata(folder_elem, metadata)
+
 
         _indent(root)
         try:

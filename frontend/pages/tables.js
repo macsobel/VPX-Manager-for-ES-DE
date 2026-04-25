@@ -1383,17 +1383,49 @@ const TablesPage = {
     },
 
     async triggerTableScrape(tableId, missingOnly) {
+        const card = document.getElementById(`table-card-${tableId}`);
+        const btnUnified = card?.querySelector('.btn-scrape-unified');
+        const btnSingle = document.getElementById('btn-scrape-single');
+        
+        const progContainer = document.getElementById('scrape-progress-container');
+        const progBar = document.getElementById('scrape-progress-bar');
+        const statusLabel = document.getElementById('scrape-status-label');
+
         try {
             Toast.info(missingOnly ? 'Downloading missing media...' : 'Overwriting all media...');
-            const card = document.getElementById(`table-card-${tableId}`);
-            const btn = card?.querySelector('.btn-scrape-unified');
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '<div class="spinner" style="width: 14px; height: 14px;"></div>';
+            
+            if (btnUnified) {
+                btnUnified.disabled = true;
+                btnUnified.innerHTML = '<div class="spinner" style="width: 14px; height: 14px;"></div>';
             }
+            if (btnSingle) {
+                btnSingle.disabled = true;
+                btnSingle.innerHTML = '<div class="spinner-sm"></div> Scraping...';
+            }
+
+            if (progContainer) {
+                progContainer.style.display = 'block';
+                if (progBar) progBar.style.width = '10%';
+                if (statusLabel) statusLabel.textContent = 'Connecting to sources...';
+            }
+
+            // Fake crawl for indeterminate progress
+            let progress = 10;
+            const crawlInterval = setInterval(() => {
+                if (progress < 90 && progBar) {
+                    progress += (90 - progress) * 0.05;
+                    progBar.style.width = `${Math.round(progress)}%`;
+                    if (progress > 40 && statusLabel) statusLabel.textContent = 'Downloading assets...';
+                    if (progress > 70 && statusLabel) statusLabel.textContent = 'Processing & saving...';
+                }
+            }, 800);
 
             const res = await fetch(`/api/scraper/download/${tableId}?missing_only=${missingOnly}`, { method: 'POST' });
             const data = await res.json();
+            
+            clearInterval(crawlInterval);
+            if (progBar) progBar.style.width = '100%';
+            if (statusLabel) statusLabel.textContent = 'Complete!';
             
             if (data.success) {
                 const count = data.downloaded ? data.downloaded.length : 0;
@@ -1409,20 +1441,41 @@ const TablesPage = {
             // Refresh the detail panel if it's currently open for this table
             const panel = document.getElementById('detail-panel');
             if (panel && panel.classList.contains('open')) {
-                // We check the title to ensure we're still looking at the same table's media
                 const title = document.getElementById('detail-title')?.textContent || '';
                 if (title.includes('Media:')) {
-                    this.showMediaDetail(tableId);
+                    // Wait a bit for the user to see the 100% bar before refreshing content
+                    setTimeout(() => {
+                        this.showMediaDetail(tableId);
+                    }, 1500);
                 }
             }
+
+            // Reset buttons
+            if (btnUnified) {
+                btnUnified.disabled = false;
+                btnUnified.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>';
+            }
+            if (btnSingle) {
+                btnSingle.disabled = false;
+                btnSingle.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg> Scrape Media';
+            }
+            
+            // Hide progress after delay
+            setTimeout(() => {
+                if (progContainer) progContainer.style.display = 'none';
+            }, 3000);
+
         } catch (e) {
             Toast.error('Scrape failed: ' + e.message);
-            const card = document.getElementById(`table-card-${tableId}`);
-            const btn = card?.querySelector('.btn-scrape-unified');
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>';
+            if (btnUnified) {
+                btnUnified.disabled = false;
+                btnUnified.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>';
             }
+            if (btnSingle) {
+                btnSingle.disabled = false;
+                btnSingle.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg> Scrape Media';
+            }
+            if (progContainer) progContainer.style.display = 'none';
         }
     },
 
@@ -1729,6 +1782,21 @@ const TablesPage = {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
                         Scrape Media
                     </button>
+
+                    <!-- Individual Scrape Progress Bar -->
+                    <div id="scrape-progress-container" style="display: none; background: var(--glass-bg); padding: 1rem; border-radius: 12px; border: 1px solid var(--glass-border); backdrop-filter: blur(8px);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div class="spinner-sm" id="scrape-spinner" style="width: 14px; height: 14px;"></div>
+                                <span style="font-weight: 600; color: var(--text-primary); font-size: 0.85rem;" id="scrape-status-label">Scraping media...</span>
+                            </div>
+                        </div>
+                        <div style="width: 100%; background-color: rgba(255, 255, 255, 0.05); border-radius: var(--radius-full); overflow: hidden; height: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                            <div id="scrape-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--accent-blue), #60a5fa); transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); position: relative;">
+                                <div class="progress-shimmer" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0;"></div>
+                            </div>
+                        </div>
+                    </div>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
                         ${tableData.vps_id ? `<a href="https://virtualpinballspreadsheet.github.io/?game=${tableData.vps_id}&f=vpx" target="_blank" class="btn btn-secondary btn-sm">VPS</a>` : ''}
                         ${tableData.vps_id ? `<a href="https://github.com/superhac/vpinmediadb/tree/main/${tableData.vps_id}" target="_blank" class="btn btn-secondary btn-sm">VPinMediaDB</a>` : ''}
