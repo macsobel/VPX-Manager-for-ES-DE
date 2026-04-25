@@ -1844,7 +1844,13 @@ const TablesPage = {
                                     <source src="${previewUrl}">
                                     Your browser does not support video.
                                 </video>
-                                <div class="media-preview-overlay" style="position: absolute; top: 0; right: 0; padding: 6px; display: flex; gap: 6px; background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);">
+                                <div class="media-preview-overlay" style="position: absolute; top: 0; right: 0; padding: 6px; display: flex; gap: 6px; background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent); border-bottom-left-radius: 8px;">
+                                    <button class="btn btn-secondary btn-sm btn-rotate" data-type="${type.id}" data-angle="270" title="Rotate Left" style="padding: 4px;">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg>
+                                    </button>
+                                    <button class="btn btn-secondary btn-sm btn-rotate" data-type="${type.id}" data-angle="90" title="Rotate Right" style="padding: 4px;">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
+                                    </button>
                                     <button class="btn btn-secondary btn-sm btn-replace" data-type="${type.id}">Replace</button>
                                     <button class="btn btn-danger btn-sm btn-delete-media" data-type="${type.id}">Delete</button>
                                 </div>

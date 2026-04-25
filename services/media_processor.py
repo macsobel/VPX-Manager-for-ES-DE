@@ -79,47 +79,131 @@ def normalize_video(file_path: str):
     Fixes the 'No supported format' error caused by yuv444p downloads.
     """
     try:
-        # 1. Metadata check with ffprobe
-        # Using full path discovered: /usr/local/bin/ffprobe
-        # Wrap file_path in abspath to prevent command injection with filenames starting with '-'
-        abs_file_path = os.path.abspath(file_path)
-        cmd_meta = [
-            "/usr/local/bin/ffprobe", "-v", "error", "-select_streams", "v:0",
-            "-show_entries", "stream=codec_name,pix_fmt", "-of", "json", abs_file_path
-        ]
+        import imageio_ffmpeg
         import json
-        output = subprocess.check_output(cmd_meta).decode()
-        data = json.loads(output)
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+
+        # 1. Metadata check with ffmpeg (ffprobe not bundled)
+        abs_file_path = os.path.abspath(file_path)
         
-        if not data.get("streams"):
+        # We can extract codec info by using ffmpeg -i and parsing, but to get JSON-like structure
+        # without ffprobe is tricky. Wait, we can just run a quick transcode check, or use regex.
+        import re
+        cmd_meta = [ffmpeg_exe, "-i", abs_file_path]
+        out = subprocess.run(cmd_meta, capture_output=True, text=True)
+        
+        # Find Video stream info: Stream #0:0(eng): Video: h264 (Main) (avc1 / ...), yuv420p, 1920x1080
+        video_stream_match = re.search(r"Stream #\d+:\d+.*?: Video: ([\w]+).*?,\s*([\w]+)[,\s]", out.stderr)
+        
+        if not video_stream_match:
+            logger.warning(f"Could not parse video stream info for {file_path}")
             return
             
-        stream = data["streams"][0]
-        codec = stream.get("codec_name")
-        pix_fmt = stream.get("pix_fmt")
+        codec = video_stream_match.group(1)
+        pix_fmt = video_stream_match.group(2)
         
         # We normalize if it's not yuv420p or not h264
         if pix_fmt != "yuv420p" or codec != "h264":
             logger.info(f"Normalizing video {file_path} (current: {codec}/{pix_fmt})")
-            temp_path = file_path + ".norm.mp4"
+            temp_path = abs_file_path + ".norm.mp4"
             
-            # 2. Transcode with ffmpeg
-            # Using full path discovered: /usr/local/bin/ffmpeg
-            abs_temp_path = os.path.abspath(temp_path)
+            # 2. Transcode with bundled ffmpeg
             cmd_trans = [
-                "/usr/local/bin/ffmpeg", "-y", "-i", abs_file_path,
+                ffmpeg_exe, "-y", "-i", abs_file_path,
                 "-pix_fmt", "yuv420p",
                 "-c:v", "libx264",
                 "-crf", "23",
                 "-preset", "fast",
                 "-c:a", "copy", # Keep audio as is
-                abs_temp_path
+                temp_path
             ]
             subprocess.check_call(cmd_trans, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
             # 3. Swap files
-            os.replace(abs_temp_path, abs_file_path)
+            os.replace(temp_path, abs_file_path)
             logger.info(f"Video normalized successfully: {file_path}")
             
     except Exception as e:
         logger.error(f"Error normalizing video {file_path}: {e}")
+
+def process_downloaded_video(file_path: str, source: str, key: str):
+    """
+    Lightweight video rotation using metadata injection.
+    Does NOT re-encode the video (-c copy).
+    Uses +faststart to ensure the moov atom is at the beginning, allowing browsers to stream it properly.
+    """
+    try:
+        # Check user-specified rules for rotation
+        needs_rotation = False
+        if source == "vpinmediadb" and key in ("1k/video.mp4", "1k/table.mp4", "4k/table.mp4"):
+            needs_rotation = True
+        elif source == "screenscraper" and key == "videotable":
+            needs_rotation = True
+
+        if not needs_rotation:
+            return
+
+        import imageio_ffmpeg
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+
+        logger.info(f"Applying lightweight 90-degree right metadata rotation to video {file_path}")
+        abs_file_path = os.path.abspath(file_path)
+        temp_path = abs_file_path + ".rot.mp4"
+        cmd = [
+            ffmpeg_exe, "-y", 
+            "-display_rotation", "270", # 270 CCW = 90 CW (Right)
+            "-i", abs_file_path,
+            "-c", "copy",
+            "-movflags", "+faststart",
+            temp_path
+        ]
+        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        os.replace(temp_path, abs_file_path)
+        logger.info(f"Video metadata rotation successful: {file_path}")
+    except Exception as e:
+        logger.error(f"Error rotating video metadata {file_path}: {e}")
+
+def rotate_video_metadata_manual(file_path: str, angle: int):
+    """
+    Manually rotate a video file using metadata injection by a specific angle.
+    Note: ffmpeg -display_rotation uses COUNTER-CLOCKWISE degrees.
+    The UI provides CLOCKWISE degrees (90, 180, 270).
+    """
+    try:
+        import imageio_ffmpeg
+        import re
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        
+        abs_file_path = os.path.abspath(file_path)
+        
+        # Read current rotation using ffmpeg
+        current_angle = 0
+        cmd_meta = [ffmpeg_exe, "-i", abs_file_path]
+        try:
+            out = subprocess.run(cmd_meta, capture_output=True, text=True)
+            match = re.search(r"displaymatrix:\s*rotation\s*of\s*([\-\d\.]+)\s*degrees", out.stderr)
+            if match:
+                current_angle = int(float(match.group(1)))
+        except Exception as meta_e:
+            logger.debug(f"Could not read current rotation metadata: {meta_e}")
+
+        # Convert Clockwise input to Counter-Clockwise for ffmpeg
+        # new_angle (CCW) = (current_angle (CCW) - clockwise_delta) % 360
+        new_angle = (current_angle - angle) % 360
+
+        temp_path = abs_file_path + ".rot.mp4"
+        cmd = [
+            ffmpeg_exe, "-y", 
+            "-display_rotation", str(new_angle),
+            "-i", abs_file_path,
+            "-c", "copy",
+            "-movflags", "+faststart",
+            temp_path
+        ]
+
+        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        os.replace(temp_path, abs_file_path)
+        logger.info(f"Manual video metadata rotation to {new_angle} successful: {file_path}")
+    except Exception as e:
+        logger.error(f"Error manually rotating video {file_path}: {e}")
+        raise

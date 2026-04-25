@@ -166,9 +166,11 @@ async def trigger_media_download(table_id: int, vps_id: Optional[str], table_nam
                         from services.media_processor import process_downloaded_image
                         await asyncio.to_thread(process_downloaded_image, str(temp_path), info["source"], info["key"])
                     
-                    # Normalize video
+                    # Normalize and rotate video
                     if category == "videos":
+                        from services.media_processor import normalize_video, process_downloaded_video
                         await asyncio.to_thread(normalize_video, str(temp_path))
+                        await asyncio.to_thread(process_downloaded_video, str(temp_path), info["source"], info["key"])
                     
                     # Apply dual-path saving
                     final_paths = await save_media_dual(

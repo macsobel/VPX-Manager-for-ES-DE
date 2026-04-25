@@ -194,7 +194,11 @@ async def rotate_media(table_id: int, media_type: str, angle: int) -> dict:
 
     try:
         # Rotate the primary file
-        rotate_image(str(file_path), angle)
+        if media_type == "videos" or str(file_path).lower().endswith(".mp4"):
+            from services.media_processor import rotate_video_metadata_manual
+            rotate_video_metadata_manual(str(file_path), angle)
+        else:
+            rotate_image(str(file_path), angle)
         
         # Re-apply dual-path synchronization
         game_stem = Path(table["filename"]).stem

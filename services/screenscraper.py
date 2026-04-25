@@ -452,6 +452,13 @@ async def download_media_for_table(
                         import asyncio
                         await asyncio.to_thread(process_downloaded_image, str(temp_path), "screenscraper", key)
                     
+                    # Normalize and rotate video
+                    if rel_folder == "videos":
+                        from services.media_processor import normalize_video, process_downloaded_video
+                        import asyncio
+                        await asyncio.to_thread(normalize_video, str(temp_path))
+                        await asyncio.to_thread(process_downloaded_video, str(temp_path), "screenscraper", key)
+                    
                     # Apply dual-path saving
                     final_paths = await save_media_dual(
                         media_base=media_base,
