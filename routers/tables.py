@@ -26,6 +26,7 @@ class TableUpdate(BaseModel):
     rating: Optional[int] = None
     notes: Optional[str] = None
     ss_id: Optional[str] = None
+    players: Optional[str] = None
 
 class IgnoreRequest(BaseModel):
     version: str
@@ -499,8 +500,12 @@ async def update_table(table_id: int, update: TableUpdate):
         
         xml_meta = {}
         if update.display_name: xml_meta["display_name"] = update.display_name
-        if update.manufacturer: xml_meta["manufacturer"] = update.manufacturer
+        if update.manufacturer: 
+            xml_meta["manufacturer"] = update.manufacturer
+            xml_meta["publisher"] = update.manufacturer
+            xml_meta["genre"] = update.manufacturer
         if update.year: xml_meta["year"] = str(update.year)
+        if update.players: xml_meta["players"] = str(update.players)
         
         # Map stars (0-5) to ES-DE rating (0.0-1.0)
         if update.rating is not None:

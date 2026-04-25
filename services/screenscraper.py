@@ -340,7 +340,11 @@ def _parse_game_result(game: dict) -> dict:
     metadata["developer"] = game.get("developpeur", {}).get("text", "") if isinstance(game.get("developpeur"), dict) else ""
     metadata["publisher"] = game.get("editeur", {}).get("text", "") if isinstance(game.get("editeur"), dict) else ""
     metadata["genre"] = game.get("genres", [{}])[0].get("text", "") if (isinstance(game.get("genres"), list) and game["genres"] and isinstance(game["genres"][0], dict)) else ""
-    metadata["players"] = str(game.get("joueurs", "1"))
+    players_raw = game.get("joueurs", "1")
+    if isinstance(players_raw, dict):
+        metadata["players"] = str(players_raw.get("text", "1"))
+    else:
+        metadata["players"] = str(players_raw)
 
     return {
         "game_id": game.get("id", ""),

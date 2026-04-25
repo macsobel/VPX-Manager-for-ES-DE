@@ -87,9 +87,12 @@ class GamelistManager:
         TAG_MAP = {
             "display_name": "name",
             "manufacturer": "developer",
+            "publisher": "publisher",
+            "genre": "genre",
             "year": "releasedate",
             "rating": "rating",
-            "desc": "desc"
+            "desc": "desc",
+            "players": "players"
         }
         
         logger.info(f"Setting metadata for {element.tag}: {metadata}")

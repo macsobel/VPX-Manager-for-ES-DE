@@ -182,9 +182,14 @@ async def scan_tables_directory() -> dict:
                     if len(parts) > 1:
                         meta_str = parts[-1].rstrip(")")
                         tokens = meta_str.split()
+                        m_parts = []
                         for t in tokens:
-                            if t.isdigit() and len(t) == 4: year = t
-                            elif not t.isdigit(): manufacturer = t if not manufacturer else manufacturer
+                            if t.isdigit() and len(t) == 4:
+                                year = t
+                            else:
+                                m_parts.append(t)
+                        if m_parts:
+                            manufacturer = " ".join(m_parts)
 
                     table_id = existing_info[0] if existing_info else None
                     table_data = {

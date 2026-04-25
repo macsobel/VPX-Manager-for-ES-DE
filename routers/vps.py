@@ -17,6 +17,7 @@ class MatchRequest(BaseModel):
     year: str = ""
     table_type: str = ""
     ipdb_id: str = ""
+    players: str = "1"
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from services.task_registry import task_registry
@@ -84,6 +85,8 @@ async def match_table(table_id: int, match: MatchRequest):
         update_data["table_type"] = match.table_type
     if match.ipdb_id:
         update_data["ipdb_id"] = match.ipdb_id
+    if match.players:
+        update_data["players"] = match.players
 
     await db.upsert_table(update_data)
     

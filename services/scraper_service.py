@@ -205,9 +205,23 @@ async def trigger_media_download(table_id: int, vps_id: Optional[str], table_nam
         table_folder = game_stem
         rom_rel_path = f"./{table_folder}/{filename}"
         
-        # Add basic info that screenscraper xml_metadata might lack
         if "name" not in xml_updates:
             xml_updates["name"] = table_name
+
+        # If manufacturer is available, ensure it's mapped to genre and publisher for theme compatibility
+        manufacturer = table_data.get("manufacturer")
+        if manufacturer:
+            if not xml_updates.get("developer") or xml_updates.get("developer") == "Unknown":
+                xml_updates["developer"] = manufacturer
+            if not xml_updates.get("publisher") or xml_updates.get("publisher") == "Unknown":
+                xml_updates["publisher"] = manufacturer
+            if not xml_updates.get("genre") or xml_updates.get("genre") == "Unknown":
+                xml_updates["genre"] = manufacturer
+
+        # Prioritize DB/VPS players count
+        db_players = table_data.get("players")
+        if db_players:
+            xml_updates["players"] = str(db_players)
 
         logger.info(f"Scraper service updating gamelist for {rom_rel_path} with keys: {list(xml_updates.keys())}")
         gm.update_game(rom_rel_path, xml_updates)

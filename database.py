@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS tables (
     ss_id TEXT DEFAULT '',
     has_manual INTEGER DEFAULT 0,
     mtime INTEGER DEFAULT 0,
+    players TEXT DEFAULT '1',
     UNIQUE(filename)
 );
 
@@ -146,6 +147,8 @@ async def init_db():
             await db.execute("ALTER TABLE tables ADD COLUMN has_altsound INTEGER DEFAULT 0")
         if "has_music" not in columns:
             await db.execute("ALTER TABLE tables ADD COLUMN has_music INTEGER DEFAULT 0")
+        if "players" not in columns:
+            await db.execute("ALTER TABLE tables ADD COLUMN players TEXT DEFAULT '1'")
             
         # Migration: Relativize paths for portability
         await db.execute("UPDATE tables SET folder_path = '~/ROMs/vpinball/' || SUBSTR(folder_path, INSTR(folder_path, '/ROMs/vpinball/') + 15) WHERE folder_path LIKE '%/ROMs/vpinball/%' AND folder_path NOT LIKE '~/%%'")

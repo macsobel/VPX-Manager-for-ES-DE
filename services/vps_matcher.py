@@ -186,6 +186,7 @@ class VPSMatcher:
                 and (t.get("urls") or [])
                 and not (t.get("urls") or [{}])[0].get("broken", False)
             ],
+            "players": str(entry.get("players", "1")),
             "score": round(score, 3),
         }
 
