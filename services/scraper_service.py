@@ -1,0 +1,205 @@
+import logging
+from typing import Optional
+from pathlib import Path
+import httpx
+import asyncio
+
+from config import load_config
+from services.vpinmediadb import check_availability as vpmdb_check
+from services.screenscraper import search_game as ss_search, test_credentials
+from services.media_processor import rotate_image_if_needed, normalize_video
+from services.gamelist_manager import GamelistManager
+
+logger = logging.getLogger(__name__)
+
+# Fallback dictionaries based on user-specified preference hierarchy.
+# The first entry that resolves wins — no further entries are tried.
+FALLBACKS = {
+    "covers": [
+        {"source": "vpinmediadb",  "key": "wheel.png"},          # 1. vpinmediadb wheel
+        {"source": "screenscraper", "key": "wheel-tarcisios"},    # 2. Tarcisio's Wheel
+        {"source": "screenscraper", "key": "wheel"},              # 3. Regular Wheel
+    ],
+    "fanart": [
+        {"source": "vpinmediadb",  "key": "1k/bg.png"},           # 1. 1k backglass
+        {"source": "vpinmediadb",  "key": "4k/table.png"},        # 2. 4k table shot
+        {"source": "vpinmediadb",  "key": "1k/table.png"},        # 3. 1k table shot
+    ],
+    "manuals": [
+        {"source": "screenscraper", "key": "manuel"},             # 1. SS manual (PDF)
+    ],
+    "marquees": [
+        {"source": "screenscraper", "key": "wheel"},              # 1. SS Wheel
+        {"source": "vpinmediadb",  "key": "wheel.png"},          # 2. vpinmediadb wheel
+    ],
+    "screenshots": [
+        {"source": "vpinmediadb",  "key": "1k/table.png"},        # 1. 1k table shot
+        {"source": "vpinmediadb",  "key": "4k/table.png"},        # 2. 4k table shot
+        {"source": "screenscraper", "key": "ss"},                 # 3. SS screenshot
+    ],
+    "videos": [
+        {"source": "vpinmediadb",  "key": "1k/video.mp4"},        # 1. vpinmediadb 1k video
+        {"source": "screenscraper", "key": "videotable"},         # 2. SS Table Video (FullHD)
+        {"source": "screenscraper", "key": "video-normalized"},  # 3. SS Standardized Video
+    ]
+}
+
+ESDE_TAG_MAP = {
+    "covers": "image",
+    "screenshots": "thumbnail",
+    "fanart": "fanart",
+    "marquees": "marquee",
+    "videos": "video",
+    "manuals": "manual"
+}
+
+async def trigger_media_download(table_id: int, vps_id: Optional[str], table_name: str, filename: str, missing_only: bool = False) -> dict:
+    cfg = load_config()
+    esde_base = Path(cfg.esde_media_base)
+    gm = GamelistManager(str(cfg.get_gamelist_xml_path()))
+    stem = Path(filename).stem
+    
+    # Check current status if we are in missing_only mode
+    existing_types = []
+    if missing_only:
+        from services.media_manager import get_esde_media_status
+        status = await get_esde_media_status(table_id)
+        existing_types = status.get("existing_types", [])
+
+    downloaded = []
+    errors = []
+    
+    # 1. Fetch from VPinMediaDB
+    vpmdb_urls = {}
+    if vps_id:
+        vpmdb_urls = await vpmdb_check(vps_id)
+        
+    # 2. Fetch from ScreenScraper API (Check auth first to elegantly skip)
+    ss_media = {}
+    ss_metadata = {}
+    auth_check = await test_credentials()
+    if auth_check.get("success"):
+        ss_result = await ss_search(table_name, filename)
+        if ss_result.get("success"):
+            ss_media = ss_result.get("available_media", {})
+            ss_metadata = ss_result.get("xml_metadata", {})
+            # Save ID
+            if ss_result.get("ss_id"):
+                import database as db
+                await db.upsert_table({"id": table_id, "ss_id": ss_result["ss_id"]})
+    else:
+        logger.info(f"Skipping ScreenScraper due to credential failure: {auth_check.get('message')}")
+        
+    # 3. Determine best download per category
+    targets = {} # "covers" -> {"url": "", "format": ".png"}
+    # Use FALLBACKS from config, fallback to default FALLBACKS if missing
+    fallbacks = getattr(cfg, 'media_preferences', FALLBACKS)
+    if not fallbacks:
+        fallbacks = FALLBACKS
+
+    for category, fallback_list in fallbacks.items():
+        for req in fallback_list:
+            source = req["source"]
+            key = req["key"]
+            if source == "vpinmediadb" and key in vpmdb_urls:
+                ext = Path(key).suffix or ".png"
+                targets[category] = {"url": vpmdb_urls[key], "ext": ext}
+                break
+            elif source == "screenscraper" and key in ss_media:
+                media_info = ss_media[key]
+                ext = f".{media_info['format']}" if media_info.get("format") else ".png"
+                targets[category] = {"url": media_info["url"], "ext": ext}
+                break
+
+    # 4. Download and process
+    xml_updates = ss_metadata.copy() # includes description/synopsis
+    
+    # Get table info for path generation
+    import database as db
+    table_data = await db.get_table(table_id)
+    if not table_data:
+        return {"success": False, "error": "Table not found in database"}
+        
+    game_stem = Path(table_data["filename"]).stem
+    folder_name = Path(table_data["folder_path"]).name
+    
+    from services.media_manager import save_media_dual
+
+    async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+        for category, info in targets.items():
+            if missing_only and category in existing_types:
+                logger.info(f"Skipping category {category} as it already exists and missing_only is true")
+                continue
+
+            if cfg.media_storage_mode == "portable":
+                media_base = Path(table_data["folder_path"]) / "media"
+            else:
+                media_base = esde_base
+
+            # Use a safe temporary path within the app's support directory
+            temp_dir = Path(cfg.support_dir) / "temp"
+            temp_dir.mkdir(exist_ok=True)
+            temp_path = temp_dir / f"dl_{game_stem}_{category}{info['ext']}"
+            
+            try:
+                resp = await client.get(info["url"])
+                if resp.status_code == 200:
+                    with open(temp_path, "wb") as f:
+                        f.write(resp.content)
+                        
+                    # Rotate if needed — only fanart and screenshots need rotation.
+                    if category in ["fanart", "screenshots"]:
+                        await asyncio.to_thread(rotate_image_if_needed, str(temp_path))
+                    
+                    # Normalize video
+                    if category == "videos":
+                        await asyncio.to_thread(normalize_video, str(temp_path))
+                    
+                    # Apply dual-path saving
+                    final_paths = await save_media_dual(
+                        media_base=media_base,
+                        media_type=category,
+                        folder_name=folder_name,
+                        game_stem=game_stem,
+                        ext=info["ext"],
+                        source_path=temp_path
+                    )
+                        
+                    downloaded.append({"type": category, "path": str(final_paths[1])})
+                    
+                    # Path for XML: always use the nested/game path
+                    if cfg.media_storage_mode == "portable":
+                        rel_path = f"./media/{category}/{folder_name}/{game_stem}{info['ext']}"
+                    else:
+                        rel_path = str(final_paths[1]).replace("\\", "/")
+                        
+                    tag = ESDE_TAG_MAP.get(category)
+                    if tag:
+                        xml_updates[tag] = rel_path
+                else:
+                    errors.append(f"Failed to download {category} via {info['url']}: HTTP {resp.status_code}")
+            except Exception as e:
+                errors.append(f"Error downloading {category}: {e}")
+            await asyncio.sleep(0.5)
+            
+    # 5. Update gamelist.xml (Duplicating for both file and folder)
+    if xml_updates:
+        # Build nested relative path: ./FolderName/table.vpx
+        # This ensures ES-DE correctly maps the game and the GamelistManager syncs the folder entry.
+        # Use filename as is if it already contains the folder (not usual for DB 'filename'), 
+        # but ES-DE default is stem-as-folder.
+        table_folder = game_stem
+        rom_rel_path = f"./{table_folder}/{filename}"
+        
+        # Add basic info that screenscraper xml_metadata might lack
+        if "name" not in xml_updates:
+            xml_updates["name"] = table_name
+
+        logger.info(f"Scraper service updating gamelist for {rom_rel_path} with keys: {list(xml_updates.keys())}")
+        gm.update_game(rom_rel_path, xml_updates)
+        
+    return {
+        "success": True,
+        "downloaded": downloaded,
+        "errors": errors
+    }

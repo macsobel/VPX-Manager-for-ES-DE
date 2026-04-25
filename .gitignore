@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+venv/
+.env
+
+# Build/Dist
+build/
+dist/
+*.spec
+
+# Application Specific
+*.pkl
+*.dat
+config.dat
+server.log
+database.db
+vpxmanager.db
+vpx_manager.db
+
+# macOS
+.DS_Store
+
+# Artifacts
+artifacts/
+brain/
+
+# Research
+_research/
+tests/*.vpx

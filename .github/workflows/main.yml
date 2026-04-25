@@ -1,0 +1,62 @@
+name: Build macOS App
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        
+    - name: Generate Obfuscated Config
+      env:
+        SS_DEV_ID: ${{ secrets.SS_DEV_ID }}
+        SS_DEVPASS: ${{ secrets.SS_DEVPASS }}
+      run: |
+        python3 build_utils.py
+        
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --clean VPX_Manager.spec
+        
+    - name: Zip App Bundle
+      run: |
+        cd dist
+        zip -r "VPX_Manager_for_ES-DE_macOS.zip" "VPX Manager for ES-DE.app"
+        
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VPX_Manager_macOS
+        path: dist/VPX_Manager_for_ES-DE_macOS.zip
+        
+    - name: Create Release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/VPX_Manager_for_ES-DE_macOS.zip
+        tag_name: v${{ github.run_number }}
+        name: Release v${{ github.run_number }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
