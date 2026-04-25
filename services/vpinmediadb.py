@@ -15,6 +15,8 @@ SOURCES_TO_CHECK = [
     "4k/table.png",     # Fanart / Screenshots
     "1k/bg.png",        # Fanart
     "1k/video.mp4",     # Videos
+    "1k/table.mp4",     # Videos (Alternative)
+    "4k/table.mp4",     # Videos (4K)
 ]
 
 async def check_availability(vps_id: str) -> dict:

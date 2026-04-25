@@ -25,6 +25,7 @@ class TableUpdate(BaseModel):
     table_type: Optional[str] = None
     rating: Optional[int] = None
     notes: Optional[str] = None
+    ss_id: Optional[str] = None
 
 class IgnoreRequest(BaseModel):
     version: str

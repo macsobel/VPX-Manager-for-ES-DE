@@ -75,4 +75,34 @@ const Modal = {
             };
         });
     },
+
+    prompt(title, message, defaultValue, onConfirm) {
+        this.show(`
+            <h3 class="modal-title">${title}</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; margin-bottom: var(--space-md);">${message}</p>
+            <input type="text" id="modal-prompt-input" class="input-field" value="${defaultValue || ''}" style="width: 100%; margin-bottom: var(--space-lg);" autofocus placeholder="Enter value...">
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
+                <button class="btn btn-primary" id="modal-prompt-confirm">Submit</button>
+            </div>
+        `);
+        
+        const input = document.getElementById('modal-prompt-input');
+        // Small delay to ensure DOM is ready for focus
+        setTimeout(() => {
+            input.focus();
+            if (defaultValue) input.select();
+        }, 50);
+        
+        const handleConfirm = () => {
+            const val = input.value;
+            onConfirm(val);
+            this.hide();
+        };
+
+        document.getElementById('modal-prompt-confirm').onclick = handleConfirm;
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') handleConfirm();
+        };
+    },
 };

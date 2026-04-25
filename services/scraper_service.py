@@ -38,9 +38,11 @@ FALLBACKS = {
         {"source": "screenscraper", "key": "ss"},                 # 3. SS screenshot
     ],
     "videos": [
-        {"source": "vpinmediadb",  "key": "1k/video.mp4"},        # 1. vpinmediadb 1k video
-        {"source": "screenscraper", "key": "videotable"},         # 2. SS Table Video (FullHD)
-        {"source": "screenscraper", "key": "video-normalized"},  # 3. SS Standardized Video
+        {"source": "vpinmediadb",  "key": "1k/table.mp4"},        # 1. vpinmediadb 1k table video
+        {"source": "vpinmediadb",  "key": "4k/table.mp4"},        # 2. vpinmediadb 4k table video
+        {"source": "vpinmediadb",  "key": "1k/video.mp4"},        # 3. vpinmediadb legacy video
+        {"source": "screenscraper", "key": "videotable"},         # 4. SS Table Video (FullHD)
+        {"source": "screenscraper", "key": "video-normalized"},  # 5. SS Standardized Video
     ]
 }
 

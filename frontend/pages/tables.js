@@ -376,7 +376,7 @@ const TablesPage = {
         content.innerHTML = `
             <div class="table-cards-grid">
                 ${this.state.tables.map((t, i) => `
-                    <div class="table-card" data-id="${t.id}" style="animation-delay: ${i * 30}ms; ${t.has_fanart ? `background-image: url('/api/media/${t.id}/serve/fanart');` : ''}">
+                    <div class="table-card" data-id="${t.id}" style="animation-delay: ${i * 30}ms; ${t.has_fanart ? `background-image: url('/api/media/${t.id}/serve/fanart?t=${Date.now()}');` : ''}">
                         <div class="table-card-name">${this.escHtml(t.display_name)}</div>
                         <div class="table-card-meta">
                             ${t.manufacturer ? `<span>${t.manufacturer}</span>` : ''}
@@ -1697,8 +1697,8 @@ const TablesPage = {
 
         try {
             const [resTable, resMedia] = await Promise.all([
-                fetch(`/api/tables/${tableId}`),
-                fetch(`/api/media/${tableId}`)
+                fetch(`/api/tables/${tableId}?t=${Date.now()}`),
+                fetch(`/api/media/${tableId}?t=${Date.now()}`)
             ]);
             
             const tableData = await resTable.json();
@@ -1716,10 +1716,13 @@ const TablesPage = {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
                         Scrape Media
                     </button>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
                         ${tableData.vps_id ? `<a href="https://virtualpinballspreadsheet.github.io/?game=${tableData.vps_id}&f=vpx" target="_blank" class="btn btn-secondary btn-sm">VPS</a>` : ''}
                         ${tableData.vps_id ? `<a href="https://github.com/superhac/vpinmediadb/tree/main/${tableData.vps_id}" target="_blank" class="btn btn-secondary btn-sm">VPinMediaDB</a>` : ''}
-                        ${tableData.ss_id ? `<a href="https://www.screenscraper.fr/gameinfos.php?platid=198&gameid=${tableData.ss_id}" target="_blank" class="btn btn-secondary btn-sm">ScreenScraper</a>` : ''}
+                        ${tableData.ss_id ? 
+                            `<a href="https://www.screenscraper.fr/gameinfos.php?platid=198&gameid=${tableData.ss_id}" target="_blank" class="btn btn-secondary btn-sm">ScreenScraper</a>` : 
+                            `<button class="btn btn-secondary btn-sm" id="btn-match-ss" style="border-style: dashed; opacity: 0.8;">Match ScreenScraper</button>`
+                        }
                     </div>
             `;
 
@@ -1806,6 +1809,30 @@ const TablesPage = {
             document.getElementById('btn-scrape-single').onclick = () => {
                 this.handleScrapeClick(tableId, tableData);
             };
+
+            const matchBtn = document.getElementById('btn-match-ss');
+            if (matchBtn) {
+                matchBtn.onclick = () => {
+                    Modal.prompt('Match ScreenScraper', 'Enter the ScreenScraper ID for this table (e.g. 189181):', '', async (val) => {
+                        if (!val) return;
+                        try {
+                            const res = await fetch(`/api/tables/${tableId}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ ss_id: val.trim() })
+                            });
+                            if (res.ok) {
+                                Toast.success('ScreenScraper ID updated');
+                                // Force a background reload of the main list too
+                                this.loadTables(false);
+                                this.showMediaDetail(tableId);
+                            }
+                        } catch (e) {
+                            Toast.error('Failed to update ID: ' + e.message);
+                        }
+                    });
+                };
+            }
             
             body.querySelectorAll('.media-preview-container').forEach(c => {
                 const overlay = c.querySelector('.media-preview-overlay');

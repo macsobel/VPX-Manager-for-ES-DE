@@ -1178,7 +1178,9 @@ select.input-field option {
     background-position: center;
     background-repeat: no-repeat;
     overflow: hidden;
-    /* Prevent sub-pixel movement during transitions */
+    /* Ensure the background and pseudo-elements are perfectly clipped */
+    background-clip: padding-box;
+    isolation: isolate;
     backface-visibility: hidden;
     transform: translateZ(0);
 }
@@ -1189,6 +1191,7 @@ select.input-field option {
     inset: 0;
     background: linear-gradient(to top, rgba(15, 23, 42, 0.95) 20%, rgba(15, 23, 42, 0.4) 100%);
     z-index: 1;
+    border-radius: inherit;
 }
 
 .table-card > * {
