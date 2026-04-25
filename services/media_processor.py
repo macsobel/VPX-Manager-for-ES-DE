@@ -46,6 +46,28 @@ def rotate_image_if_needed(file_path: str):
     """
     pass
 
+def process_downloaded_image(file_path: str, source: str, key: str):
+    """
+    Apply user-specific rotation rules to downloaded media:
+    1. VPinMediaDB "table.png" -> always rotate right 90 degrees.
+    2. ScreenScraper "Table Screenshot" -> rotate right 90 degrees IF wider than height.
+    """
+    try:
+        if source == "vpinmediadb" and key in ("1k/table.png", "4k/table.png", "table.png"):
+            logger.info(f"Applying VPinMediaDB table.png rotation rule to {file_path}")
+            rotate_image(file_path, 90)
+            return
+
+        if source == "screenscraper" and key in ("ss", "sstitle"):
+            from PIL import Image
+            with Image.open(file_path) as img:
+                width, height = img.size
+            if width > height:
+                logger.info(f"Applying ScreenScraper landscape screenshot rotation rule to {file_path}")
+                rotate_image(file_path, 90)
+    except Exception as e:
+        logger.error(f"Error processing downloaded image {file_path}: {e}")
+
 def normalize_video(file_path: str):
     """
     Ensure video is in a browser-compatible format (H.264 / yuv420p).

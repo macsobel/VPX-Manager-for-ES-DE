@@ -445,6 +445,12 @@ async def download_media_for_table(
                 if resp.status_code == 200 and len(resp.content) > 100:
                     with open(temp_path, "wb") as f:
                         f.write(resp.content)
+                        
+                    # Apply specific user rotation rules
+                    if rel_folder in ["fanart", "screenshots", "playfield", "marquees", "covers"]:
+                        from services.media_processor import process_downloaded_image
+                        import asyncio
+                        await asyncio.to_thread(process_downloaded_image, str(temp_path), "screenscraper", key)
                     
                     # Apply dual-path saving
                     final_paths = await save_media_dual(

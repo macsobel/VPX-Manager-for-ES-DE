@@ -112,14 +112,14 @@ async def trigger_media_download(table_id: int, vps_id: Optional[str], table_nam
             logger.debug(f"  Checking source: {source}, key: {key}")
             if source == "vpinmediadb" and key in vpmdb_urls:
                 ext = Path(key).suffix or ".png"
-                targets[category] = {"url": vpmdb_urls[key], "ext": ext}
+                targets[category] = {"url": vpmdb_urls[key], "ext": ext, "source": source, "key": key}
                 logger.info(f"  MATCH FOUND (VPinMediaDB): {key} -> {vpmdb_urls[key]}")
                 break
             elif source == "screenscraper" and key in ss_media:
                 media_info = ss_media[key]
                 logger.debug(f"    SS Match Candidate: {key} -> {media_info}")
                 ext = f".{media_info['format']}" if media_info.get("format") else ".png"
-                targets[category] = {"url": media_info["url"], "ext": ext}
+                targets[category] = {"url": media_info["url"], "ext": ext, "source": source, "key": key}
                 logger.info(f"  MATCH FOUND (ScreenScraper): {key} -> {media_info['url']}")
                 break
         if category not in targets:
@@ -161,9 +161,10 @@ async def trigger_media_download(table_id: int, vps_id: Optional[str], table_nam
                     with open(temp_path, "wb") as f:
                         f.write(resp.content)
                         
-                    # Rotate if needed — only fanart and screenshots need rotation.
-                    if category in ["fanart", "screenshots"]:
-                        await asyncio.to_thread(rotate_image_if_needed, str(temp_path))
+                    # Apply specific user rotation rules
+                    if category in ["fanart", "screenshots", "playfield", "marquees", "covers"]: # Broaden categories just in case, logic handles specifics
+                        from services.media_processor import process_downloaded_image
+                        await asyncio.to_thread(process_downloaded_image, str(temp_path), info["source"], info["key"])
                     
                     # Normalize video
                     if category == "videos":
