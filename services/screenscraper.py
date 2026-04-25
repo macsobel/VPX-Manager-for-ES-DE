@@ -183,23 +183,37 @@ async def test_credentials() -> dict:
         return {"success": False, "message": f"Connection error: {str(e)}"}
 
 
-async def search_game(game_name: str, filename: str = "") -> dict:
+async def search_game(game_name: str, filename: str = "", ss_id: Optional[str] = None) -> dict:
     """
     Search ScreenScraper for a Visual Pinball game.
-    Tries exact ROM name search first, then falls back to text search.
+    Tries gameid search first, then exact ROM name, then falls back to text search.
     Returns matched game info with available media.
     """
     params = _get_auth_params()
     params["systemeid"] = str(SYSTEM_ID_VPINBALL)
 
     clean_name = _clean_game_name(game_name)
-    logger.info(f"ScreenScraper search: '{game_name}' → cleaned: '{clean_name}'")
+    logger.info(f"ScreenScraper search: '{game_name}' (ss_id: {ss_id}) → cleaned: '{clean_name}'")
 
     result = None
 
     async with httpx.AsyncClient(timeout=30.0) as client:
+        # Strategy 0: jeuInfos with gameid (Direct match)
+        if ss_id:
+            try:
+                search_params = {**params, "gameid": ss_id}
+                resp = await client.get(f"{API_BASE}/jeuInfos.php", params=search_params)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    game = data.get("response", {}).get("jeu", {})
+                    if game and game.get("id"):
+                        result = _parse_game_result(game)
+                        logger.info(f"ScreenScraper matched by gameid: {ss_id}")
+            except Exception as e:
+                logger.debug(f"Game ID search failed: {e}")
+
         # Strategy 1: jeuInfos with romnom (exact match)
-        if filename:
+        if not result and filename:
             try:
                 search_params = {**params, "romnom": filename}
                 resp = await client.get(f"{API_BASE}/jeuInfos.php", params=search_params)
@@ -283,6 +297,8 @@ def _parse_game_result(game: dict) -> dict:
                     "folder": folder_tuple[0],
                     "suffix": folder_tuple[1],
                 }
+    
+    logger.info(f"ScreenScraper available media types for '{game_name}': {list(available_media.keys())}")
 
     # Extract metadata for gamelist.xml
     metadata = {}
@@ -291,20 +307,35 @@ def _parse_game_result(game: dict) -> dict:
     desc = ""
     for region in REGION_PRIORITY:
         for s in synopses:
-            if s.get("region", "").lower() == region:
+            if isinstance(s, dict) and s.get("region", "").lower() == region:
                 desc = s.get("text", "")
                 break
         if desc: break
     if desc: 
         metadata["desc"] = desc
-        logger.debug(f"Extracted description for '{game_name}': {desc[:50]}...")
 
-    metadata["rating"] = str(round(float(game.get("note", "0")) / 20.0, 1)) if game.get("note") else "0"
-    metadata["releasedate"] = game.get("dates", [{}])[0].get("text", "")[:4] if game.get("dates") else ""
-    metadata["developer"] = game.get("developpeur", {}).get("text", "")
-    metadata["publisher"] = game.get("editeur", {}).get("text", "")
-    metadata["genre"] = game.get("genres", [{}])[0].get("text", "") if game.get("genres") else ""
-    metadata["players"] = game.get("joueurs", "1")
+    # Robustly handle rating (note)
+    note = game.get("note", "0")
+    if isinstance(note, dict):
+        note = note.get("text", "0")
+    try:
+        metadata["rating"] = str(round(float(note) / 20.0, 1))
+    except (ValueError, TypeError):
+        metadata["rating"] = "0"
+
+    # Robustly handle releasedate
+    dates = game.get("dates", [])
+    rel_date = ""
+    if dates and isinstance(dates, list):
+        first_date = dates[0]
+        if isinstance(first_date, dict):
+            rel_date = first_date.get("text", "")[:4]
+    metadata["releasedate"] = rel_date
+
+    metadata["developer"] = game.get("developpeur", {}).get("text", "") if isinstance(game.get("developpeur"), dict) else ""
+    metadata["publisher"] = game.get("editeur", {}).get("text", "") if isinstance(game.get("editeur"), dict) else ""
+    metadata["genre"] = game.get("genres", [{}])[0].get("text", "") if (isinstance(game.get("genres"), list) and game["genres"] and isinstance(game["genres"][0], dict)) else ""
+    metadata["players"] = str(game.get("joueurs", "1"))
 
     return {
         "game_id": game.get("id", ""),

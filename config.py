@@ -163,6 +163,8 @@ class AppConfig(BaseModel):
             {"source": "screenscraper", "key": "ss"},
         ],
         "videos": [
+            {"source": "vpinmediadb",  "key": "1k/table.mp4"},
+            {"source": "vpinmediadb",  "key": "4k/table.mp4"},
             {"source": "vpinmediadb",  "key": "1k/video.mp4"},
             {"source": "screenscraper", "key": "videotable"},
             {"source": "screenscraper", "key": "video-normalized"},

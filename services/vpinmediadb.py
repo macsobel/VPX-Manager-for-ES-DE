@@ -30,13 +30,16 @@ async def check_availability(vps_id: str) -> dict:
     available = {}
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
         # Perform HEAD requests for each source to check availability.
-        # Github Raw respects HEAD requests
         for source in SOURCES_TO_CHECK:
             url = f"{REPO_RAW_BASE}/{vps_id}/{source}"
             try:
                 resp = await client.head(url)
+                logger.debug(f"vpinmediadb check: {url} -> {resp.status_code}")
                 if resp.status_code == 200:
                     available[source] = url
+                    # Aliasing: map variants to standard keys for backward compatibility with user configs
+                    if source in ("1k/table.mp4", "4k/table.mp4"):
+                        available["1k/video.mp4"] = url
             except Exception as e:
                 logger.debug(f"vpinmediadb: {source} check failed: {e}")
                 

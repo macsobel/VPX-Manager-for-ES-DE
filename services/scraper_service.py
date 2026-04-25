@@ -81,7 +81,12 @@ async def trigger_media_download(table_id: int, vps_id: Optional[str], table_nam
     ss_metadata = {}
     auth_check = await test_credentials()
     if auth_check.get("success"):
-        ss_result = await ss_search(table_name, filename)
+        # Fetch current table data again to get the ss_id if it was recently matched
+        import database as db
+        current_table = await db.get_table(table_id)
+        ss_id_to_use = current_table.get("ss_id") if current_table else None
+        
+        ss_result = await ss_search(table_name, filename, ss_id=ss_id_to_use)
         if ss_result.get("success"):
             ss_media = ss_result.get("available_media", {})
             ss_metadata = ss_result.get("xml_metadata", {})
@@ -100,18 +105,25 @@ async def trigger_media_download(table_id: int, vps_id: Optional[str], table_nam
         fallbacks = FALLBACKS
 
     for category, fallback_list in fallbacks.items():
+        logger.info(f"Processing category: {category}")
         for req in fallback_list:
             source = req["source"]
             key = req["key"]
+            logger.debug(f"  Checking source: {source}, key: {key}")
             if source == "vpinmediadb" and key in vpmdb_urls:
                 ext = Path(key).suffix or ".png"
                 targets[category] = {"url": vpmdb_urls[key], "ext": ext}
+                logger.info(f"  MATCH FOUND (VPinMediaDB): {key} -> {vpmdb_urls[key]}")
                 break
             elif source == "screenscraper" and key in ss_media:
                 media_info = ss_media[key]
+                logger.debug(f"    SS Match Candidate: {key} -> {media_info}")
                 ext = f".{media_info['format']}" if media_info.get("format") else ".png"
                 targets[category] = {"url": media_info["url"], "ext": ext}
+                logger.info(f"  MATCH FOUND (ScreenScraper): {key} -> {media_info['url']}")
                 break
+        if category not in targets:
+            logger.warning(f"  NO MATCH FOUND for category: {category}")
 
     # 4. Download and process
     xml_updates = ss_metadata.copy() # includes description/synopsis
