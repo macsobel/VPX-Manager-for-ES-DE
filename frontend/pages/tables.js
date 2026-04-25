@@ -730,7 +730,10 @@ const TablesPage = {
             body.innerHTML = `
                 <div style="margin-bottom: var(--space-md);">
                     <div class="input-label">Rating</div>
-                    <div id="rating-stars" class="rating-stars" style="font-size: 1.5rem; cursor: pointer; display: flex; gap: 4px;">
+                    <div id="rating-stars" class="rating-stars" style="font-size: 1.5rem; cursor: pointer; display: flex; gap: 4px; align-items: center;">
+                        <span data-rating="0" title="No Rating" style="color: ${(t.rating || 0) === 0 ? 'var(--accent-red)' : 'var(--text-muted)'}; margin-right: 8px; font-size: 1.2rem; display: flex; align-items: center;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                        </span>
                         ${[1, 2, 3, 4, 5].map(n => `<span data-rating="${n}" style="color: ${n <= (t.rating || 0) ? 'var(--accent-amber)' : 'var(--text-muted)'}">★</span>`).join('')}
                     </div>
                 </div>
@@ -849,8 +852,18 @@ const TablesPage = {
                 star.onclick = () => {
                     currentRating = parseInt(star.dataset.rating);
                     document.querySelectorAll('#rating-stars span').forEach(s => {
-                        s.style.color = parseInt(s.dataset.rating) <= currentRating
-                            ? 'var(--accent-amber)' : 'var(--text-muted)';
+                        const sRating = parseInt(s.dataset.rating);
+                        if (sRating === 0) {
+                            // The "No Rating" icon
+                            s.style.color = (currentRating === 0) ? 'var(--accent-red)' : 'var(--text-muted)';
+                        } else {
+                            // The stars
+                            if (currentRating === 0) {
+                                s.style.color = 'var(--text-muted)';
+                            } else {
+                                s.style.color = sRating <= currentRating ? 'var(--accent-amber)' : 'var(--text-muted)';
+                            }
+                        }
                     });
                 };
             });

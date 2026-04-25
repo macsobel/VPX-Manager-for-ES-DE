@@ -302,15 +302,20 @@ def _parse_game_result(game: dict) -> dict:
 
     # Extract metadata for gamelist.xml
     metadata = {}
-    # Description (region priority)
+    # Description (language priority)
     synopses = game.get("synopsis", [])
     desc = ""
-    for region in REGION_PRIORITY:
+    # Try language first (en), then region-based fallback
+    LANG_PRIORITY = ["en", "wor", "us", "eu"]
+    for lang in LANG_PRIORITY:
         for s in synopses:
-            if isinstance(s, dict) and s.get("region", "").lower() == region:
+            if not isinstance(s, dict): continue
+            s_lang = s.get("langue", "").lower() or s.get("region", "").lower()
+            if s_lang == lang:
                 desc = s.get("text", "")
                 break
         if desc: break
+    
     if desc: 
         metadata["desc"] = desc
 

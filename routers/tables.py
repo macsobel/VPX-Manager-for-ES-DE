@@ -188,10 +188,11 @@ async def get_table(table_id: int):
             if game_meta.get("rating"):
                 try:
                     xml_rating_float = float(game_meta["rating"])
-                    if xml_rating_float > 0:
-                        # Map ES-DE (0.0-1.0) back to stars (0-5)
-                        table["rating"] = int(xml_rating_float * 5)
-                        logger.debug(f"Enriched rating from XML for {table_id}: {table['rating']} stars")
+                    # if xml_rating_float > 0:
+                    #     # Map ES-DE (0.0-1.0) back to stars (0-5)
+                    #     table["rating"] = int(xml_rating_float * 5)
+                    #     logger.debug(f"Enriched rating from XML for {table_id}: {table['rating']} stars")
+                    pass
                 except (ValueError, TypeError):
                     pass
             

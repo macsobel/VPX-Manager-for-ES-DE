@@ -2500,17 +2500,28 @@ select.input-field option {
 
 .pdf-viewer-container {
     flex: 1;
-    overflow: auto;
+    overflow-y: auto;
     background: #1e1e1e;
     display: flex;
-    justify-content: center;
-    padding: var(--space-lg);
+    flex-direction: column;
+    align-items: center;
+    padding: 0;
     position: relative;
+    scroll-behavior: smooth;
 }
 
-#pdf-canvas {
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+.pdf-page-wrapper {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.pdf-page-wrapper canvas {
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
     max-width: 100%;
+    height: auto !important;
 }
 
 .pdf-controls {

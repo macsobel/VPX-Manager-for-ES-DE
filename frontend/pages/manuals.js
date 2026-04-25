@@ -12,10 +12,8 @@ const ManualsPage = {
         tables: [],
         selectedTable: null,
         pdfDoc: null,
-        pageNum: 1,
-        pageRendering: false,
-        pageNumPending: null,
-        scale: 1.5,
+        isFullscreen: false,
+        zoomLevel: 1.0,
         canvas: null,
         ctx: null,
         pollingInterval: null
@@ -193,18 +191,22 @@ const ManualsPage = {
             // Already has manual: Show controls and Delete button
             if (leftActionsArea) {
                 leftActionsArea.innerHTML = `
-                    <button class="btn btn-secondary btn-sm" id="pdf-zoom-out" title="Zoom Out">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                    <button class="btn btn-secondary btn-sm" id="btn-fullscreen" title="Toggle Fullscreen">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                        </svg>
+                        Fullscreen
                     </button>
-                    <button class="btn btn-secondary btn-sm" id="pdf-zoom-in" title="Zoom In">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
-                    </button>
-                    <div style="width: 1px; height: 20px; background: var(--border-color); margin: 0 0.5rem;"></div>
-                    <button class="btn btn-secondary btn-sm" id="pdf-prev">Prev</button>
-                    <span class="page-info" style="font-size:0.85rem; min-width:60px; text-align:center;">
-                        <span id="pdf-page-num">1</span> / <span id="pdf-page-count">0</span>
-                    </span>
-                    <button class="btn btn-secondary btn-sm" id="pdf-next">Next</button>
+                    <div id="zoom-controls" style="display: none; gap: 0.5rem; margin-left: 0.5rem; align-items: center; border-left: 1px solid var(--border-color); padding-left: 0.75rem;">
+                        <button class="btn btn-secondary btn-sm" id="pdf-zoom-out" title="Zoom Out">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                        </button>
+                        <span id="zoom-percent" style="font-size: 0.8rem; min-width: 40px; text-align: center; color: var(--text-secondary);">100%</span>
+                        <button class="btn btn-secondary btn-sm" id="pdf-zoom-in" title="Zoom In">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="pdf-zoom-reset" style="padding: 2px 8px; font-size: 0.7rem;">Reset</button>
+                    </div>
                 `;
             }
             if (actionsArea) {
@@ -251,43 +253,56 @@ const ManualsPage = {
 
     renderPdfViewer(table) {
         const contentArea = document.getElementById('manual-content-area');
-        contentArea.innerHTML = '<canvas id="pdf-canvas" style="direction: ltr;"></canvas>';
+        contentArea.innerHTML = '<div class="pdf-loading-overlay"><div class="spinner"></div><span>Loading manual...</span></div>';
 
-        this.state.canvas = document.getElementById('pdf-canvas');
-        this.state.ctx = this.state.canvas.getContext('2d');
-        this.state.pageNum = 1;
+        document.getElementById('btn-fullscreen').addEventListener('click', () => this.toggleFullscreen());
+        
+        document.getElementById('pdf-zoom-in')?.addEventListener('click', () => {
+            if (this.state.zoomLevel < 1.0) {
+                this.state.zoomLevel = Math.min(1.0, this.state.zoomLevel + 0.25);
+                this.renderAllPages();
+            }
+        });
+        document.getElementById('pdf-zoom-out')?.addEventListener('click', () => {
+            this.state.zoomLevel = Math.max(0.25, this.state.zoomLevel - 0.25);
+            this.renderAllPages();
+        });
+        document.getElementById('pdf-zoom-reset')?.addEventListener('click', () => {
+            this.state.zoomLevel = 1.0;
+            this.renderAllPages();
+        });
 
-        // Remove old listeners to prevent duplicates
-        const prevBtn = document.getElementById('pdf-prev');
-        const nextBtn = document.getElementById('pdf-next');
-        const zoomInBtn = document.getElementById('pdf-zoom-in');
-        const zoomOutBtn = document.getElementById('pdf-zoom-out');
+        // Listen for fullscreen changes
+        document.addEventListener('fullscreenchange', () => {
+            const zoomControls = document.getElementById('zoom-controls');
+            if (zoomControls) {
+                zoomControls.style.display = document.fullscreenElement ? 'flex' : 'none';
+            }
+            
+            // Update button label
+            const fsBtn = document.getElementById('btn-fullscreen');
+            if (fsBtn) {
+                const isFs = !!document.fullscreenElement;
+                fsBtn.innerHTML = `
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        ${isFs 
+                            ? '<path d="M4 14h6m0 0v6m0-6L3 21M20 10h-6m0 0V4m0 4l7-7"></path>' 
+                            : '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>'}
+                    </svg>
+                    ${isFs ? 'Exit Fullscreen' : 'Fullscreen'}
+                `;
+            }
 
-        const newPrev = prevBtn.cloneNode(true);
-        const newNext = nextBtn.cloneNode(true);
-        const newZoomIn = zoomInBtn.cloneNode(true);
-        const newZoomOut = zoomOutBtn.cloneNode(true);
-        const deleteBtn = document.getElementById('btn-delete-manual');
-        const newDelete = deleteBtn.cloneNode(true);
+            this.renderAllPages();
+        });
 
-        prevBtn.parentNode.replaceChild(newPrev, prevBtn);
-        nextBtn.parentNode.replaceChild(newNext, nextBtn);
-        zoomInBtn.parentNode.replaceChild(newZoomIn, zoomInBtn);
-        zoomOutBtn.parentNode.replaceChild(newZoomOut, zoomOutBtn);
-        deleteBtn.parentNode.replaceChild(newDelete, deleteBtn);
-
-        document.getElementById('pdf-prev').addEventListener('click', () => this.onPrevPage());
-        document.getElementById('pdf-next').addEventListener('click', () => this.onNextPage());
-        document.getElementById('pdf-zoom-in').addEventListener('click', () => { this.state.scale += 0.25; this.renderPage(this.state.pageNum); });
-        document.getElementById('pdf-zoom-out').addEventListener('click', () => { this.state.scale = Math.max(0.5, this.state.scale - 0.25); this.renderPage(this.state.pageNum); });
         document.getElementById('btn-delete-manual').addEventListener('click', () => this.deleteManual(table.id));
 
         const url = `/api/media/${table.id}/manual`;
 
         pdfjsLib.getDocument(url).promise.then(pdfDoc_ => {
             this.state.pdfDoc = pdfDoc_;
-            document.getElementById('pdf-page-count').textContent = this.state.pdfDoc.numPages;
-            this.renderPage(this.state.pageNum);
+            this.renderAllPages();
         }).catch(err => {
             console.error('Error loading PDF:', err);
             contentArea.innerHTML = `
@@ -296,53 +311,81 @@ const ManualsPage = {
                     <p class="text-muted text-sm mt-2">${err.message}</p>
                 </div>
             `;
-            actionsArea.style.display = 'none';
         });
     },
 
-    renderPage(num) {
-        this.state.pageRendering = true;
-        this.state.pdfDoc.getPage(num).then(page => {
-            const viewport = page.getViewport({scale: this.state.scale});
-            this.state.canvas.height = viewport.height;
-            this.state.canvas.width = viewport.width;
+    async renderAllPages() {
+        const contentArea = document.getElementById('manual-content-area');
+        
+        // Save relative scroll position to avoid jumping to top
+        const scrollPercent = contentArea.scrollHeight > 0 ? contentArea.scrollTop / contentArea.scrollHeight : 0;
+
+        contentArea.innerHTML = ''; // Clear container
+
+        const containerWidth = contentArea.clientWidth - 40; // Spacing
+        
+        // Update zoom percentage label and button states
+        const zoomLabel = document.getElementById('zoom-percent');
+        if (zoomLabel) zoomLabel.textContent = `${Math.round(this.state.zoomLevel * 100)}%`;
+
+        const zoomInBtn = document.getElementById('pdf-zoom-in');
+        if (zoomInBtn) {
+            zoomInBtn.disabled = this.state.zoomLevel >= 1.0;
+            zoomInBtn.style.opacity = this.state.zoomLevel >= 1.0 ? '0.5' : '1';
+        }
+        
+        const zoomOutBtn = document.getElementById('pdf-zoom-out');
+        if (zoomOutBtn) {
+            zoomOutBtn.disabled = this.state.zoomLevel <= 0.25;
+            zoomOutBtn.style.opacity = this.state.zoomLevel <= 0.25 ? '0.5' : '1';
+        }
+
+        for (let i = 1; i <= this.state.pdfDoc.numPages; i++) {
+            const page = await this.state.pdfDoc.getPage(i);
+            
+            // Calculate scale to fit width, then apply zoomLevel
+            const unscaledViewport = page.getViewport({ scale: 1 });
+            const fitScale = containerWidth / unscaledViewport.width;
+            const scale = fitScale * this.state.zoomLevel;
+            const viewport = page.getViewport({ scale });
+
+            const pageWrapper = document.createElement('div');
+            pageWrapper.className = 'pdf-page-wrapper';
+            pageWrapper.style.marginBottom = '20px';
+            pageWrapper.style.display = 'flex';
+            pageWrapper.style.justifyContent = 'center';
+
+            const canvas = document.createElement('canvas');
+            canvas.style.display = 'block';
+            canvas.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.5)';
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            pageWrapper.appendChild(canvas);
+            contentArea.appendChild(pageWrapper);
 
             const renderContext = {
-                canvasContext: this.state.ctx,
+                canvasContext: canvas.getContext('2d'),
                 viewport: viewport
             };
-            const renderTask = page.render(renderContext);
+            await page.render(renderContext).promise;
+        }
 
-            renderTask.promise.then(() => {
-                this.state.pageRendering = false;
-                if (this.state.pageNumPending !== null) {
-                    this.renderPage(this.state.pageNumPending);
-                    this.state.pageNumPending = null;
-                }
-            });
-        });
-
-        document.getElementById('pdf-page-num').textContent = num;
-    },
-
-    queueRenderPage(num) {
-        if (this.state.pageRendering) {
-            this.state.pageNumPending = num;
-        } else {
-            this.renderPage(num);
+        // Restore relative scroll position
+        if (scrollPercent > 0) {
+            contentArea.scrollTop = scrollPercent * contentArea.scrollHeight;
         }
     },
 
-    onPrevPage() {
-        if (this.state.pageNum <= 1) return;
-        this.state.pageNum--;
-        this.queueRenderPage(this.state.pageNum);
-    },
-
-    onNextPage() {
-        if (this.state.pageNum >= this.state.pdfDoc.numPages) return;
-        this.state.pageNum++;
-        this.queueRenderPage(this.state.pageNum);
+    toggleFullscreen() {
+        const content = document.querySelector('.manual-content');
+        if (!document.fullscreenElement) {
+            content.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
     },
 
     deleteManual(tableId) {

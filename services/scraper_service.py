@@ -212,6 +212,15 @@ async def trigger_media_download(table_id: int, vps_id: Optional[str], table_nam
         logger.info(f"Scraper service updating gamelist for {rom_rel_path} with keys: {list(xml_updates.keys())}")
         gm.update_game(rom_rel_path, xml_updates)
         
+        # ALSO update the local database with the metadata (ONLY description/notes as requested)
+        db_updates = {}
+        if "desc" in xml_updates:
+            db_updates["notes"] = xml_updates["desc"]
+            
+        if db_updates:
+            db_updates["id"] = table_id
+            await db.upsert_table(db_updates)
+            
     return {
         "success": True,
         "downloaded": downloaded,

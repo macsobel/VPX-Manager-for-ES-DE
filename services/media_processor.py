@@ -9,31 +9,36 @@ logger = logging.getLogger(__name__)
 def rotate_image(file_path: str, angle: int):
     """
     Rotate an image by the given angle (in degrees clockwise).
-    PIL.Image.ROTATE_90 is 90 deg counter-clockwise.
-    PIL.Image.ROTATE_270 is 270 deg counter-clockwise (90 deg clockwise).
+    Uses macOS 'sips' for robustness against malformed PNG headers.
     """
     try:
-        with Image.open(file_path) as img:
-            # PIL constants:
-            # ROTATE_90 = 90 deg CCW
-            # ROTATE_180 = 180 deg
-            # ROTATE_270 = 90 deg CW
-            if angle == 90:
-                method = Image.ROTATE_270
-            elif angle == 270 or angle == -90:
-                method = Image.ROTATE_90
-            elif angle == 180:
-                method = Image.ROTATE_180
-            else:
-                logger.warning(f"Unsupported rotation angle: {angle}")
-                return
-
-            logger.info(f"Manually rotating image {file_path} by {angle} degrees")
-            rotated = img.transpose(method)
-            rotated.save(file_path)
+        abs_file_path = os.path.abspath(file_path)
+        # sips uses degrees clockwise
+        # Pillow was doing some weird mapping, but sips is direct.
+        # angle is already clockwise from frontend.
+        cmd = ["sips", "-r", str(angle), abs_file_path]
+        logger.info(f"Manually rotating image {file_path} by {angle} degrees using sips")
+        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as e:
-        logger.error(f"Error rotating image {file_path}: {e}")
-        raise e
+        logger.error(f"Error rotating image {file_path} with sips: {e}")
+        # Fallback to Pillow if sips fails (e.g. if we were on Linux, but this app is Mac-focused)
+        try:
+            from PIL import Image
+            with Image.open(file_path) as img:
+                if angle == 90:
+                    method = Image.ROTATE_270
+                elif angle == 270 or angle == -90:
+                    method = Image.ROTATE_90
+                elif angle == 180:
+                    method = Image.ROTATE_180
+                else:
+                    return
+                rotated = img.transpose(method)
+                rotated.save(file_path)
+                logger.info(f"Rotation successful via Pillow fallback")
+        except Exception as e2:
+            logger.error(f"Pillow fallback also failed: {e2}")
+            raise e2
 
 def rotate_image_if_needed(file_path: str):
     """
