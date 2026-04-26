@@ -31,6 +31,8 @@ MEDIA_TYPE_MAP = {
     "screenmarquee":      ("marquees", ""),
     "ss":                 ("screenshots", ""),
     "sstitle":            ("screenshots", ""),
+    "sstable":            ("screenshots", ""), # Table Screenshot (Pincab)
+    "ssfronton1-1":       ("screenshots", ""), # Front-End 1:1 Screenshot (Pincab)
     "fanart":             ("fanart", ""),
     "video":              ("videos", ""),
     "video-normalized":   ("videos", ""),
@@ -48,7 +50,7 @@ MEDIA_TYPE_MAP = {
 # The media types we actually want to download, in priority order
 DESIRED_MEDIA_TYPES = [
     "wheel-tarcisios", "wheel-hd", "wheel",  # marquee/wheel/covers
-    "ss",                                     # screenshot
+    "sstable", "ssfronton1-1", "ss",         # screenshots (Table first, then regular)
     "videotable", "video",                    # video (FullHD then regular)
     "video-normalized",                       # fallback video
     "box-2D",                                 # cover

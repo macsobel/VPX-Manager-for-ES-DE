@@ -63,13 +63,17 @@ def process_downloaded_image(file_path: str, source: str, key: str):
             rotate_image(file_path, 90)
             return
 
-        if source == "screenscraper" and key in ("ss", "sstitle"):
+        # ScreenScraper screenshots no longer rotated by default per user request
+        if source == "screenscraper" and key in ("sstable", "ssfronton1-1"):
             from PIL import Image
             with Image.open(file_path) as img:
                 width, height = img.size
             if width > height:
-                logger.info(f"Applying ScreenScraper landscape screenshot rotation rule to {file_path}")
+                logger.info(f"Applying ScreenScraper landscape pincab screenshot rotation rule to {file_path}")
                 rotate_image(file_path, 90)
+            return
+
+        pass
     except Exception as e:
         logger.error(f"Error processing downloaded image {file_path}: {e}")
 
@@ -128,9 +132,8 @@ def normalize_video(file_path: str):
 
 def process_downloaded_video(file_path: str, source: str, key: str):
     """
-    Lightweight video rotation using metadata injection.
-    Does NOT re-encode the video (-c copy).
-    Uses +faststart to ensure the moov atom is at the beginning, allowing browsers to stream it properly.
+    Physically rotate a video file by transcoding it.
+    Emulation Station Desktop Edition ignores rotation metadata, so we must bake the rotation into the pixels.
     """
     try:
         # Check user-specified rules for rotation
@@ -146,64 +149,64 @@ def process_downloaded_video(file_path: str, source: str, key: str):
         import imageio_ffmpeg
         ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
 
-        logger.info(f"Applying lightweight 90-degree right metadata rotation to video {file_path}")
+        logger.info(f"Applying permanent 90-degree right rotation to video {file_path}")
         abs_file_path = os.path.abspath(file_path)
         temp_path = abs_file_path + ".rot.mp4"
         cmd = [
             ffmpeg_exe, "-y", 
-            "-display_rotation", "270", # 270 CCW = 90 CW (Right)
             "-i", abs_file_path,
-            "-c", "copy",
-            "-movflags", "+faststart",
+            "-vf", "transpose=1", # 1 = 90 Clockwise (Right)
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "23",
+            "-c:a", "copy",
             temp_path
         ]
         subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         os.replace(temp_path, abs_file_path)
-        logger.info(f"Video metadata rotation successful: {file_path}")
+        logger.info(f"Video rotation transcode successful: {file_path}")
     except Exception as e:
-        logger.error(f"Error rotating video metadata {file_path}: {e}")
+        logger.error(f"Error rotating video {file_path}: {e}")
 
 def rotate_video_metadata_manual(file_path: str, angle: int):
     """
-    Manually rotate a video file using metadata injection by a specific angle.
-    Note: ffmpeg -display_rotation uses COUNTER-CLOCKWISE degrees.
-    The UI provides CLOCKWISE degrees (90, 180, 270).
+    Manually rotate a video file by transcoding it with a specific angle.
     """
     try:
         import imageio_ffmpeg
-        import re
         ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
         
         abs_file_path = os.path.abspath(file_path)
         
-        # Read current rotation using ffmpeg
-        current_angle = 0
-        cmd_meta = [ffmpeg_exe, "-i", abs_file_path]
-        try:
-            out = subprocess.run(cmd_meta, capture_output=True, text=True)
-            match = re.search(r"displaymatrix:\s*rotation\s*of\s*([\-\d\.]+)\s*degrees", out.stderr)
-            if match:
-                current_angle = int(float(match.group(1)))
-        except Exception as meta_e:
-            logger.debug(f"Could not read current rotation metadata: {meta_e}")
-
-        # Convert Clockwise input to Counter-Clockwise for ffmpeg
-        # new_angle (CCW) = (current_angle (CCW) - clockwise_delta) % 360
-        new_angle = (current_angle - angle) % 360
+        angle = angle % 360
+        vf_param = ""
+        if angle == 90:
+            vf_param = "transpose=1"
+        elif angle == 180:
+            vf_param = "transpose=1,transpose=1"
+        elif angle == 270:
+            vf_param = "transpose=2"
 
         temp_path = abs_file_path + ".rot.mp4"
         cmd = [
             ffmpeg_exe, "-y", 
-            "-display_rotation", str(new_angle),
             "-i", abs_file_path,
-            "-c", "copy",
-            "-movflags", "+faststart",
-            temp_path
         ]
+        
+        if vf_param:
+            cmd.extend(["-vf", vf_param])
+            
+        cmd.extend([
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "23",
+            "-c:a", "copy",
+            temp_path
+        ])
 
         subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         os.replace(temp_path, abs_file_path)
-        logger.info(f"Manual video metadata rotation to {new_angle} successful: {file_path}")
+        logger.info(f"Manual video rotation to {angle} degrees successful: {file_path}")
     except Exception as e:
         logger.error(f"Error manually rotating video {file_path}: {e}")
         raise
