@@ -147,6 +147,29 @@ class VPSMatcher:
         results.sort(key=lambda x: x["score"], reverse=True)
         return results[:limit]
 
+    def _extract_ipdb_id(self, entry: dict) -> str:
+        """Extract IPDB ID from entry fields (ipdbNr, ipdb_id, or ipdbUrl)."""
+        # Try direct fields first
+        ipdb_id = entry.get("ipdbNr") or entry.get("ipdb_id", "")
+        if ipdb_id:
+            return str(ipdb_id)
+
+        # Fallback to extracting from ipdbUrl
+        url = entry.get("ipdbUrl", "")
+        if url:
+            import re
+            # Match id=1234 or machine.cgi?1234 (some older variants)
+            match = re.search(r'id=(\d+)', url)
+            if match:
+                return match.group(1)
+            
+            # Fallback for URLs ending in the ID
+            match = re.search(r'/(\d+)$', url.strip('/'))
+            if match:
+                return match.group(1)
+                
+        return ""
+
     def _format_entry(self, entry: dict, score: float = 0.0) -> dict:
         """Standardize a VPS entry into the format expected by the frontend."""
         table_files = entry.get("tableFiles", [])
@@ -161,7 +184,7 @@ class VPSMatcher:
             "year": str(entry.get("year", "")),
             "theme": " • ".join(entry.get("theme") or []),
             "type": entry.get("type", ""),
-            "ipdb_id": entry.get("ipdbNr", entry.get("ipdb_id", "")),
+            "ipdb_id": self._extract_ipdb_id(entry),
             "version": latest_vpx.get("version", ""),
             "table_url": (latest_vpx.get("urls") or [{}])[0].get("url", "") if latest_vpx.get("urls") else "",
             "roms": [{"version": r.get("version"), "url": (r.get("urls") or [{}])[0].get("url", "")} for r in entry.get("romFiles", []) if r.get("version")],

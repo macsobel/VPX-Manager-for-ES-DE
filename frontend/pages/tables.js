@@ -817,7 +817,7 @@ const TablesPage = {
 
                         <div><strong>Path:</strong> ${t.folder_path}</div>
                         <div><strong>VPS ID:</strong> ${t.vps_id || 'Not matched'}</div>
-                        <div><strong>IPDB ID:</strong> ${t.ipdb_id || 'N/A'}</div>
+                        <div><strong>IPDB ID:</strong> ${t.ipdb_id ? `<a href="https://www.ipdb.org/machine.cgi?id=${t.ipdb_id}" target="_blank" rel="noopener" class="link" style="color: var(--accent-blue); text-decoration: underline;">${t.ipdb_id}</a>` : 'N/A'}</div>
                         <div><strong>Added:</strong> ${t.date_added ? new Date(t.date_added).toLocaleDateString() : 'Unknown'}</div>
                     </div>
                 </div>
