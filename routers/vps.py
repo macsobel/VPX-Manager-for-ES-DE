@@ -15,6 +15,7 @@ class MatchRequest(BaseModel):
     name: str = ""
     manufacturer: str = ""
     year: str = ""
+    theme: str = ""
     table_type: str = ""
     ipdb_id: str = ""
     players: str = "1"
@@ -81,6 +82,8 @@ async def match_table(table_id: int, match: MatchRequest):
         update_data["manufacturer"] = match.manufacturer
     if match.year:
         update_data["year"] = match.year
+    if match.theme:
+        update_data["theme"] = match.theme
     if match.table_type:
         update_data["table_type"] = match.table_type
     if match.ipdb_id:

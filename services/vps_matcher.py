@@ -159,6 +159,7 @@ class VPSMatcher:
             "name": entry.get("name", ""),
             "manufacturer": entry.get("manufacturer", ""),
             "year": str(entry.get("year", "")),
+            "theme": " • ".join(entry.get("theme") or []),
             "type": entry.get("type", ""),
             "ipdb_id": entry.get("ipdbNr", entry.get("ipdb_id", "")),
             "version": latest_vpx.get("version", ""),

@@ -211,15 +211,20 @@ async def trigger_media_download(table_id: int, vps_id: Optional[str], table_nam
         if "name" not in xml_updates:
             xml_updates["name"] = table_name
 
-        # If manufacturer is available, ensure it's mapped to genre and publisher for theme compatibility
+        # If manufacturer is available, ensure it's mapped to developer and publisher
         manufacturer = table_data.get("manufacturer")
+        theme = table_data.get("theme")
         if manufacturer:
             if not xml_updates.get("developer") or xml_updates.get("developer") == "Unknown":
                 xml_updates["developer"] = manufacturer
             if not xml_updates.get("publisher") or xml_updates.get("publisher") == "Unknown":
                 xml_updates["publisher"] = manufacturer
-            if not xml_updates.get("genre") or xml_updates.get("genre") == "Unknown":
-                xml_updates["genre"] = manufacturer
+        
+        # Use theme for genre, fallback to manufacturer if theme is empty
+        if theme:
+            xml_updates["genre"] = theme
+        elif manufacturer and (not xml_updates.get("genre") or xml_updates.get("genre") == "Unknown"):
+            xml_updates["genre"] = manufacturer
 
         # Prioritize DB/VPS players count
         db_players = table_data.get("players")

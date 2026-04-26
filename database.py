@@ -5,6 +5,7 @@ SQLite database layer using aiosqlite.
 Manages tables, media, and collections.
 """
 import aiosqlite
+import sqlite3
 import json
 import os
 from pathlib import Path
@@ -43,6 +44,7 @@ CREATE TABLE IF NOT EXISTS tables (
     folder_path TEXT DEFAULT '',
     date_added TEXT NOT NULL,
     rating INTEGER DEFAULT 0,
+    theme TEXT DEFAULT '',
     notes TEXT DEFAULT '',
     features TEXT DEFAULT '{}',
     vbs_hash TEXT DEFAULT '',
@@ -138,8 +140,15 @@ async def init_db():
             await db.execute("ALTER TABLE tables ADD COLUMN has_altsound INTEGER DEFAULT 0")
         if "has_music" not in columns:
             await db.execute("ALTER TABLE tables ADD COLUMN has_music INTEGER DEFAULT 0")
-        if "players" not in columns:
+        try:
+            await db.execute("ALTER TABLE tables ADD COLUMN theme TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass # Column already exists
+            
+        try:
             await db.execute("ALTER TABLE tables ADD COLUMN players TEXT DEFAULT '1'")
+        except sqlite3.OperationalError:
+            pass
             
         # Migration: Relativize paths for portability
         await db.execute("UPDATE tables SET folder_path = '~/ROMs/vpinball/' || SUBSTR(folder_path, INSTR(folder_path, '/ROMs/vpinball/') + 15) WHERE folder_path LIKE '%/ROMs/vpinball/%' AND folder_path NOT LIKE '~/%%'")
