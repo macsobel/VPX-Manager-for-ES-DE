@@ -347,9 +347,18 @@ async def _run_batch_scrape(tables_to_scrape: list, missing_only: bool = True):
 @router.get("/status")
 async def get_scrape_status(include_quota: bool = False):
     from services.task_registry import task_registry
+    from config import config
+    
+    # Check if user has credentials saved (literal check of config fields)
+    has_user_creds = bool(config.screenscraper_username and config.screenscraper_password)
+    
     quota = None
     if include_quota:
         quota = await get_quota_info()
+        # Ensure has_credentials is also updated in the quota object if it exists
+        if quota:
+            quota["has_credentials"] = quota.get("has_credentials", False) or has_user_creds
+
     task = task_registry.get_task("batch-scraper")
     return {
         "batch": {
@@ -360,6 +369,7 @@ async def get_scrape_status(include_quota: bool = False):
             "error_count": 0,
         },
         "quota": quota,
+        "has_credentials": has_user_creds  # Direct report
     }
 
 @router.get("/manuals-status")

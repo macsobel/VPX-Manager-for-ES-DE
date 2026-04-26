@@ -554,6 +554,12 @@ _quota_cache = {
     "timestamp": 0
 }
 
+def clear_quota_cache():
+    """Invalidate the quota cache, forcing a fresh fetch on the next request."""
+    global _quota_cache
+    _quota_cache["data"] = None
+    _quota_cache["timestamp"] = 0
+
 async def get_quota_info(force_refresh: bool = False) -> dict:
     """
     Get current ScreenScraper API quota information.
@@ -570,6 +576,7 @@ async def get_quota_info(force_refresh: bool = False) -> dict:
     if result.get("success"):
         quota_data = {
             "authenticated": True,
+            "has_credentials": True,
             "username": result.get("username", "Unknown"),
             "requests_today": result.get("requests_today", "?"),
             "max_requests": result.get("max_requests", "?"),
@@ -578,4 +585,12 @@ async def get_quota_info(force_refresh: bool = False) -> dict:
         _quota_cache = {"data": quota_data, "timestamp": current_time}
         return quota_data
     
-    return {"authenticated": False, "message": result.get("message", "")}
+    # Even if API test fails, we might still have credentials saved locally
+    params = _get_auth_params()
+    has_creds = bool(params.get("ssid") and params.get("sspassword"))
+    
+    return {
+        "authenticated": False, 
+        "has_credentials": has_creds,
+        "message": result.get("message", "")
+    }

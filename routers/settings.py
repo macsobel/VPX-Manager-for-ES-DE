@@ -61,6 +61,11 @@ async def update_settings(update: SettingsUpdate):
     for key, val in new_config.model_dump().items():
         setattr(config, key, val)
     save_config(new_config)
+    
+    # Invalidate cache so ScreenScraper auth is re-checked immediately
+    from services.screenscraper import clear_quota_cache
+    clear_quota_cache()
+    
     return config.model_dump()
 
 

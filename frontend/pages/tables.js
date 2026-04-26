@@ -136,6 +136,19 @@ const TablesPage = {
 
         this.loadFilters();
         this.loadTables();
+        
+        // Restore scroll position from localStorage if available
+        const savedScroll = localStorage.getItem('tables_scroll_pos');
+        if (savedScroll) {
+            setTimeout(() => window.scrollTo(0, parseInt(savedScroll)), 100);
+        }
+
+        // Save scroll position to localStorage
+        window.onscroll = () => {
+            if (window.location.hash === '#tables') {
+                localStorage.setItem('tables_scroll_pos', window.scrollY);
+            }
+        };
         this.bindEvents();
         if (this.state.view === 'media') this.updateQuota();
         this.startStatusPolling();
@@ -177,6 +190,7 @@ const TablesPage = {
             offset: this.state.offset,
         });
 
+        const scrollPos = window.scrollY;
         try {
             const res = await fetch(`/api/tables?${params}`);
             const data = await res.json();
@@ -191,6 +205,9 @@ const TablesPage = {
                 this.loadMissing(this.state.mediaFilter);
             }
             this.renderPagination();
+            if (scrollPos > 0) {
+                window.scrollTo(0, scrollPos);
+            }
         } catch (e) {
             document.getElementById('tables-content').innerHTML = `
                 <div class="empty-state">
@@ -1065,6 +1082,9 @@ const TablesPage = {
                         Toast.success(`Matched to "${vps.name}"`);
                         Modal.hide();
                         this.loadTables();
+                        if (document.getElementById('detail-panel').classList.contains('open')) {
+                            this.showMediaDetail(tableId);
+                        }
                     } catch (e) {
                         Toast.error('Match failed: ' + e.message);
                     }
@@ -1113,6 +1133,9 @@ const TablesPage = {
                                         Toast.success(`Matched to "${vps.name}"`);
                                         Modal.hide();
                                         this.loadTables();
+                                        if (document.getElementById('detail-panel').classList.contains('open')) {
+                                            this.showMediaDetail(tableId);
+                                        }
                                     } catch (e) {
                                         Toast.error('Match failed: ' + e.message);
                                     }
@@ -1232,6 +1255,7 @@ const TablesPage = {
             const res = await fetch('/api/scraper/status?include_quota=true');
             const data = await res.json();
             this.state.scraper.quota = data.quota;
+            this.state.scraper.has_credentials = data.has_credentials;
             
             const display = document.getElementById('quota-display');
             if (!display) return;
@@ -1300,11 +1324,16 @@ const TablesPage = {
                         <div class="media-card-header">
                             <div class="media-card-title" title="${t.filename}">${t.display_name}</div>
                             <div class="media-card-actions-top">
+                                ${!t.vps_id ? `
+                                    <button class="btn btn-icon btn-match" data-id="${t.id}" title="Match VPS">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                                    </button>
+                                ` : ''}
                                 <button class="btn btn-icon btn-scrape-unified" data-id="${t.id}" title="Scrape Media">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
                                 </button>
                                 <button class="btn btn-icon btn-delete-all-media" data-id="${t.id}" title="Delete All Media" style="color: var(--accent-red); background: rgba(239, 68, 68, 0.1);">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></polyline></svg>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                                 </button>
                             </div>
                         </div>
@@ -1340,6 +1369,78 @@ const TablesPage = {
         content.querySelectorAll('.btn-delete-all-media').forEach(btn => {
             btn.onclick = (e) => { e.stopPropagation(); this.handleDeleteMediaClick(parseInt(btn.dataset.id)); }
         });
+        content.querySelectorAll('.btn-match').forEach(btn => {
+            btn.onclick = (e) => { e.stopPropagation(); this.showVPSMatch(parseInt(btn.dataset.id)); }
+        });
+    },
+
+    async validateScrapeConditions(tables) {
+        // Force a quota check if we don't have a confirmed authenticated state yet
+        if (!this.state.scraper.quota || !this.state.scraper.quota.authenticated) {
+            await this.updateQuota();
+        }
+
+        return new Promise((resolve) => {
+            const hideScreenScraperWarning = localStorage.getItem('hideScreenScraperWarning') === 'true';
+            
+            // Final check: do we actually have any credentials saved in config?
+            // This flag is now directly reported by the backend regardless of API status
+            const hasCreds = this.state.scraper.has_credentials || this.state.scraper.quota?.has_credentials;
+            const missingScreenScraper = !hasCreds && !hideScreenScraperWarning;
+            
+            const tablesMissingVps = tables.filter(t => !t.vps_id);
+            const missingVps = tablesMissingVps.length > 0;
+
+            if (!missingScreenScraper && !missingVps) {
+                resolve(true);
+                return;
+            }
+
+            let messageHtml = '<p>You are about to scrape media, but we noticed the following that would provide a better download experience:</p><ul style="text-align: left; padding-left: 20px;">';
+            
+            if (missingScreenScraper) {
+                messageHtml += '<li style="margin-bottom: 10px;">🔴 <strong>No Screenscraper credentials saved in Settings:</strong> wheels, marquees, fanart, videos, and manuals may be skipped.</li>';
+            }
+            if (missingVps) {
+                messageHtml += `<li style="margin-bottom: 10px;">🔴 <strong>No VPS ID match:</strong> please match tables to be scanned with a VPS ID or table media from VPinMediaDB will be skipped.</li>`;
+            }
+            
+            messageHtml += '</ul>';
+
+            if (missingScreenScraper) {
+                messageHtml += `
+                    <div style="margin-top: 15px; text-align: left; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 6px;">
+                        <label style="display: flex; align-items: center; cursor: pointer; margin: 0; font-size: 0.9em; color: var(--text-secondary);">
+                            <input type="checkbox" id="scrape-opt-out-checkbox" style="margin-right: 8px;">
+                            Don't remind me about ScreenScraper again
+                        </label>
+                    </div>
+                `;
+            }
+
+            Modal.choice(
+                'Missing Scraper Configuration',
+                messageHtml,
+                [
+                    { 
+                        label: 'Cancel', 
+                        class: 'btn-secondary', 
+                        onClick: () => resolve(false) 
+                    },
+                    { 
+                        label: 'Continue Anyway', 
+                        class: 'btn-warning', 
+                        onClick: () => {
+                            const checkbox = document.getElementById('scrape-opt-out-checkbox');
+                            if (checkbox && checkbox.checked) {
+                                localStorage.setItem('hideScreenScraperWarning', 'true');
+                            }
+                            resolve(true);
+                        } 
+                    }
+                ]
+            );
+        });
     },
 
     async handleScrapeClick(tableId, tableData = null) {
@@ -1354,6 +1455,9 @@ const TablesPage = {
                 return Toast.error('Table not found');
             }
         }
+
+        const canProceed = await this.validateScrapeConditions([table]);
+        if (!canProceed) return;
 
         try {
             const res = await fetch(`/api/media/${tableId}`);
@@ -1590,9 +1694,8 @@ const TablesPage = {
     },
 
     async scrapeAll() {
-        if (!this.state.scraper.quota?.authenticated) {
-            return Toast.error('ScreenScraper not configured in Settings');
-        }
+        const canProceed = await this.validateScrapeConditions(this.state.tables);
+        if (!canProceed) return;
 
         Modal.choice(
             'Batch Scrape Media',
@@ -1798,6 +1901,7 @@ const TablesPage = {
                         </div>
                     </div>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                        ${!tableData.vps_id ? `<button class="btn btn-secondary btn-sm" id="btn-match-vps-detail" style="border-style: dashed; opacity: 0.8;">Match VPS</button>` : ''}
                         ${tableData.vps_id ? `<a href="https://virtualpinballspreadsheet.github.io/?game=${tableData.vps_id}&f=vpx" target="_blank" class="btn btn-secondary btn-sm">VPS</a>` : ''}
                         ${tableData.vps_id ? `<a href="https://github.com/superhac/vpinmediadb/tree/main/${tableData.vps_id}" target="_blank" class="btn btn-secondary btn-sm">VPinMediaDB</a>` : ''}
                         ${tableData.ss_id ? 
@@ -1921,6 +2025,13 @@ const TablesPage = {
                 };
             }
             
+            const matchVpsBtn = document.getElementById('btn-match-vps-detail');
+            if (matchVpsBtn) {
+                matchVpsBtn.onclick = () => {
+                    this.showVPSMatch(tableId);
+                };
+            }
+
             body.querySelectorAll('.media-preview-container').forEach(c => {
                 const overlay = c.querySelector('.media-preview-overlay');
                 if (overlay) {
