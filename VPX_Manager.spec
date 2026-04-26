@@ -4,7 +4,16 @@ import sys
 block_cipher = None
 
 import os
-from config import VERSION
+
+# Helper to read VERSION without importing the whole module (avoids Analysis path issues)
+def get_version():
+    with open('config.py', 'r') as f:
+        for line in f:
+            if 'VERSION = ' in line:
+                return line.split('=')[1].strip().replace('"', '').replace("'", "")
+    return "Dev Build"
+
+VERSION = get_version()
 
 datas = [('frontend', 'frontend'), ('resources', 'resources')]
 if os.path.exists('config.dat'):
