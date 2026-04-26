@@ -7,13 +7,31 @@ import sys
 import shutil
 import subprocess
 from pathlib import Path
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from typing import Optional
 from config import config, save_config, AppConfig
 import database as db
 
 router = APIRouter(prefix="/api", tags=["settings"])
+
+def check_is_local(request: Request) -> bool:
+    """Check if the request originated from the same computer as the server."""
+    client_host = request.client.host
+    # Direct loopback
+    if client_host in ("127.0.0.1", "::1", "localhost"):
+        return True
+    
+    # Check against server's own LAN IPs
+    import socket
+    try:
+        hostname = socket.gethostname()
+        local_ips = socket.gethostbyname_ex(hostname)[2]
+        if client_host in local_ips:
+            return True
+    except Exception:
+        pass
+    return False
 
 
 class SettingsUpdate(BaseModel):
@@ -32,14 +50,15 @@ class SettingsUpdate(BaseModel):
 
 
 @router.get("/settings")
-async def get_settings():
+async def get_settings(request: Request):
     # Return model data + dynamic properties
     data = config.model_dump()
     
     data.update({
         "support_dir": config.support_dir,
         "vps_db_path": config.vps_db_path,
-        "db_path": config.db_path
+        "db_path": config.db_path,
+        "is_local": check_is_local(request)
     })
     return data
 
@@ -104,7 +123,7 @@ async def pick_path(prompt: str = "Select a path", pick_files: bool = False):
 
 
 @router.get("/system/status")
-async def system_status():
+async def system_status(request: Request):
     """System overview: table counts, disk usage, directory status."""
     tables_dir = config.expanded_tables_dir
 
@@ -158,6 +177,7 @@ async def system_status():
             "disk_used_gb": round(disk.used / (1024**3), 1),
             "disk_free_gb": round(disk.free / (1024**3), 1),
         },
+        "is_local": check_is_local(request)
     }
 
 @router.post("/migrate-media")

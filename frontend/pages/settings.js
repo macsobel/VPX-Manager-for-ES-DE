@@ -61,16 +61,18 @@ const SettingsPage = {
         this.bindEvents();
     },
 
-    _renderDirInput(id, label, value, description, pickFiles = false) {
+    _renderDirInput(id, label, value, description, pickFiles = false, isLocal = true) {
         return `
             <div class="input-group">
                 <label class="input-label">${label}</label>
                 <div style="display: flex; gap: var(--space-sm); align-items: center;">
                     <input class="input-field" id="${id}" name="${id}" value="${value}" style="flex: 1;">
+                    ${isLocal ? `
                     <button class="btn btn-secondary btn-pick-path" data-target="${id}" data-prompt="${label}" data-files="${pickFiles}" title="Browse…" style="flex-shrink: 0; padding: 7px 12px;">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
                         Browse
                     </button>
+                    ` : ''}
                 </div>
                 ${description ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 3px;">${description}</div>` : ''}
             </div>
@@ -83,7 +85,7 @@ const SettingsPage = {
             const data = await res.json();
 
             document.getElementById('settings-form').innerHTML = `
-                ${this._renderDirInput('setting-tables-dir', 'Tables Directory', data.tables_dir, 'Folder containing your VPX tables')}
+                ${this._renderDirInput('setting-tables-dir', 'Tables Directory', data.tables_dir, 'Folder containing your VPX tables', false, data.is_local)}
 
                 <div style="grid-column: 1 / -1; margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border-subtle);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
@@ -97,7 +99,7 @@ const SettingsPage = {
                         </a>
                     </div>
                     <div style="display: grid; gap: var(--space-md);">
-                        ${this._renderDirInput('setting-vpx-app', 'VPX Standalone App Path', data.vpx_standalone_app_path, 'Path to the VPinballX executable or .app bundle', true)}
+                        ${this._renderDirInput('setting-vpx-app', 'VPX Standalone App Path', data.vpx_standalone_app_path, 'Path to the VPinballX executable or .app bundle', true, data.is_local)}
 
                         <div class="input-group">
                             <label class="input-label">VPX Flavor</label>
@@ -129,7 +131,7 @@ const SettingsPage = {
                         </a>
                     </div>
                     <div style="display: grid; gap: var(--space-md);">
-                        ${this._renderDirInput('setting-esde-app', 'EmulationStation: DE App Path', data.esde_app_path, 'Path to the ES-DE executable or .app bundle', true)}
+                        ${this._renderDirInput('setting-esde-app', 'EmulationStation: DE App Path', data.esde_app_path, 'Path to the ES-DE executable or .app bundle', true, data.is_local)}
                         
                         <div style="margin-top: var(--space-sm);">
                             <label class="input-label">Media Storage Strategy</label>
@@ -141,7 +143,7 @@ const SettingsPage = {
                         </div>
 
                         <div id="esde-media-dir-container" style="${data.media_storage_mode === 'standard' ? '' : 'display: none;'}">
-                            ${this._renderDirInput('setting-esde-media-dir', 'ES-DE Downloaded Media Directory', data.esde_media_dir, 'Directory for ES-DE downloaded media')}
+                            ${this._renderDirInput('setting-esde-media-dir', 'ES-DE Downloaded Media Directory', data.esde_media_dir, 'Directory for ES-DE downloaded media', false, data.is_local)}
                             <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: -8px; margin-bottom: var(--space-sm);">
                                 Note: gamelist.xml will be automatically managed in the corresponding ES-DE gamelists folder.
                             </div>
