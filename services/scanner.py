@@ -95,10 +95,10 @@ async def scan_tables_directory() -> dict:
     try:
         existing_db = await db.get_db()
         try:
-            cursor = await existing_db.execute("SELECT id, filename, mtime FROM tables")
+            cursor = await existing_db.execute("SELECT id, filename, mtime, vps_id FROM tables")
             rows = await cursor.fetchall()
-            # Store existing info: {filename: (id, mtime_in_db)}
-            existing_meta = {row["filename"]: (row["id"], row["mtime"]) for row in rows}
+            # Store existing info: {filename: (id, mtime_in_db, vps_id)}
+            existing_meta = {row["filename"]: (row["id"], row["mtime"], row["vps_id"]) for row in rows}
         finally:
             await existing_db.close()
 
@@ -192,11 +192,9 @@ async def scan_tables_directory() -> dict:
                             manufacturer = " ".join(m_parts)
 
                     table_id = existing_info[0] if existing_info else None
+                    vps_id = existing_info[2] if existing_info else None
                     table_data = {
                         "filename": vpx_path.name,
-                        "display_name": display_name,
-                        "manufacturer": manufacturer,
-                        "year": year,
                         "version": meta["version"],
                         "author": meta["author"],
                         "has_b2s": 1 if has_b2s else 0,
@@ -209,6 +207,11 @@ async def scan_tables_directory() -> dict:
                         "vbs_hash": vbs_hash,
                         "mtime": current_mtime
                     }
+
+                    if not vps_id:
+                        table_data["display_name"] = display_name
+                        table_data["manufacturer"] = manufacturer
+                        table_data["year"] = year
 
                     if table_id:
                         table_data["id"] = table_id

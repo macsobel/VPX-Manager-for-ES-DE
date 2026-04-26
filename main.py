@@ -203,7 +203,7 @@ if __name__ == "__main__":
 
         class VPXMenuBarApp(rumps.App):
             def __init__(self):
-                super(VPXMenuBarApp, self).__init__("VPX Manager", quit_button=None)
+                super(VPXMenuBarApp, self).__init__("VPX Manager for ES-DE", title="VPX Manager", quit_button=None)
 
                 # Asset resolution for the icon
                 icon_path = None

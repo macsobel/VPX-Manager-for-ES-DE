@@ -226,6 +226,26 @@ a {
     opacity: 1;
 }
 
+.nav-link-primary {
+    background: linear-gradient(135deg, var(--accent-blue), #3b7dff);
+    color: white !important;
+    font-weight: 700 !important;
+    margin-bottom: var(--space-md);
+    box-shadow: 0 4px 12px var(--accent-blue-glow);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-link-primary svg {
+    color: white;
+    opacity: 1 !important;
+}
+
+.nav-link-primary:hover {
+    background: linear-gradient(135deg, #5b96ff, #4b8aff);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px var(--accent-blue-glow);
+}
+
 .sidebar-footer {
     margin-top: auto;
     padding: var(--space-lg);
@@ -640,10 +660,23 @@ a {
     box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
 }
 
-.btn-icon.btn-vps-link:hover, .btn-icon.btn-match:hover {
+.btn-icon.btn-vps-link:hover {
     color: var(--accent-blue);
     border-color: var(--accent-blue);
     box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+}
+
+.btn-match, .btn-match-vps-detail {
+    color: var(--accent-amber) !important;
+    border-color: var(--accent-amber) !important;
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+    font-weight: 700 !important;
+}
+
+.btn-match:hover, .btn-match-vps-detail:hover {
+    background: rgba(245, 158, 11, 0.1) !important;
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.5) !important;
+    color: #ffb534 !important;
 }
 
 .btn-icon.btn-detail:hover {

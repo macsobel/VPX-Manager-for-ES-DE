@@ -61,6 +61,7 @@ def migrate_legacy_data():
     legacy_log = Path.home() / "vpx_manager.log"
     legacy_support_old = Path.home() / "Library" / "Application Support" / "VPinballX"
     legacy_launcher_dir = Path.home() / ".vpinmanager"
+    legacy_support_empty = Path.home() / "Library" / "Application Support" / "VPX Manager"
     
     # Create new support dir
     APP_SUPPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -113,6 +114,16 @@ def migrate_legacy_data():
             print(f"Migrated log file to {LOG_FILE}")
         except Exception as e:
             print(f"Error migrating log file: {e}")
+
+    # 5. Cleanup empty legacy folder from rumps
+    if legacy_support_empty.exists() and legacy_support_empty.is_dir():
+        # Only remove if it's empty to be safe
+        try:
+            if not any(legacy_support_empty.iterdir()):
+                legacy_support_empty.rmdir()
+                print(f"Removed empty legacy folder: {legacy_support_empty}")
+        except Exception:
+            pass
 
 
 # Run migration before loading
