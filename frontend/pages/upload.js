@@ -998,7 +998,10 @@ const UploadPage = {
             if (data.success) {
                 const vpsNote = this._state.vpsId ? ' (VPS matched)' : '';
                 Toast.success(`Table imported: ${data.folder}${vpsNote}`);
-                progressText.textContent = 'Import complete!';
+                progressText.textContent = 'Import complete! Updating library...';
+                
+                // Trigger a table scan refresh
+                fetch('/api/tables/scan', { method: 'POST' }).catch(() => {});
                 setTimeout(() => {
                     overlay.style.display = 'none';
                     this._resetState();
@@ -1189,7 +1192,9 @@ const UploadPage = {
                         if (data.roms) this._updateRomGuidance(data.roms);
                         if (data.nvram) this._updateNvramGuidance(data.nvram);
                         if (data.patch_info && data.patch_info.patch_url) {
-                            this._showVbsAutoPatch(data.patch_info.patch_url);
+                            // Don't show auto-patch banner for existing table on initial load
+                            // as requested by the user. Only show if replacing VPX.
+                            // this._showVbsAutoPatch(data.patch_info.patch_url);
                         }
                         if (data.altcolors) this._updateAltcolorGuidance(data.altcolors);
                     }
@@ -1361,7 +1366,10 @@ const UploadPage = {
                 }
             }
             Toast.success(`Changes applied successfully`);
-            progressText.textContent = 'Done!';
+            progressText.textContent = 'Done! Updating library...';
+            
+            // Trigger a table scan refresh
+            fetch('/api/tables/scan', { method: 'POST' }).catch(() => {});
             setTimeout(() => {
                 overlay.style.display = 'none';
                 window.location.hash = '#tables';

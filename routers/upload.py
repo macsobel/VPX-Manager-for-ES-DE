@@ -414,6 +414,12 @@ async def upload_file_to_table(
         target = table_dir / f"{base_name}.vpx"
         if target.exists():
             target.unlink()
+        # Delete any existing .vbs files to ensure clean state if replacing table
+        for old_vbs in table_dir.glob("*.vbs"):
+            try:
+                old_vbs.unlink()
+            except Exception:
+                pass
         
     elif file_type == "backglass":
         # Delete ANY existing .directb2s first
