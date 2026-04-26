@@ -204,21 +204,24 @@ if __name__ == "__main__":
 
         class VPXMenuBarApp(rumps.App):
             def __init__(self):
-                super(VPXMenuBarApp, self).__init__("VPX Manager for ES-DE", title="VPX Manager", quit_button=None)
+                super(VPXMenuBarApp, self).__init__("", quit_button=None)
 
                 # Asset resolution for the icon
                 icon_path = None
+                icon_filename = "MenuBarIconColor.png"
                 if getattr(sys, 'frozen', False):
                     # PyInstaller path
                     base_path = sys._MEIPASS
-                    icon_path = os.path.join(base_path, 'resources', 'MenuBarIconTemplate.png')
+                    icon_path = os.path.join(base_path, 'resources', icon_filename)
                 else:
                     # Running from script
-                    icon_path = os.path.join(os.path.dirname(__file__), 'resources', 'MenuBarIconTemplate.png')
+                    icon_path = os.path.join(os.path.dirname(__file__), 'resources', icon_filename)
 
                 if os.path.exists(icon_path):
+                    # Set the icon. rumps handles absolute paths well, 
+                    # but we ensure it's not treated as a template.
                     self.icon = icon_path
-                    self.template = True
+                    self.template = False
 
                 # Define initial menu structure
                 self.status_item = rumps.MenuItem("Managing 0 Tables")
@@ -228,10 +231,12 @@ if __name__ == "__main__":
                 self.menu = [
                     self.status_item,
                     None,  # Separator
-                    rumps.MenuItem("Open Web UI", callback=self.open_web_ui),
-                    rumps.MenuItem("Open Emulation Station", callback=self.open_es),
-                    rumps.MenuItem("Check for Updates...", callback=self.check_for_updates),
                     rumps.MenuItem("About VPX Manager", callback=self.about_window),
+                    rumps.MenuItem("Check for Updates...", callback=self.check_for_updates),
+                    None,  # Separator
+                    rumps.MenuItem("Open Web Interface", callback=self.open_web_ui),
+                    rumps.MenuItem("Open Emulation Station", callback=self.open_es),
+                    None,  # Separator
                     rumps.MenuItem("Restart", callback=self.restart),
                     rumps.MenuItem("Quit", callback=self.quit_app)
                 ]

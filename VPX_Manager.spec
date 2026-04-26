@@ -76,5 +76,6 @@ app = BUNDLE(
         'CFBundleShortVersionString': VERSION,
         'CFBundleVersion': VERSION,
         'NSHumanReadableCopyright': 'Copyright © 2026 macsobel',
+        'LSUIElement': True,
     },
 )

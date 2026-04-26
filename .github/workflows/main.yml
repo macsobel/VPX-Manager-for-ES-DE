@@ -6,6 +6,13 @@ on:
     tags: [ "v*" ]
   pull_request:
     branches: [ "**" ]
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish a new release?'
+        required: true
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -52,7 +59,7 @@ jobs:
         path: dist/VPX_Manager_for_ES-DE_macOS.zip
         
     - name: Create Release
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
       uses: softprops/action-gh-release@v2
       with:
         files: dist/VPX_Manager_for_ES-DE_macOS.zip
