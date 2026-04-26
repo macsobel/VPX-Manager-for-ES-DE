@@ -3,6 +3,7 @@ name: Build macOS App
 on:
   push:
     branches: [ "**" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "**" ]
 
@@ -50,7 +51,7 @@ jobs:
         path: dist/VPX_Manager_for_ES-DE_macOS.zip
         
     - name: Create Release
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
         files: dist/VPX_Manager_for_ES-DE_macOS.zip
