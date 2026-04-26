@@ -314,7 +314,7 @@ async def get_tables(
         elif vps_matched is False:
             where_clauses.append("(vps_id = '' OR vps_id IS NULL)")
 
-        query_parts = ["SELECT t.*, EXISTS(SELECT 1 FROM media m WHERE m.table_id = t.id AND m.media_type = 'fanart') as has_fanart FROM tables t"]
+        query_parts = ["SELECT t.* FROM tables t"]
 
         if collection_id is not None:
             query_parts.append("JOIN collection_tables ct ON ct.table_id = t.id")
@@ -470,35 +470,7 @@ async def get_media_for_table(table_id: int) -> list[dict]:
         await db.close()
 
 
-async def get_tables_missing_media() -> list[dict]:
-    """Get tables that are missing one or more media types."""
-    all_types = {"wheel", "backglass", "playfield", "table_video"}
-    db = await get_db()
-    try:
-        query = """
-            SELECT t.id, t.display_name, t.filename, t.vps_id, GROUP_CONCAT(m.media_type) as existing_media
-            FROM tables t
-            LEFT JOIN media m ON t.id = m.table_id
-            GROUP BY t.id
-        """
-        cursor = await db.execute(query)
-        rows = await cursor.fetchall()
-        result = []
-        for r in rows:
-            existing = set(r["existing_media"].split(",")) if r["existing_media"] else set()
-            missing = all_types - existing
-            if missing:
-                result.append({
-                    "id": r["id"],
-                    "display_name": r["display_name"],
-                    "filename": r["filename"],
-                    "vps_id": r["vps_id"],
-                    "missing": list(missing),
-                    "existing": list(existing),
-                })
-        return result
-    finally:
-        await db.close()
+
 
 
 # ── Collection CRUD ─────────────────────────────────────────────────

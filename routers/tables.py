@@ -132,7 +132,9 @@ async def get_stats():
     total = await db.get_table_count()
     matched = await db.get_table_count(vps_matched=True)
     unmatched = await db.get_table_count(vps_matched=False)
-    missing_media = await db.get_tables_missing_media()
+    from services.media_manager import get_all_media_status
+    media_statuses = await get_all_media_status()
+    missing_media_count = sum(1 for s in media_statuses if s.get("missing_types"))
     
     # VBS stats
     db_conn = await db.get_db()
@@ -153,7 +155,7 @@ async def get_stats():
         "total_tables": total,
         "vps_matched": matched,
         "vps_unmatched": unmatched,
-        "missing_media": len(missing_media),
+        "missing_media": missing_media_count,
         "vbs_extracted": vbs_extracted,
         "vbs_patched": vbs_patched
     }

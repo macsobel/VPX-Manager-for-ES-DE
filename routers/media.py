@@ -20,10 +20,33 @@ async def get_missing_media():
 @router.get("/tables-with-manuals")
 async def get_tables_with_manuals():
     """Get list of table IDs that have manuals."""
-    conn = await db.get_db()
-    async with conn.execute("SELECT DISTINCT table_id FROM media WHERE media_type = 'manuals'") as cursor:
-        rows = await cursor.fetchall()
-        return [row[0] for row in rows]
+    from config import config
+    from pathlib import Path
+    
+    manuals_dir = config.esde_media_base / "manuals"
+    if not manuals_dir.exists():
+        return []
+        
+    tables = await db.get_tables(limit=2000)
+    has_manual_ids = []
+    
+    for t in tables:
+        if not t.get("filename"):
+            continue
+            
+        stem = Path(t["filename"]).stem
+        folder_name = Path(t.get("folder_path", "")).name if t.get("folder_path") else ""
+        
+        # Check root
+        if (manuals_dir / f"{stem}.pdf").exists():
+            has_manual_ids.append(t["id"])
+            continue
+            
+        # Check nested
+        if folder_name and (manuals_dir / folder_name / f"{stem}.pdf").exists():
+            has_manual_ids.append(t["id"])
+            
+    return has_manual_ids
 
 
 @router.get("/{table_id}")
@@ -99,26 +122,6 @@ async def serve_esde_media_file(table_id: int, media_type: str):
     """Serve a specific ES-DE media file."""
     file_path = await get_media_file_path(table_id, media_type)
     if not file_path or not file_path.exists():
-        raise HTTPException(status_code=404, detail="Media file not found on disk")
-
-    return FileResponse(file_path)
-
-
-@router.get("/file/{media_id}")
-async def serve_media_file(media_id: int):
-    """Serve a media file by ID."""
-    conn = await db.get_db()
-    try:
-        cursor = await conn.execute("SELECT * FROM media WHERE id = ?", (media_id,))
-        row = await cursor.fetchone()
-    finally:
-        await conn.close()
-
-    if not row:
-        raise HTTPException(status_code=404, detail="Media not found")
-
-    file_path = Path(dict(row)["file_path"])
-    if not file_path.exists():
         raise HTTPException(status_code=404, detail="Media file not found on disk")
 
     return FileResponse(file_path)
