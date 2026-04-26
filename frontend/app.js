@@ -88,6 +88,32 @@ const App = {
             return;
         }
 
+        // Handle vbs-manager/{tableId} route
+        const vbsMatch = hash.match(/^vbs-manager\/(\d+)$/);
+        if (vbsMatch) {
+            this.currentPage = 'vbs-manager';
+            Nav.setActive('vbs-manager');
+            const container = document.getElementById('page-container');
+            container.style.animation = 'none';
+            container.offsetHeight;
+            container.style.animation = '';
+            VbsManagerPage.render(parseInt(vbsMatch[1]));
+            return;
+        }
+
+        // Handle ini-manager/{tableId} route
+        const iniMatch = hash.match(/^ini-manager\/(\d+)$/);
+        if (iniMatch) {
+            this.currentPage = 'ini-manager';
+            Nav.setActive('ini-manager');
+            const container = document.getElementById('page-container');
+            container.style.animation = 'none';
+            container.offsetHeight;
+            container.style.animation = '';
+            IniManagerPage.render(parseInt(iniMatch[1]));
+            return;
+        }
+
         // Handle simple media route
         if (hash === 'media') {
             this.currentPage = 'tables';

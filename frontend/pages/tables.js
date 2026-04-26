@@ -843,6 +843,17 @@ const TablesPage = {
                     </button>
                 </div>
 
+                <div style="margin-top: var(--space-sm); display: flex; gap: var(--space-sm);">
+                    <button class="btn btn-secondary" id="btn-manage-vbs" style="flex: 1; height: 38px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.85rem;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        Manage VBS
+                    </button>
+                    <button class="btn btn-secondary" id="btn-manage-ini" style="flex: 1; height: 38px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.85rem;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                        Manage INI
+                    </button>
+                </div>
+
                 <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm); align-items: stretch;">
                     <button class="btn btn-primary" id="btn-save-detail" style="flex: 1; justify-content: center;">Save Changes</button>
                     ${t.vps_id ? `
@@ -1020,6 +1031,18 @@ const TablesPage = {
                 // View Media — show media detail in current panel
                 document.getElementById('btn-view-media').onclick = () => {
                     this.showMediaDetail(tableId);
+                };
+
+                // Manage VBS
+                document.getElementById('btn-manage-vbs').onclick = () => {
+                    panel.classList.remove('open');
+                    window.location.hash = `#vbs-manager/${tableId}`;
+                };
+
+                // Manage INI
+                document.getElementById('btn-manage-ini').onclick = () => {
+                    panel.classList.remove('open');
+                    window.location.hash = `#ini-manager/${tableId}`;
                 };
         } catch (e) {
             body.innerHTML = `<span style="color: var(--accent-red);">Failed to load: ${e.message}</span>`;

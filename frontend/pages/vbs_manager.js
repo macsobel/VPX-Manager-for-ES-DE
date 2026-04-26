@@ -12,7 +12,7 @@ const VbsManagerPage = {
         proposedContent: ""
     },
 
-    async render() {
+    async render(tableId = null) {
         const container = document.getElementById('page-container');
         container.innerHTML = `
             <div class="page-header" style="display: flex; justify-content: space-between; align-items: center;">
@@ -151,7 +151,9 @@ const VbsManagerPage = {
         }
 
         this.bindEvents();
-        this.loadTables();
+        this.loadTables().then(() => {
+            if (tableId) this.selectTable(tableId);
+        });
         this.loadPatchStats(); // Load patching statistics
         this.startStatusPolling(); // Check for ongoing bulk extraction
     },
@@ -931,3 +933,4 @@ const VbsManagerPage = {
 };
 
 // Hook into App router unmount if supported, or handled natively by SPA replacing DOM.
+window.VbsManagerPage = VbsManagerPage;

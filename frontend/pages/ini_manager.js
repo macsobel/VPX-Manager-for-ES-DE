@@ -10,7 +10,7 @@ const IniManagerPage = {
         originalContent: "",
     },
 
-    async render() {
+    async render(tableId = null) {
         const container = document.getElementById('page-container');
         container.innerHTML = `
             <div class="page-header" style="display: flex; justify-content: space-between; align-items: center;">
@@ -152,14 +152,14 @@ const IniManagerPage = {
         if (!window.ace) {
             const script = document.createElement('script');
             script.src = "https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.js";
-            script.onload = () => this.init();
+            script.onload = () => this.init(tableId);
             document.head.appendChild(script);
         } else {
-            this.init();
+            this.init(tableId);
         }
     },
 
-    async init() {
+    async init(tableId = null) {
         // Setup search
         document.getElementById('ini-search').addEventListener('input', (e) => {
             this.renderTableList(e.target.value);
@@ -171,6 +171,7 @@ const IniManagerPage = {
         });
 
         await this.loadStatus();
+        if (tableId) this.selectTable(tableId);
         this.startPollingStatus();
     },
 
@@ -240,7 +241,7 @@ const IniManagerPage = {
     },
 
     async selectTable(tableId) {
-        this.state.selectedTable = tableId;
+        this.state.selectedTable = parseInt(tableId);
         this.renderTableList(document.getElementById('ini-search').value);
 
         const emptyState = document.getElementById('ini-detail-empty');
