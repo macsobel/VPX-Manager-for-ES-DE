@@ -77,6 +77,7 @@ class GamelistManager:
 
         _indent(root)
         try:
+            self.xml_path.parent.mkdir(parents=True, exist_ok=True)
             tree.write(self.xml_path, encoding="utf-8", xml_declaration=True)
             logger.debug(f"Successfully wrote {self.xml_path}")
         except Exception as e:
@@ -156,6 +157,7 @@ class GamelistManager:
         if found:
             _indent(root)
             try:
+                self.xml_path.parent.mkdir(parents=True, exist_ok=True)
                 tree.write(self.xml_path, encoding="utf-8", xml_declaration=True)
                 logger.info(f"Renamed game/folder entries from {old_rom_path} to {new_rom_path}")
             except Exception as e:
@@ -197,6 +199,7 @@ class GamelistManager:
         if found:
             _indent(root)
             try:
+                self.xml_path.parent.mkdir(parents=True, exist_ok=True)
                 tree.write(self.xml_path, encoding="utf-8", xml_declaration=True)
                 logger.info(f"Removed game/folder entries for {rom_path} from gamelist.xml")
             except Exception as e:

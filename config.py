@@ -10,6 +10,7 @@ import shutil
 import platform
 import os
 from pathlib import Path
+from typing import Optional
 from pydantic import BaseModel, validator
 
 
@@ -53,6 +54,18 @@ def decode_password(encoded: str) -> str:
     except Exception:
         # If decoding fails, it might be legacy plain text (or already decoded)
         return encoded
+
+
+def relativize_path(p: Optional[str]) -> str:
+    """Contract absolute paths in the home directory to user-relative (~/)."""
+    if not p:
+        return ""
+    abs_p = os.path.abspath(os.path.expanduser(p))
+    home = os.path.expanduser("~")
+    if abs_p.startswith(home):
+        # Only replace if it's at the start of a path segment
+        return abs_p.replace(home, "~", 1)
+    return abs_p
 
 
 def migrate_legacy_data():
@@ -319,6 +332,12 @@ def save_config(cfg: AppConfig) -> None:
         # Security: Never save dev credentials to JSON
         data.pop("screenscraper_devid", None)
         data.pop("screenscraper_devpassword", None)
+
+        # Path Portability: Relativize paths to home directory
+        path_keys = ["tables_dir", "esde_media_dir", "esde_gamelists_dir"]
+        for pk in path_keys:
+            if data.get(pk):
+                data[pk] = relativize_path(data[pk])
 
         with open(CONFIG_FILE, "w") as f:
             json.dump(data, f, indent=4)

@@ -9,7 +9,7 @@ import json
 import os
 from pathlib import Path
 from datetime import datetime
-from config import config
+from config import config, relativize_path
 
 DB_PATH = config.db_path
 
@@ -17,15 +17,6 @@ def _expand_path(p: str | None) -> str:
     """Expand user-relative paths (~/) to absolute paths."""
     if not p: return ""
     return os.path.expanduser(p)
-
-def _relativize_path(p: str | None) -> str:
-    """Contract absolute paths in the home directory to user-relative (~/)."""
-    if not p: return ""
-    abs_p = os.path.abspath(os.path.expanduser(p))
-    home = os.path.expanduser("~")
-    if abs_p.startswith(home):
-        return abs_p.replace(home, "~", 1)
-    return abs_p
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tables (
@@ -233,7 +224,7 @@ async def upsert_tables_batch(tables_data: list[dict]):
         for d in tables_data:
             item = d.copy()
             if "folder_path" in item:
-                item["folder_path"] = _relativize_path(item["folder_path"])
+                item["folder_path"] = relativize_path(item["folder_path"])
             if "date_added" not in item:
                 item["date_added"] = datetime.now().isoformat()
             processed.append(item)
@@ -244,8 +235,8 @@ async def upsert_tables_batch(tables_data: list[dict]):
             filename = item.get("filename")
             if not filename: continue
 
-            # Check existence
-            cursor = await db.execute("SELECT id FROM tables WHERE filename = ?", (filename,))
+            # Check existence (case-insensitive for macOS compatibility)
+            cursor = await db.execute("SELECT id FROM tables WHERE filename = ? COLLATE NOCASE", (filename,))
             row = await cursor.fetchone()
 
             if row:

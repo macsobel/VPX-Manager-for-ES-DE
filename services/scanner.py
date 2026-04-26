@@ -97,13 +97,13 @@ async def scan_tables_directory() -> dict:
         try:
             cursor = await existing_db.execute("SELECT id, filename, mtime, vps_id FROM tables")
             rows = await cursor.fetchall()
-            # Store existing info: {filename: (id, mtime_in_db, vps_id)}
-            existing_meta = {row["filename"]: (row["id"], row["mtime"], row["vps_id"]) for row in rows}
+            # Store existing info: {filename_lower: (id, mtime_in_db, vps_id)}
+            existing_meta = {row["filename"].lower(): (row["id"], row["mtime"], row["vps_id"]) for row in rows}
         finally:
             await existing_db.close()
 
         tables_to_upsert = []
-        found_filenames = set(v[0].name for v in vpx_files)
+        found_filenames = set(v[0].name.lower() for v in vpx_files)
         
         import asyncio
         semaphore = asyncio.Semaphore(10) # Process up to 10 tables concurrently
@@ -115,7 +115,7 @@ async def scan_tables_directory() -> dict:
                 try:
                     # Check if we can skip parsing
                     current_mtime = str(vpx_path.stat().st_mtime)
-                    existing_info = existing_meta.get(vpx_path.name)
+                    existing_info = existing_meta.get(vpx_path.name.lower())
                     
                     if existing_info and existing_info[1] == current_mtime:
                         return None
@@ -208,7 +208,7 @@ async def scan_tables_directory() -> dict:
                         "mtime": current_mtime
                     }
 
-                    if not vps_id:
+                    if not vps_id or vps_id == "":
                         table_data["display_name"] = display_name
                         table_data["manufacturer"] = manufacturer
                         table_data["year"] = year
@@ -256,7 +256,7 @@ async def scan_tables_directory() -> dict:
             all_existing = await cursor.fetchall()
             
             for row in all_existing:
-                if row["filename"] not in found_filenames:
+                if row["filename"].lower() not in found_filenames:
                     # Need to delete this table!
                     from services.media_manager import delete_all_media_for_table
                     from services.gamelist_manager import GamelistManager
