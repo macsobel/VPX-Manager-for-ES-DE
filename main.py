@@ -12,8 +12,8 @@ from pathlib import Path
 import os
 
 import database as db
-from config import LOG_FILE
-from routers import tables, upload, vps, media, collections, settings as settings_router, scraper, patches, tools, vbs_manager, ini_manager
+from config import LOG_FILE, VERSION
+from routers import tables, upload, vps, media, collections, settings as settings_router, scraper, patches, tools, vbs_manager, ini_manager, updates
 import socket
 
 # ── Logging & Security ──────────────────────────────────────────────
@@ -112,7 +112,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="VPX Manager for ES-DE",
     description="VPinFE-inspired table management for VPX on macOS",
-    version="2.0.0",
+    version=VERSION,
     lifespan=lifespan,
 )
 
@@ -128,6 +128,7 @@ app.include_router(patches.router)
 app.include_router(tools.router)
 app.include_router(vbs_manager.router)
 app.include_router(ini_manager.router)
+app.include_router(updates.router)
 
 # ── Static Frontend ─────────────────────────────────────────────────
 from config import APP_SUPPORT_DIR
@@ -229,6 +230,8 @@ if __name__ == "__main__":
                     None,  # Separator
                     rumps.MenuItem("Open Web UI", callback=self.open_web_ui),
                     rumps.MenuItem("Open Emulation Station", callback=self.open_es),
+                    rumps.MenuItem("Check for Updates...", callback=self.check_for_updates),
+                    rumps.MenuItem("About VPX Manager", callback=self.about_window),
                     rumps.MenuItem("Restart", callback=self.restart),
                     rumps.MenuItem("Quit", callback=self.quit_app)
                 ]
@@ -236,6 +239,34 @@ if __name__ == "__main__":
             def open_web_ui(self, sender):
                 import webbrowser
                 webbrowser.open("http://localhost:8746")
+
+            def about_window(self, sender):
+                rumps.alert(
+                    title="VPX Manager for ES-DE",
+                    message=f"Version {VERSION}\n\nVPinFE-inspired table management for Visual Pinball X on macOS.\n\nCreated by macsobel",
+                    ok="Close"
+                )
+
+            def check_for_updates(self, sender):
+                from services.update_service import update_service
+                try:
+                    result = asyncio.run(update_service.check_for_updates())
+                    if result.get("update_available"):
+                        if rumps.alert(
+                            title="Update Available",
+                            message=f"A new version ({result['latest_version']}) is available.\n\nWould you like to open the download page?",
+                            ok="Download",
+                            cancel="Later"
+                        ):
+                            import webbrowser
+                            webbrowser.open(result["download_url"])
+                    elif result.get("error"):
+                        rumps.alert("Update Check Failed", result["error"])
+                    else:
+                        rumps.alert("Up to Date", f"You are running the latest version ({VERSION}).")
+                except Exception as e:
+                    logger.error(f"Error checking for updates from menubar: {e}")
+                    rumps.alert("Update Check Failed", str(e))
 
             @rumps.timer(5)
             def update_status(self, _):

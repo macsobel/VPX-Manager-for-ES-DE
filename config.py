@@ -13,6 +13,25 @@ from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel, validator
 
+def _load_version():
+    """Load version from version.txt or environment variable."""
+    # Check for injected version file (bundled with app)
+    v_file = Path(__file__).parent / "version.txt"
+    if v_file.exists():
+        try:
+            return v_file.read_text().strip()
+        except Exception:
+            pass
+            
+    # Check for environment variable (GitHub Actions)
+    env_v = os.environ.get("GITHUB_RUN_NUMBER")
+    if env_v:
+        return env_v
+        
+    return "Dev Build"
+
+VERSION = _load_version()
+
 
 # Cross-platform support directory detection
 if platform.system() == "Darwin":

@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from typing import Optional
-from config import config, save_config, AppConfig
+from config import config, save_config, AppConfig, VERSION
 import database as db
 
 router = APIRouter(prefix="/api", tags=["settings"])
@@ -177,7 +177,8 @@ async def system_status(request: Request):
             "disk_used_gb": round(disk.used / (1024**3), 1),
             "disk_free_gb": round(disk.free / (1024**3), 1),
         },
-        "is_local": check_is_local(request)
+        "is_local": check_is_local(request),
+        "version": VERSION
     }
 
 @router.post("/migrate-media")

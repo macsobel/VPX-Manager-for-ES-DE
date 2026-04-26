@@ -2,7 +2,7 @@ name: Build macOS App
 
 on:
   push:
-    branches: [ "**" ]
+    branches: [ "main" ]
     tags: [ "v*" ]
   pull_request:
     branches: [ "**" ]
@@ -28,11 +28,12 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
         
-    - name: Generate Obfuscated Config
+    - name: Generate Obfuscated Config and Version
       env:
         SS_DEV_ID: ${{ secrets.SS_DEV_ID }}
         SS_DEVPASS: ${{ secrets.SS_DEVPASS }}
       run: |
+        echo "${{ github.run_number }}" > version.txt
         python3 build_utils.py
         
     - name: Build with PyInstaller
@@ -51,12 +52,12 @@ jobs:
         path: dist/VPX_Manager_for_ES-DE_macOS.zip
         
     - name: Create Release
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: softprops/action-gh-release@v2
       with:
         files: dist/VPX_Manager_for_ES-DE_macOS.zip
-        tag_name: v${{ github.run_number }}
-        name: Release v${{ github.run_number }}
+        tag_name: ${{ github.run_number }}
+        name: Build ${{ github.run_number }}
         draft: false
         prerelease: false
       env:

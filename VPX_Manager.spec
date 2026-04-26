@@ -4,9 +4,13 @@ import sys
 block_cipher = None
 
 import os
+from config import VERSION
+
 datas = [('frontend', 'frontend'), ('resources', 'resources')]
 if os.path.exists('config.dat'):
     datas.append(('config.dat', '.'))
+if os.path.exists('version.txt'):
+    datas.append(('version.txt', '.'))
 
 a = Analysis(
     ['main.py'],
@@ -59,4 +63,9 @@ app = BUNDLE(
     name='VPX Manager for ES-DE.app',
     icon='resources/icon.icns' if sys.platform == 'darwin' else 'resources/icon.png',
     bundle_identifier='com.macsobel.vpxmanager',
+    info_plist={
+        'CFBundleShortVersionString': VERSION,
+        'CFBundleVersion': VERSION,
+        'NSHumanReadableCopyright': 'Copyright © 2026 macsobel',
+    },
 )

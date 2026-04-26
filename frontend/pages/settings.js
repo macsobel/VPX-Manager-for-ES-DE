@@ -52,6 +52,10 @@ const SettingsPage = {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                         Media Download Preferences
                     </button>
+                    <button class="btn btn-secondary" id="btn-check-updates">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
+                        Check for Updates
+                    </button>
                 </div>
             </div>
         `;
@@ -354,6 +358,9 @@ const SettingsPage = {
                             <div class="dir-status ${info.directories.support_dir.exists ? 'exists' : 'missing'}">
                                 ${info.directories.support_dir.exists ? '✓' : '✗'} Internal Data
                             </div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: var(--space-sm);">
+                                Version: <strong style="color: var(--text-secondary);">${info.version || '2.0.0'}</strong>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -377,6 +384,37 @@ const SettingsPage = {
             const res = await fetch('/api/vps/sync', { method: 'POST' });
             const data = await res.json();
             data.success ? Toast.success(data.message) : Toast.error(data.message);
+        };
+
+        document.getElementById('btn-check-updates').onclick = async () => {
+            const btn = document.getElementById('btn-check-updates');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width: 14px; height: 14px;"></div> Checking...';
+            
+            try {
+                const res = await fetch('/api/updates/check');
+                const result = await res.json();
+                
+                if (result.update_available) {
+                    Modal.confirm(
+                        'Update Available',
+                        `A new version (${result.latest_version}) is available. Would you like to open the release page?\n\n${result.body.substring(0, 200)}${result.body.length > 200 ? '...' : ''}`,
+                        () => {
+                            window.open(result.download_url, '_blank');
+                        }
+                    );
+                } else if (result.error) {
+                    Toast.error('Update check failed: ' + result.error);
+                } else {
+                    Toast.success('You are running the latest version (' + result.current_version + ')');
+                }
+            } catch (e) {
+                Toast.error('Failed to check for updates');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         };
     },
 };
