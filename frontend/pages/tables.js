@@ -1543,6 +1543,7 @@ const TablesPage = {
             
             this.updateQuota();
             this.loadMissing(this.state.mediaFilter);
+            this.loadTables();
 
             // Refresh the detail panel if it's currently open for this table
             const panel = document.getElementById('detail-panel');

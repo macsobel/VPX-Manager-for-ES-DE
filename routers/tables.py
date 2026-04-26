@@ -61,14 +61,35 @@ async def list_tables(
     )
     total = await db.get_table_count(search=search, vps_matched=vps_matched)
     
-    # Enrich with latest VPS versions from cache
+    # Enrich with latest VPS versions from cache and physical media status
     from services.vps_matcher import vps_matcher
     if not vps_matcher._loaded:
         await vps_matcher._load_cached_async()
+        
+    esde_base = config.esde_media_base
+    fanart_dir = esde_base / "fanart"
     
     enriched_tables = []
     for t in tables:
         t_dict = dict(t)
+        
+        # Override the database has_fanart with actual physical file existence
+        has_fanart = 0
+        if fanart_dir.exists() and t_dict.get("filename"):
+            stem = Path(t_dict["filename"]).stem
+            folder_name = Path(t_dict.get("folder_path", "")).name if t_dict.get("folder_path") else ""
+            
+            for ext in [".png", ".jpg", ".jpeg", ".webp"]:
+                # Check root folder
+                if (fanart_dir / f"{stem}{ext}").exists():
+                    has_fanart = 1
+                    break
+                # Check nested game folder
+                if folder_name and (fanart_dir / folder_name / f"{stem}{ext}").exists():
+                    has_fanart = 1
+                    break
+        t_dict["has_fanart"] = has_fanart
+        
         if t_dict.get("vps_id"):
             entry = vps_matcher.get_entry(t_dict["vps_id"])
             if entry:
