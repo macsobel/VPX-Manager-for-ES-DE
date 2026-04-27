@@ -55,9 +55,9 @@ const ManualsPage = {
                 </div>
             </div>
 
-            <div class="manuals-layout">
+            <div class="adaptive-split-layout" id="manuals-workspace">
                 <!-- Left Panel: Table List -->
-                <div class="manual-sidebar">
+                <div class="adaptive-sidebar">
                     <div class="manual-search-container">
                         <div class="search-wrapper" style="max-width: none;">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -74,10 +74,18 @@ const ManualsPage = {
                 </div>
 
                 <!-- Right Panel: PDF Viewer / Actions -->
-                <div class="manual-content">
+                <div class="adaptive-content">
                     <div class="manual-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); background: var(--bg-tertiary);">
-                        <div id="manual-actions-left" style="display: flex; gap: 0.75rem; align-items: center;">
-                            <!-- Zoom/Nav controls go here -->
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <!-- Persistent Back Button Container -->
+                            <div id="manual-back-container" style="display: flex; align-items: center;">
+                                <button class="mobile-back-btn" onclick="ManualsPage.closeDetail()">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                                </button>
+                            </div>
+                            <div id="manual-actions-left" style="display: flex; gap: 0.75rem; align-items: center;">
+                                <!-- Zoom/Nav controls go here -->
+                            </div>
                         </div>
                         <div id="manual-actions" style="display: flex; gap: 0.75rem; align-items: center;">
                             <!-- Action buttons go here -->
@@ -178,6 +186,7 @@ const ManualsPage = {
         if (!table) return;
 
         this.state.selectedTable = table;
+        document.getElementById('manuals-workspace')?.classList.add('content-active');
         this.renderTableList(document.getElementById('manual-search').value);
 
         const actionsArea = document.getElementById('manual-actions');
@@ -508,6 +517,10 @@ const ManualsPage = {
         } catch (error) {
             console.error('Error cancelling download:', error);
         }
+    },
+
+    closeDetail() {
+        document.getElementById('manuals-workspace')?.classList.remove('content-active');
     },
 
     unload() {

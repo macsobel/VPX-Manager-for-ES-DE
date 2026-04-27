@@ -1657,10 +1657,19 @@ select.input-field option {
 }
 
 /* ── Responsive ────────────────────────────────────────────────── */
-@media (max-width: 768px) {
+/* ── Responsive Overhaul ────────────────────────────────────────── */
+
+/* Tablet View: Collapsed Sidebar */
+@media (max-width: 1024px) {
+    .page-container {
+        padding: var(--space-lg);
+    }
+}
+
+@media (max-width: 850px) {
     .sidebar {
-        width: 60px;
-        min-width: 60px;
+        width: 70px;
+        min-width: 70px;
     }
 
     .sidebar .brand-text,
@@ -1677,15 +1686,12 @@ select.input-field option {
 
     .nav-link {
         justify-content: center;
-        padding: var(--space-md);
+        padding: 14px;
+        margin: 4px;
     }
 
     .main-content {
-        margin-left: 60px;
-    }
-
-    .page-container {
-        padding: var(--space-md);
+        margin-left: 70px;
     }
 
     .stats-grid {
@@ -1695,6 +1701,50 @@ select.input-field option {
     .detail-panel {
         width: 100%;
         right: -100%;
+    }
+}
+
+/* Mobile Content Stacking (Navigation remains Sidebar) */
+@media (max-width: 768px) {
+    .page-container {
+        padding: var(--space-md);
+    }
+
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: var(--space-md);
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .toolbar {
+        flex-direction: column;
+        gap: var(--space-md);
+    }
+
+    .toolbar > * {
+        width: 100% !important;
+    }
+
+    .search-wrapper {
+        width: 100%;
+    }
+
+    .data-table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .input-group {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .input-group .btn {
+        width: 100%;
     }
 }
 
@@ -2799,4 +2849,93 @@ select.input-field option {
     font-weight: 600;
     text-align: center;
     animation: scaleIn 0.3s ease-out;
+}
+/* ── Adaptive Split Layout Pattern ─────────────────────────────── */
+.adaptive-split-layout {
+    display: flex;
+    gap: var(--space-lg);
+    height: calc(100vh - 180px);
+    margin-top: var(--space-md);
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+}
+
+.adaptive-sidebar {
+    flex: 0 0 320px;
+    width: 320px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.adaptive-content {
+    flex: 1;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 2;
+}
+
+.mobile-back-btn {
+    display: none !important;
+}
+
+/* Mobile Adaptive Split View */
+@media (max-width: 850px) {
+    .adaptive-split-layout {
+        height: calc(100vh - 150px);
+        gap: 0;
+        margin-top: 0;
+        border-radius: 0;
+    }
+
+    .adaptive-sidebar {
+        flex: 0 0 100%;
+        width: 100%;
+        transition: transform var(--transition-base);
+        border: none;
+        border-radius: 0;
+    }
+
+    .adaptive-content {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        transform: translateX(100%);
+        transition: transform var(--transition-base);
+        border: none;
+        border-radius: 0;
+    }
+
+    .adaptive-split-layout.content-active .adaptive-sidebar {
+        transform: translateX(-100%);
+    }
+
+    .adaptive-split-layout.content-active .adaptive-content {
+        transform: translateX(0);
+    }
+
+    .mobile-back-btn {
+        display: flex !important;
+        margin-right: var(--space-md);
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-md);
+        width: 36px;
+        height: 36px;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-primary);
+        cursor: pointer;
+    }
 }

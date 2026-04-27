@@ -58,10 +58,10 @@ const VbsManagerPage = {
                 </div>
             </div>
 
-            <!-- Main Layout: Grid vs Detail -->
-            <div id="vbs-workspace-container" style="display: flex; gap: 2rem; height: calc(100vh - 200px);">
+            <!-- Main Layout: Master List vs Detail -->
+            <div class="adaptive-split-layout" id="vbs-workspace">
                 <!-- Left: Master List -->
-                <div style="flex: 1; display: flex; flex-direction: column; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden;">
+                <div class="adaptive-sidebar">
                     <div style="padding: 1.25rem; border-bottom: 1px solid var(--border-color); background: var(--bg-tertiary);">
                         <div class="search-wrapper">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -76,12 +76,17 @@ const VbsManagerPage = {
                 </div>
 
                 <!-- Right: Detail Workspace -->
-                <div id="vbs-detail-workspace" style="flex: 2; display: none; flex-direction: column; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden;">
+                <div class="adaptive-content" id="vbs-detail-workspace">
                     <!-- Detail Header -->
                     <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); background: var(--bg-tertiary); display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div>
-                            <h2 id="detail-title" style="margin: 0 0 0.5rem 0; font-size: 1.25rem;">Table Name</h2>
-                            <div id="detail-filename" style="color: var(--text-secondary); font-size: 0.85rem; font-family: monospace;">filename.vpx</div>
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+                            <button class="mobile-back-btn" onclick="VbsManagerPage.closeDetail()">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                            </button>
+                            <div>
+                                <h2 id="detail-title" style="margin: 0 0 0.5rem 0; font-size: 1.25rem;">Table Name</h2>
+                                <div id="detail-filename" style="color: var(--text-secondary); font-size: 0.85rem; font-family: monospace;">filename.vpx</div>
+                            </div>
                         </div>
                         <div id="detail-actions" style="display: flex; gap: 0.5rem;">
                             <!-- Actions injected dynamically based on status -->
@@ -105,7 +110,7 @@ const VbsManagerPage = {
                     </div>
                 </div>
 
-                <!-- Empty State for Detail -->
+                <!-- Empty State for Detail (Desktop Only) -->
                 <div id="vbs-detail-empty" style="flex: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color); color: var(--text-muted);">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom: 1rem; opacity: 0.5;">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -263,6 +268,7 @@ const VbsManagerPage = {
         if (!tableInfo) return;
 
         this.state.selectedTable = tableInfo;
+        document.getElementById('vbs-workspace')?.classList.add('content-active');
         this.renderTableList(document.getElementById('vbs-search').value); // Update active state
 
         // Show loading state in detail
@@ -668,6 +674,10 @@ const VbsManagerPage = {
         const t = this.state.tables.find(x => x.table_id === tableId);
         if (t) t.vbs_status = status;
         this.renderTableList(document.getElementById('vbs-search').value);
+    },
+
+    closeDetail() {
+        document.getElementById('vbs-workspace')?.classList.remove('content-active');
     },
 
     // Clean up when leaving page
