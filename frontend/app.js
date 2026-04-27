@@ -24,6 +24,7 @@ const App = {
 
     init() {
         Nav.init();
+        if (window.Onboarding) Onboarding.init();
         window.addEventListener('hashchange', () => this.route());
         this.route();
     },
