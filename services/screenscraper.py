@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 API_BASE = "https://api.screenscraper.fr/api2"
 SYSTEM_ID_VPINBALL = 198  # Visual Pinball system ID on ScreenScraper
 SOFTNAME = "VPin Manager"
+DEFAULT_HEADERS = {"Accept-Encoding": "identity"}
 
 # ScreenScraper media type → (folder, suffix)
 MEDIA_TYPE_MAP = {
@@ -140,7 +141,7 @@ async def test_credentials() -> dict:
         return {"success": False, "message": "No ScreenScraper credentials configured"}
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, headers=DEFAULT_HEADERS) as client:
             # Use ssuserInfos to validate credentials
             resp = await client.get(
                 f"{API_BASE}/ssuserInfos.php",
@@ -199,7 +200,7 @@ async def search_game(game_name: str, filename: str = "", ss_id: Optional[str] =
 
     result = None
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=30.0, headers=DEFAULT_HEADERS) as client:
         # Strategy 0: jeuInfos with gameid (Direct match)
         if ss_id:
             try:
@@ -421,7 +422,7 @@ async def download_media_for_table(
     downloaded = []
     errors = []
 
-    async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=60.0, follow_redirects=True, headers=DEFAULT_HEADERS) as client:
         for key, media_info in to_download.items():
             media_url = media_info["url"]
             file_ext = f".{media_info['format']}" if media_info.get("format") else ".png"
