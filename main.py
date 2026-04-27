@@ -197,137 +197,242 @@ if __name__ == "__main__":
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
 
-    # Try to launch the macOS menubar app
-    try:
-        import rumps
-        import os
+    import platform
+    import os
 
-        class VPXMenuBarApp(rumps.App):
-            def __init__(self):
-                super(VPXMenuBarApp, self).__init__("", quit_button=None)
+    def _shutdown_server():
+        global server_instance
+        if server_instance:
+            server_instance.should_exit = True
+        if server_thread.is_alive():
+            server_thread.join(timeout=2.0)
 
-                # Asset resolution for the icon
-                icon_path = None
-                icon_filename = "MenuBarIconColor.png"
-                if getattr(sys, 'frozen', False):
-                    # PyInstaller path
-                    base_path = sys._MEIPASS
-                    icon_path = os.path.join(base_path, 'resources', icon_filename)
-                else:
-                    # Running from script
-                    icon_path = os.path.join(os.path.dirname(__file__), 'resources', icon_filename)
+    # Launch System Tray / Menu Bar based on OS
+    if platform.system() == "Darwin":
+        try:
+            import rumps
 
-                if os.path.exists(icon_path):
-                    # Set the icon. rumps handles absolute paths well, 
-                    # but we ensure it's not treated as a template.
-                    self.icon = icon_path
-                    self.template = False
+            class VPXMenuBarApp(rumps.App):
+                def __init__(self):
+                    super(VPXMenuBarApp, self).__init__("", quit_button=None)
 
-                # Define initial menu structure
-                self.status_item = rumps.MenuItem("Managing 0 Tables")
-                # Make it grayed out/unclickable
-                self.status_item.set_callback(None)
+                    # Asset resolution for the icon
+                    icon_path = None
+                    icon_filename = "MenuBarIconColor.png"
+                    if getattr(sys, 'frozen', False):
+                        # PyInstaller path
+                        base_path = sys._MEIPASS
+                        icon_path = os.path.join(base_path, 'resources', icon_filename)
+                    else:
+                        # Running from script
+                        icon_path = os.path.join(os.path.dirname(__file__), 'resources', icon_filename)
 
-                self.menu = [
-                    self.status_item,
-                    None,  # Separator
-                    rumps.MenuItem("About VPX Manager", callback=self.about_window),
-                    rumps.MenuItem("Check for Updates...", callback=self.check_for_updates),
-                    None,  # Separator
-                    rumps.MenuItem("Open Web Interface", callback=self.open_web_ui),
-                    rumps.MenuItem("Open Emulation Station", callback=self.open_es),
-                    None,  # Separator
-                    rumps.MenuItem("Restart", callback=self.restart),
-                    rumps.MenuItem("Quit", callback=self.quit_app)
-                ]
+                    if os.path.exists(icon_path):
+                        # Set the icon. rumps handles absolute paths well,
+                        # but we ensure it's not treated as a template.
+                        self.icon = icon_path
+                        self.template = False
 
-            def open_web_ui(self, sender):
-                import webbrowser
+                    # Define initial menu structure
+                    self.status_item = rumps.MenuItem("Managing 0 Tables")
+                    # Make it grayed out/unclickable
+                    self.status_item.set_callback(None)
+
+                    self.menu = [
+                        self.status_item,
+                        None,  # Separator
+                        rumps.MenuItem("About VPX Manager", callback=self.about_window),
+                        rumps.MenuItem("Check for Updates...", callback=self.check_for_updates),
+                        None,  # Separator
+                        rumps.MenuItem("Open Web Interface", callback=self.open_web_ui),
+                        rumps.MenuItem("Open Emulation Station", callback=self.open_es),
+                        None,  # Separator
+                        rumps.MenuItem("Restart", callback=self.restart),
+                        rumps.MenuItem("Quit", callback=self.quit_app)
+                    ]
+
+                def open_web_ui(self, sender):
+                    import webbrowser
+                    webbrowser.open("http://localhost:8746")
+
+                def about_window(self, sender):
+                    rumps.alert(
+                        title="VPX Manager for ES-DE",
+                        message=f"Version {VERSION}\n\nA Visual Pinball file management system for macOS and Linux with media file management for Emulation Station. Let's make some macOS pincabs!\n\nDeveloped by Aaron Sobel",
+                        ok="Close"
+                    )
+
+                def check_for_updates(self, sender):
+                    from services.update_service import update_service
+                    try:
+                        result = asyncio.run(update_service.check_for_updates())
+                        if result.get("update_available"):
+                            if rumps.alert(
+                                title="Update Available",
+                                message=f"A new version ({result['latest_version']}) is available.\n\nWould you like to open the download page?",
+                                ok="Download",
+                                cancel="Later"
+                            ):
+                                import webbrowser
+                                webbrowser.open(result["download_url"])
+                        elif result.get("error"):
+                            rumps.alert("Update Check Failed", result["error"])
+                        else:
+                            rumps.alert("Up to Date", f"You are running the latest version ({VERSION}).")
+                    except Exception as e:
+                        logger.error(f"Error checking for updates from menubar: {e}")
+                        rumps.alert("Update Check Failed", str(e))
+
+                @rumps.timer(5)
+                def update_status(self, _):
+                    # We need to run db operations in a new event loop or using asyncio.run
+                    # since we are in a synchronous callback on the main thread.
+                    try:
+                        count = asyncio.run(db.get_table_count())
+                        self.status_item.title = f"Managing {count} Tables"
+                    except Exception as e:
+                        logger.error(f"Error updating table count in menubar: {e}")
+
+                def open_es(self, sender):
+                    from config import config
+                    es_path = config.esde_app_path
+                    try:
+                        import subprocess
+                        subprocess.run(["open", es_path], check=False)
+                    except Exception as e:
+                        logger.error(f"Failed to open Emulation Station: {e}")
+
+                def restart(self, sender):
+                    try:
+                        import subprocess
+                        if getattr(sys, 'frozen', False):
+                            # Executable / .app bundle
+                            bundle_path = sys.executable
+                            # If inside a macOS .app, sys.executable is .../Contents/MacOS/VPX_Manager
+                            # We want the .app path
+                            if ".app/Contents/MacOS" in bundle_path:
+                                bundle_path = bundle_path.split(".app")[0] + ".app"
+
+                            subprocess.Popen(["open", "-n", bundle_path])
+                        else:
+                            # Script
+                            subprocess.Popen([sys.executable, *sys.argv])
+                    except Exception as e:
+                        logger.error(f"Failed to restart app: {e}")
+                    finally:
+                        _shutdown_server()
+                        rumps.quit_application()
+
+                def quit_app(self, sender):
+                    _shutdown_server()
+                    rumps.quit_application()
+
+            # Run the app
+            VPXMenuBarApp().run()
+
+        except ImportError:
+            # Fallback if rumps is missing
+            try:
+                while True:
+                    import time
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                sys.exit(0)
+
+    elif platform.system() == "Linux":
+        try:
+            import pystray
+            from PIL import Image
+            import webbrowser
+            import subprocess
+
+            def open_web_ui(icon, item):
                 webbrowser.open("http://localhost:8746")
 
-            def about_window(self, sender):
-                rumps.alert(
-                    title="VPX Manager for ES-DE",
-                    message=f"Version {VERSION}\n\nA Visual Pinball file management system for macOS and Linux with media file management for Emulation Station. Let's make some macOS pincabs!\n\nDeveloped by Aaron Sobel",
-                    ok="Close"
-                )
-
-            def check_for_updates(self, sender):
-                from services.update_service import update_service
+            def about_window(icon, item):
                 try:
-                    result = asyncio.run(update_service.check_for_updates())
-                    if result.get("update_available"):
-                        if rumps.alert(
-                            title="Update Available",
-                            message=f"A new version ({result['latest_version']}) is available.\n\nWould you like to open the download page?",
-                            ok="Download",
-                            cancel="Later"
-                        ):
-                            import webbrowser
-                            webbrowser.open(result["download_url"])
-                    elif result.get("error"):
-                        rumps.alert("Update Check Failed", result["error"])
-                    else:
-                        rumps.alert("Up to Date", f"You are running the latest version ({VERSION}).")
-                except Exception as e:
-                    logger.error(f"Error checking for updates from menubar: {e}")
-                    rumps.alert("Update Check Failed", str(e))
+                    import tkinter as tk
+                    from tkinter import messagebox
+                    root = tk.Tk()
+                    root.withdraw()
+                    messagebox.showinfo("VPX Manager for ES-DE", f"Version {VERSION}\n\nA Visual Pinball file management system for macOS and Linux with media file management for Emulation Station.\n\nDeveloped by Aaron Sobel")
+                    root.destroy()
+                except ImportError:
+                    logger.warning("Tkinter not available for about window")
 
-            @rumps.timer(5)
-            def update_status(self, _):
-                # We need to run db operations in a new event loop or using asyncio.run
-                # since we are in a synchronous callback on the main thread.
-                try:
-                    count = asyncio.run(db.get_table_count())
-                    self.status_item.title = f"Managing {count} Tables"
-                except Exception as e:
-                    logger.error(f"Error updating table count in menubar: {e}")
+            def check_for_updates(icon, item):
+                # Placeholder for update check on linux tray for now
+                pass
 
-            def open_es(self, sender):
+            def open_es(icon, item):
                 from config import config
                 es_path = config.esde_app_path
                 try:
-                    import subprocess
-                    subprocess.run(["open", es_path], check=False)
+                    subprocess.Popen([es_path])
                 except Exception as e:
                     logger.error(f"Failed to open Emulation Station: {e}")
 
-            def _shutdown_server(self):
-                global server_instance
-                if server_instance:
-                    server_instance.should_exit = True
-                if server_thread.is_alive():
-                    server_thread.join(timeout=2.0)
-
-            def restart(self, sender):
+            def restart(icon, item):
                 try:
-                    import subprocess
-                    if getattr(sys, 'frozen', False):
-                        # Executable / .app bundle
-                        bundle_path = sys.executable
-                        # If inside a macOS .app, sys.executable is .../Contents/MacOS/VPX_Manager
-                        # We want the .app path
-                        if ".app/Contents/MacOS" in bundle_path:
-                            bundle_path = bundle_path.split(".app")[0] + ".app"
-                        subprocess.Popen(["open", "-n", bundle_path])
+                    import os
+                    appimage = os.environ.get("APPIMAGE")
+                    if appimage:
+                        subprocess.Popen([appimage])
+                    elif getattr(sys, 'frozen', False):
+                        subprocess.Popen([sys.executable])
                     else:
-                        # Script
                         subprocess.Popen([sys.executable, *sys.argv])
                 except Exception as e:
                     logger.error(f"Failed to restart app: {e}")
                 finally:
-                    self._shutdown_server()
-                    rumps.quit_application()
+                    _shutdown_server()
+                    icon.stop()
 
-            def quit_app(self, sender):
-                self._shutdown_server()
-                rumps.quit_application()
+            def quit_app(icon, item):
+                _shutdown_server()
+                icon.stop()
 
-        # Run the app
-        VPXMenuBarApp().run()
+            # Load the icon image
+            icon_path = None
+            icon_filename = "MenuBarIconColor.png"
+            if getattr(sys, 'frozen', False):
+                base_path = sys._MEIPASS
+                icon_path = os.path.join(base_path, 'resources', icon_filename)
+            else:
+                icon_path = os.path.join(os.path.dirname(__file__), 'resources', icon_filename)
 
-    except ImportError:
-        # Fallback if not on macOS or rumps is missing
+            image = Image.open(icon_path) if os.path.exists(icon_path) else Image.new('RGB', (64, 64), color = (73, 109, 137))
+
+            # Menu setup
+            menu = pystray.Menu(
+                pystray.MenuItem("About VPX Manager", about_window),
+                pystray.MenuItem("Check for Updates...", check_for_updates),
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("Open Web Interface", open_web_ui),
+                pystray.MenuItem("Open Emulation Station", open_es),
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("Restart", restart),
+                pystray.MenuItem("Quit", quit_app)
+            )
+
+            icon = pystray.Icon("VPX Manager", image, "VPX Manager", menu)
+
+            # We would use a background thread for status updates similar to rumps.timer,
+            # but for simplicity in this port we will omit the active status polling.
+
+            icon.run()
+
+        except ImportError:
+            # Fallback if pystray is missing
+            try:
+                while True:
+                    import time
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                sys.exit(0)
+
+    else:
+        # Fallback for other platforms
         try:
             while True:
                 import time

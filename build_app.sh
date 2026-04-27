@@ -67,12 +67,57 @@ if [ "${PLATFORM}" == "macOS" ]; then
     echo "To launch:  open \"${APP_BUNDLE}\""
 else
     # For Linux builds
-    BINARY="${DIST_DIR}/VPX_Manager/VPX_Manager"
+    echo "Creating AppImage (Linux specific)..."
+
+    # Setup AppDir
+    APPDIR="${DIST_DIR}/VPX_Manager.AppDir"
+    rm -rf "${APPDIR}"
+    mkdir -p "${APPDIR}/usr/bin"
+
+    # Copy PyInstaller output
+    cp -r "${DIST_DIR}/VPX_Manager/"* "${APPDIR}/usr/bin/"
+
+    # Create .desktop file
+    cat > "${APPDIR}/vpx-manager.desktop" <<EOF
+[Desktop Entry]
+Name=VPX Manager for ES-DE
+Exec=VPX_Manager
+Icon=icon
+Type=Application
+Categories=Utility;
+EOF
+
+    # Add icon
+    cp "${SCRIPT_DIR}/resources/icon.png" "${APPDIR}/icon.png"
+
+    # Create AppRun script
+    cat > "${APPDIR}/AppRun" <<'EOF'
+#!/bin/bash
+HERE="$(dirname "$(readlink -f "${0}")")"
+export PATH="${HERE}/usr/bin:${PATH}"
+exec "${HERE}/usr/bin/VPX_Manager" "$@"
+EOF
+    chmod +x "${APPDIR}/AppRun"
+
+    # Download appimagetool if not present
+    APPIMAGETOOL="${DIST_DIR}/appimagetool-x86_64.AppImage"
+    if [ ! -f "${APPIMAGETOOL}" ]; then
+        echo "Downloading appimagetool..."
+        curl -L "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" -o "${APPIMAGETOOL}"
+        chmod +x "${APPIMAGETOOL}"
+    fi
+
+    # Generate AppImage
+    ARCH=x86_64 "${APPIMAGETOOL}" "${APPDIR}" "${DIST_DIR}/VPX_Manager-x86_64.AppImage"
+
+    APPIMAGE_BUNDLE="${DIST_DIR}/VPX_Manager-x86_64.AppImage"
+
     echo ""
     echo "=== Build Complete ==="
-    echo "Binary: ${BINARY}"
+    echo "AppImage: ${APPIMAGE_BUNDLE}"
+    echo "Total Size: $(du -sh "${APPIMAGE_BUNDLE}" | awk '{print $1}')"
     echo ""
-    echo "To launch:  ./${BINARY}"
+    echo "To launch:  ./${APPIMAGE_BUNDLE}"
 fi
 
 echo "Server URL: http://localhost:8746"

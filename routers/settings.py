@@ -91,11 +91,33 @@ async def update_settings(update: SettingsUpdate):
 @router.post("/settings/pick-path")
 async def pick_path(prompt: str = "Select a path", pick_files: bool = False):
     """
-    Open a macOS native picker dialog via osascript.
+    Open a native picker dialog. Uses osascript on macOS and tkinter on Linux.
     Can pick folders or files (including .app bundles).
     """
-    if sys.platform != "darwin":
-        return {"path": None, "error": "Folder picker only supported on macOS"}
+    if sys.platform == "linux":
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+
+            if pick_files:
+                picked_path = filedialog.askopenfilename(title=prompt)
+            else:
+                picked_path = filedialog.askdirectory(title=prompt)
+
+            root.destroy()
+
+            if picked_path:
+                return {"path": picked_path}
+            return {"path": None}
+        except Exception as e:
+            return {"path": None, "error": f"Linux folder picker failed: {str(e)}"}
+
+    elif sys.platform != "darwin":
+        return {"path": None, "error": "Folder picker only supported on macOS and Linux"}
 
     # choose file allows selecting .app bundles as files which is often what users expect for 'App Path'
     # choose folder is better for directories like 'Tables'
