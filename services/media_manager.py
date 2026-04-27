@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 Media manager service.
 Unified around ES-DE downloaded_media standard.
@@ -8,10 +9,9 @@ Stores and tracks media in ESDE downloaded_media folders:
 import os
 import shutil
 from pathlib import Path
-from typing import List, Dict, Optional
-from config import config
-import database as db
 
+import database as db
+from config import config
 
 # Standard ES-DE media categories for status tracking
 ESDE_STATUS_TYPES = ["fanart", "covers", "manuals", "marquees", "screenshots", "videos"]
@@ -22,6 +22,7 @@ ESDE_EXTENSIONS = {
     "videos": [".mp4", ".mkv", ".avi", ".webm"],
     "manuals": [".pdf"],
 }
+
 
 async def get_media_status(table_id: int) -> dict:
     """
@@ -54,7 +55,11 @@ async def get_esde_media_status(table_id: int) -> dict:
 
     table = await db.get_table(table_id)
     if not table:
-        return {"id": table_id, "existing_types": [], "missing_types": list(ESDE_STATUS_TYPES)}
+        return {
+            "id": table_id,
+            "existing_types": [],
+            "missing_types": list(ESDE_STATUS_TYPES),
+        }
 
     filename = table.get("filename", "")
     stem = Path(filename).stem if filename else ""
@@ -66,7 +71,7 @@ async def get_esde_media_status(table_id: int) -> dict:
         folder_name = Path(table["folder_path"]).name
         for status_type in ESDE_STATUS_TYPES:
             found = False
-            
+
             folder_path = esde_base / status_type
             if folder_path.exists():
                 if status_type in ("videos",):
@@ -82,10 +87,13 @@ async def get_esde_media_status(table_id: int) -> dict:
                         found = True
                         break
                     # Check nested
-                    if folder_name and (folder_path / folder_name / f"{stem}{ext}").exists():
+                    if (
+                        folder_name
+                        and (folder_path / folder_name / f"{stem}{ext}").exists()
+                    ):
                         found = True
                         break
-            
+
             if found:
                 existing.append(status_type)
             else:
@@ -122,7 +130,7 @@ async def get_media_file_path(table_id: int, media_type: str) -> Optional[Path]:
 
     esde_base = config.esde_media_base
     folder_path = esde_base / media_type
-    
+
     if not folder_path.exists():
         return None
 
@@ -138,7 +146,7 @@ async def get_media_file_path(table_id: int, media_type: str) -> Optional[Path]:
         path = folder_path / f"{stem}{ext}"
         if path.exists():
             return path
-            
+
     # 2. Check Nested Path (Game representation)
     folder_name = Path(table["folder_path"]).name
     if folder_name:
@@ -155,27 +163,36 @@ async def delete_media_file(table_id: int, media_type: str) -> dict:
     Delete a specific ES-DE media file and its database record.
     """
     file_path = await get_media_file_path(table_id, media_type)
-    
+
     # Delete from database first (or always, to ensure sync)
     try:
         conn = await db.get_db()
         await conn.execute(
             "DELETE FROM media WHERE table_id = ? AND media_type = ?",
-            (table_id, media_type)
+            (table_id, media_type),
         )
         await conn.commit()
     except Exception as db_err:
         import logging
-        logging.getLogger(__name__).error(f"Failed to delete DB record for media: {db_err}")
+
+        logging.getLogger(__name__).error(
+            f"Failed to delete DB record for media: {db_err}"
+        )
 
     if file_path and file_path.exists():
         try:
             file_path.unlink()
-            return {"success": True, "message": f"Deleted {file_path.name} and removed database record"}
+            return {
+                "success": True,
+                "message": f"Deleted {file_path.name} and removed database record",
+            }
         except Exception as e:
             return {"success": False, "error": str(e)}
-    
-    return {"success": True, "message": "Database record removed (file was already missing)"}
+
+    return {
+        "success": True,
+        "message": "Database record removed (file was already missing)",
+    }
 
 
 async def rotate_media(table_id: int, media_type: str, angle: int) -> dict:
@@ -183,7 +200,7 @@ async def rotate_media(table_id: int, media_type: str, angle: int) -> dict:
     Rotate a media file and update all physical instances (dual-path).
     """
     from services.media_processor import rotate_image
-    
+
     table = await db.get_table(table_id)
     if not table:
         return {"success": False, "error": "Table not found"}
@@ -196,31 +213,33 @@ async def rotate_media(table_id: int, media_type: str, angle: int) -> dict:
         # Rotate the primary file
         if media_type == "videos" or str(file_path).lower().endswith(".mp4"):
             from services.media_processor import rotate_video_metadata_manual
+
             rotate_video_metadata_manual(str(file_path), angle)
         else:
             rotate_image(str(file_path), angle)
-        
+
         # Re-apply dual-path synchronization
         game_stem = Path(table["filename"]).stem
         folder_name = Path(table["folder_path"]).name
-        
+
         if config.media_storage_mode == "portable":
             media_base = Path(table["folder_path"]) / "media"
         else:
             media_base = config.esde_media_base
-            
+
         await save_media_dual(
             media_base=media_base,
             media_type=media_type,
             folder_name=folder_name,
             game_stem=game_stem,
             ext=file_path.suffix,
-            source_path=file_path
+            source_path=file_path,
         )
-        
+
         return {"success": True, "message": f"Media rotated {angle} degrees"}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
 
 async def delete_all_media_for_table(table_filename: str) -> None:
     """
@@ -229,6 +248,7 @@ async def delete_all_media_for_table(table_filename: str) -> None:
     table_stem = Path(table_filename).stem
     media_base = config.esde_media_base
     import logging
+
     logger = logging.getLogger(__name__)
 
     for sub in ESDE_STATUS_TYPES:
@@ -240,23 +260,28 @@ async def delete_all_media_for_table(table_filename: str) -> None:
                     logger.info(f"Deleted global media: {file_path}")
                 except Exception as e:
                     logger.error(f"Failed to delete global media {file_path}: {e}")
- 
- 
+
+
 async def delete_all_media_by_id(table_id: int) -> dict:
     """Helper to delete all media for a table ID."""
     table = await db.get_table(table_id)
     if not table:
         return {"success": False, "error": "Table not found"}
-    
+
     filename = table.get("filename", "")
     if not filename:
         return {"success": False, "error": "Table has no filename"}
-        
+
     await delete_all_media_for_table(filename)
-    return {"success": True, "message": f"Deleted all media for {table.get('display_name')}"}
+    return {
+        "success": True,
+        "message": f"Deleted all media for {table.get('display_name')}",
+    }
 
 
-async def save_uploaded_media(table_id: int, media_type: str, filename: str, content: bytes) -> dict:
+async def save_uploaded_media(
+    table_id: int, media_type: str, filename: str, content: bytes
+) -> dict:
     """
     Save an uploaded media file to the ES-DE global folders with dual-path duplication.
     """
@@ -271,7 +296,7 @@ async def save_uploaded_media(table_id: int, media_type: str, filename: str, con
     ext = Path(filename).suffix.lower()
     game_stem = Path(table["filename"]).stem
     folder_name = Path(table["folder_path"]).name
-    
+
     # Determine base directory
     if config.media_storage_mode == "portable":
         media_base = Path(table["folder_path"]) / "media"
@@ -283,7 +308,7 @@ async def save_uploaded_media(table_id: int, media_type: str, filename: str, con
 
     # Path 1: Root level (for Folder)
     path_folder = target_dir / f"{folder_name}{ext}"
-    
+
     # Path 2: Nested level (for Game)
     path_game_dir = target_dir / folder_name
     path_game_dir.mkdir(parents=True, exist_ok=True)
@@ -293,13 +318,14 @@ async def save_uploaded_media(table_id: int, media_type: str, filename: str, con
         # Write primary file
         with open(path_folder, "wb") as f:
             f.write(content)
-        
+
         # Duplicate to secondary path
         shutil.copy2(path_folder, path_game)
-        
+
         # Sync with gamelist.xml (using the nested path as primary for the game entry)
         try:
             from services.gamelist_manager import GamelistManager
+
             gm = GamelistManager(str(config.get_gamelist_xml_path()))
 
             tag_map = {
@@ -308,13 +334,15 @@ async def save_uploaded_media(table_id: int, media_type: str, filename: str, con
                 "fanart": "fanart",
                 "marquees": "marquee",
                 "videos": "video",
-                "manuals": "manual"
+                "manuals": "manual",
             }
             tag = tag_map.get(media_type)
             if tag:
                 # Always use the nested path for the <game> entry in XML
                 if config.media_storage_mode == "portable":
-                    rel_xml_path = f"./media/{media_type}/{folder_name}/{game_stem}{ext}"
+                    rel_xml_path = (
+                        f"./media/{media_type}/{folder_name}/{game_stem}{ext}"
+                    )
                 else:
                     rel_xml_path = str(path_game).replace("\\", "/")
 
@@ -322,7 +350,10 @@ async def save_uploaded_media(table_id: int, media_type: str, filename: str, con
                 gm.update_game(rom_rel_path, {tag: rel_xml_path})
         except Exception as e:
             import logging
-            logging.getLogger(__name__).error(f"Failed to sync gamelist.xml on upload: {e}")
+
+            logging.getLogger(__name__).error(
+                f"Failed to sync gamelist.xml on upload: {e}"
+            )
 
         return {
             "success": True,
@@ -333,7 +364,15 @@ async def save_uploaded_media(table_id: int, media_type: str, filename: str, con
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-async def save_media_dual(media_base: Path, media_type: str, folder_name: str, game_stem: str, ext: str, source_path: Path) -> list[Path]:
+
+async def save_media_dual(
+    media_base: Path,
+    media_type: str,
+    folder_name: str,
+    game_stem: str,
+    ext: str,
+    source_path: Path,
+) -> list[Path]:
     """
     Helper to ensure a media file exists in both ES-DE required locations for nested tables.
     Used by scraper and media processor after initial download/edit.
@@ -343,7 +382,7 @@ async def save_media_dual(media_base: Path, media_type: str, folder_name: str, g
 
     # Path 1: Root level (for Folder representation)
     path_folder = target_dir / f"{folder_name}{ext}"
-    
+
     # Path 2: Nested level (for Game representation)
     path_game_dir = target_dir / folder_name
     path_game_dir.mkdir(parents=True, exist_ok=True)
@@ -352,16 +391,26 @@ async def save_media_dual(media_base: Path, media_type: str, folder_name: str, g
     # Check if source is already one of the targets (using samefile for casing-insensitive comparison)
     is_path_folder = False
     is_path_game = False
-    
+
     try:
-        if source_path.exists() and path_folder.exists() and os.path.samefile(source_path, path_folder):
+        if (
+            source_path.exists()
+            and path_folder.exists()
+            and os.path.samefile(source_path, path_folder)
+        ):
             is_path_folder = True
-    except (OSError, ValueError): pass
-    
+    except (OSError, ValueError):
+        pass
+
     try:
-        if source_path.exists() and path_game.exists() and os.path.samefile(source_path, path_game):
+        if (
+            source_path.exists()
+            and path_game.exists()
+            and os.path.samefile(source_path, path_game)
+        ):
             is_path_game = True
-    except (OSError, ValueError): pass
+    except (OSError, ValueError):
+        pass
 
     if is_path_folder:
         # Source is Path 1, just refresh Path 2
@@ -375,7 +424,7 @@ async def save_media_dual(media_base: Path, media_type: str, folder_name: str, g
             path_folder.unlink()
         shutil.move(str(source_path), str(path_folder))
         shutil.copy2(path_folder, path_game)
-        
+
     return [path_folder, path_game]
 
 
@@ -391,7 +440,9 @@ async def migrate_media_strategy(target_mode: str):
     tables = await db.get_tables()
     total_tables = len(tables)
 
-    task_registry.start_task("media-migration", total=total_tables, message="Initializing mapping...")
+    task_registry.start_task(
+        "media-migration", total=total_tables, message="Initializing mapping..."
+    )
 
     global_esde = cfg.expanded_esde_media_dir
     tables_dir = cfg.expanded_tables_dir
@@ -401,123 +452,177 @@ async def migrate_media_strategy(target_mode: str):
     try:
         if target_mode == "portable":
             # Move from Global -> Portable
-            task_registry.update_progress("media-migration", 0, "Moving to Portable Mode...")
+            task_registry.update_progress(
+                "media-migration", 0, "Moving to Portable Mode..."
+            )
             for i, t in enumerate(tables):
-                task_registry.update_progress("media-migration", i, f"Migrating ({i}/{total_tables})")
+                task_registry.update_progress(
+                    "media-migration", i, f"Migrating ({i}/{total_tables})"
+                )
                 filename = t.get("filename", "")
                 if not filename:
                     continue
 
                 stem = Path(filename).stem
 
-                for media_type in ["covers", "screenshots", "fanart", "marquees", "videos", "manuals"]:
+                for media_type in [
+                    "covers",
+                    "screenshots",
+                    "fanart",
+                    "marquees",
+                    "videos",
+                    "manuals",
+                ]:
                     global_category_dir = global_esde / media_type
                     if not global_category_dir.exists():
                         continue
-                        
+
                     found_file = None
                     for ext in [".png", ".jpg", ".mp4", ".pdf"]:
                         check_path = global_category_dir / f"{stem}{ext}"
                         if check_path.exists():
                             found_file = check_path
                             break
-                            
+
                     if found_file:
                         # Move to portable
-                        portable_dir = tables_dir / Path(filename).parent / "media" / media_type
+                        portable_dir = (
+                            tables_dir / Path(filename).parent / "media" / media_type
+                        )
                         portable_dir.mkdir(parents=True, exist_ok=True)
                         dest_path = portable_dir / found_file.name
-                        
+
                         try:
                             shutil.move(str(found_file), str(dest_path))
                             moved_count += 1
                         except Exception as e:
                             import logging
-                            logging.getLogger(__name__).error(f"Failed to move {found_file} to {dest_path}: {e}")
+
+                            logging.getLogger(__name__).error(
+                                f"Failed to move {found_file} to {dest_path}: {e}"
+                            )
 
         else:
             # Move from Portable -> Global (Standard)
-            task_registry.update_progress("media-migration", 0, "Moving to Standard Mode...")
+            task_registry.update_progress(
+                "media-migration", 0, "Moving to Standard Mode..."
+            )
             for i, t in enumerate(tables):
-                task_registry.update_progress("media-migration", i, f"Migrating ({i}/{total_tables})")
+                task_registry.update_progress(
+                    "media-migration", i, f"Migrating ({i}/{total_tables})"
+                )
                 filename = t.get("filename", "")
                 if not filename:
                     continue
 
                 portable_base = tables_dir / Path(filename).parent / "media"
 
-                for media_type in ["covers", "screenshots", "fanart", "marquees", "videos", "manuals"]:
+                for media_type in [
+                    "covers",
+                    "screenshots",
+                    "fanart",
+                    "marquees",
+                    "videos",
+                    "manuals",
+                ]:
                     portable_category_dir = portable_base / media_type
                     if not portable_category_dir.exists():
                         continue
-                        
+
                     found_file = None
                     for ext in [".png", ".jpg", ".mp4", ".pdf"]:
                         check_path = portable_category_dir / f"{stem}{ext}"
                         if check_path.exists():
                             found_file = check_path
                             break
-                            
+
                     if found_file:
                         global_category_dir = global_esde / media_type
                         global_category_dir.mkdir(parents=True, exist_ok=True)
                         dest_path = global_category_dir / found_file.name
-                        
+
                         try:
                             shutil.move(str(found_file), str(dest_path))
                             moved_count += 1
                         except Exception as e:
                             import logging
-                            logging.getLogger(__name__).error(f"Failed to move {found_file} to {dest_path}: {e}")
-                            
+
+                            logging.getLogger(__name__).error(
+                                f"Failed to move {found_file} to {dest_path}: {e}"
+                            )
+
         # Rewrite XML paths for all tables using the configured gamelist path
         gm = GamelistManager(str(cfg.get_gamelist_xml_path()))
 
         old_xml = cfg.expanded_tables_dir / "gamelist.xml"
         new_xml = cfg.get_gamelist_xml_path()
-        
+
         if old_xml.exists() and old_xml != new_xml:
             try:
                 new_xml.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(str(old_xml), str(new_xml))
             except Exception as e:
                 import logging
+
                 logging.getLogger(__name__).error(f"Failed to copy gamelist.xml: {e}")
 
         for t in tables:
             filename = t.get("filename", "")
-            if not filename: continue
-            
+            if not filename:
+                continue
+
             from services.media_manager import get_esde_media_status
-            tag_map = {"covers": "image", "screenshots": "thumbnail", "fanart": "fanart", "marquees": "marquee", "videos": "video", "manuals": "manual"}
-            
+
+            tag_map = {
+                "covers": "image",
+                "screenshots": "thumbnail",
+                "fanart": "fanart",
+                "marquees": "marquee",
+                "videos": "video",
+                "manuals": "manual",
+            }
+
             esde_status = await get_esde_media_status(t["id"])
             existing = esde_status.get("existing_types", [])
             if not existing:
                 continue
-                
+
             xml_updates = {}
             for media_type in existing:
                 tag = tag_map.get(media_type)
-                if not tag: continue
-                
+                if not tag:
+                    continue
+
                 ext = ".png"
-                if media_type == "videos": ext = ".mp4"
-                elif media_type == "manuals": ext = ".pdf"
-                
+                if media_type == "videos":
+                    ext = ".mp4"
+                elif media_type == "manuals":
+                    ext = ".pdf"
+
                 target_filename = f"{Path(filename).stem}{ext}"
                 if target_mode == "portable":
-                    rel_path = f"./{Path(filename).parent.name}/media/{media_type}/{target_filename}" if Path(filename).parent.name else f"./media/{media_type}/{target_filename}"
+                    rel_path = (
+                        f"./{Path(filename).parent.name}/media/{media_type}/{target_filename}"
+                        if Path(filename).parent.name
+                        else f"./media/{media_type}/{target_filename}"
+                    )
                 else:
                     global_category_dir = global_esde / media_type
-                    rel_path = str(global_category_dir / target_filename).replace("\\", "/")
-                
+                    rel_path = str(global_category_dir / target_filename).replace(
+                        "\\", "/"
+                    )
+
                 xml_updates[tag] = rel_path
-                
+
             gm.update_game(f"./{filename}", xml_updates)
 
-        task_registry.complete_task("media-migration", f"Completed: migrated {moved_count} files")
-        return {"success": True, "message": f"Migrated {moved_count} files successfully."}
+        task_registry.complete_task(
+            "media-migration", f"Completed: migrated {moved_count} files"
+        )
+        return {
+            "success": True,
+            "message": f"Migrated {moved_count} files successfully.",
+        }
     except Exception as e:
         task_registry.fail_task("media-migration", str(e))
         return {"success": False, "error": str(e)}

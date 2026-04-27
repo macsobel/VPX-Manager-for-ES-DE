@@ -1,19 +1,24 @@
+import os
+
 """
 Settings and system status API router.
 Includes macOS native folder picker via osascript.
 """
-import os
-import sys
+
 import shutil
 import subprocess
+import sys
 from pathlib import Path
+from typing import Optional
+
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
-from typing import Optional
-from config import config, save_config, AppConfig, VERSION
+
 import database as db
+from config import VERSION, AppConfig, config, save_config
 
 router = APIRouter(prefix="/api", tags=["settings"])
+
 
 def check_is_local(request: Request) -> bool:
     """Check if the request originated from the same computer as the server."""
@@ -21,9 +26,10 @@ def check_is_local(request: Request) -> bool:
     # Direct loopback
     if client_host in ("127.0.0.1", "::1", "localhost"):
         return True
-    
+
     # Check against server's own LAN IPs
     import socket
+
     try:
         hostname = socket.gethostname()
         local_ips = socket.gethostbyname_ex(hostname)[2]
@@ -53,13 +59,15 @@ class SettingsUpdate(BaseModel):
 async def get_settings(request: Request):
     # Return model data + dynamic properties
     data = config.model_dump()
-    
-    data.update({
-        "support_dir": config.support_dir,
-        "vps_db_path": config.vps_db_path,
-        "db_path": config.db_path,
-        "is_local": check_is_local(request)
-    })
+
+    data.update(
+        {
+            "support_dir": config.support_dir,
+            "vps_db_path": config.vps_db_path,
+            "db_path": config.db_path,
+            "is_local": check_is_local(request),
+        }
+    )
     return data
 
 
@@ -80,11 +88,12 @@ async def update_settings(update: SettingsUpdate):
     for key, val in new_config.model_dump().items():
         setattr(config, key, val)
     save_config(new_config)
-    
+
     # Invalidate cache so ScreenScraper auth is re-checked immediately
     from services.screenscraper import clear_quota_cache
+
     clear_quota_cache()
-    
+
     return config.model_dump()
 
 
@@ -100,11 +109,11 @@ async def pick_path(prompt: str = "Select a path", pick_files: bool = False):
     # choose file allows selecting .app bundles as files which is often what users expect for 'App Path'
     # choose folder is better for directories like 'Tables'
     cmd = "choose file" if pick_files else "choose folder"
-    
-    script = f'''
+
+    script = f"""
     set chosen to {cmd} with prompt "{prompt}"
     return POSIX path of chosen
-    '''
+    """
     try:
         result = subprocess.run(
             ["osascript", "-e", script],
@@ -149,7 +158,9 @@ async def system_status(request: Request):
                     media_count += 1
 
     # Disk usage
-    disk = shutil.disk_usage(str(tables_dir.parent) if tables_dir.parent.exists() else "/")
+    disk = shutil.disk_usage(
+        str(tables_dir.parent) if tables_dir.parent.exists() else "/"
+    )
 
     db_tables = await db.get_table_count()
 
@@ -178,31 +189,45 @@ async def system_status(request: Request):
             "disk_free_gb": round(disk.free / (1024**3), 1),
         },
         "is_local": check_is_local(request),
-        "version": VERSION
+        "version": VERSION,
     }
+
 
 @router.post("/migrate-media")
 async def migrate_media():
     """Migrate media based on the current storage strategy."""
-    from services.media_manager import migrate_media_strategy
-    from config import config
     import asyncio
-    
+
+    from config import config
+    from services.media_manager import migrate_media_strategy
+
     # Run in background to avoid timeout
     asyncio.create_task(migrate_media_strategy(config.media_storage_mode))
-    
-    return {"success": True, "message": f"Migration to {config.media_storage_mode} started in background. Check global progress."}
+
+    return {
+        "success": True,
+        "message": f"Migration to {config.media_storage_mode} started in background. Check global progress.",
+    }
 
 
 @router.get("/scraper/sources")
 async def get_scraper_sources():
     """Return available scraper sources and their valid keys."""
     from services.vpinmediadb import SOURCES_TO_CHECK as vpmdb_keys
+
     # ScreenScraper keys are somewhat dynamic but we have a standard set we use
-    ss_keys = ["wheel-tarcisios", "wheel", "manuel", "ss", "videotable", "video-normalized", "fanart", "box-2d"]
-    
-    return [
-        {"id": "vpinmediadb", "name": "VPinMediaDB", "keys": vpmdb_keys},
-        {"id": "screenscraper", "name": "ScreenScraper", "keys": ss_keys}
+    ss_keys = [
+        "wheel-tarcisios",
+        "wheel",
+        "manuel",
+        "ss",
+        "videotable",
+        "video-normalized",
+        "fanart",
+        "box-2d",
     ]
 
+    return [
+        {"id": "vpinmediadb", "name": "VPinMediaDB", "keys": vpmdb_keys},
+        {"id": "screenscraper", "name": "ScreenScraper", "keys": ss_keys},
+    ]

@@ -1,12 +1,15 @@
 from __future__ import annotations
-import os
+
 import logging
+import os
 from pathlib import Path
+
 import database as db
 from config import config
 from services.gamelist_manager import GamelistManager
 
 logger = logging.getLogger(__name__)
+
 
 class TableFileService:
     @staticmethod
@@ -20,7 +23,7 @@ class TableFileService:
             base = f"{name} ({year})"
         else:
             base = name
-        
+
         # Sanitize folder name: remove characters that are invalid in folder names
         return "".join(c for c in base if c not in '<>:"/\\|?*').strip()
 
@@ -36,15 +39,13 @@ class TableFileService:
 
         old_folder_path = Path(table["folder_path"])
         old_vpx_filename = table["filename"]
-        
+
         if not old_folder_path.exists():
             return {"success": False, "error": f"Folder not found: {old_folder_path}"}
 
         # 1. Build new base name
         standard_base = TableFileService.get_standard_name(
-            table["display_name"],
-            table["manufacturer"],
-            table["year"]
+            table["display_name"], table["manufacturer"], table["year"]
         )
         new_vpx_filename = f"{standard_base}.vpx"
         new_folder_name = standard_base
@@ -59,7 +60,7 @@ class TableFileService:
         for file in old_folder_path.glob("*"):
             if file.is_dir():
                 continue
-            
+
             if file.stem == old_stem:
                 # This matches our primary file or a sidecar (e.g. .directb2s)
                 new_file = file.parent / f"{standard_base}{file.suffix}"
@@ -74,23 +75,31 @@ class TableFileService:
         # Special case: if we are inside the folder we are renaming, this might fail on some OS.
         if old_folder_path.name != new_folder_name:
             if new_folder_path.exists():
-                logger.error(f"Cannot rename folder, target already exists: {new_folder_path}")
+                logger.error(
+                    f"Cannot rename folder, target already exists: {new_folder_path}"
+                )
                 # We still update the DB for the files we successfully renamed inside though
             else:
                 try:
                     old_folder_path.rename(new_folder_path)
-                    results["renames"].append({"old": old_folder_path.name, "new": new_folder_path.name})
+                    results["renames"].append(
+                        {"old": old_folder_path.name, "new": new_folder_path.name}
+                    )
                     # Use new folder path for DB update
                 except Exception as e:
                     logger.error(f"Folder rename failed: {e}")
-                    new_folder_path = old_folder_path # Stay with old path if rename failed
+                    new_folder_path = (
+                        old_folder_path  # Stay with old path if rename failed
+                    )
 
         # 4. Update Database
-        await db.upsert_table({
-            "id": table_id,
-            "filename": new_vpx_filename,
-            "folder_path": str(new_folder_path)
-        })
+        await db.upsert_table(
+            {
+                "id": table_id,
+                "filename": new_vpx_filename,
+                "folder_path": str(new_folder_path),
+            }
+        )
 
         # 5. Update gamelist.xml (ES-DE)
         # We need relative paths for gamelist.xml
@@ -108,17 +117,25 @@ class TableFileService:
         # We rename any files in /images, /videos, /manuals that start with the old stem
         try:
             from services.media_manager import ESDE_EXTENSIONS
+
             esde_base = config.expanded_tables_dir
             categories = ["images", "videos", "manuals"]
-            
+
             for cat in categories:
                 cat_dir = esde_base / cat
                 if not cat_dir.exists():
                     continue
-                
+
                 # Suffixes often used in ES-DE (plus plain)
-                possible_suffixes = ["", "-image", "-marquee", "-fanart", "-video", "-manual"]
-                
+                possible_suffixes = [
+                    "",
+                    "-image",
+                    "-marquee",
+                    "-fanart",
+                    "-video",
+                    "-manual",
+                ]
+
                 for suf in possible_suffixes:
                     for ext in ESDE_EXTENSIONS.get(cat, []):
                         old_media = cat_dir / f"{old_stem}{suf}{ext}"
@@ -126,7 +143,12 @@ class TableFileService:
                             new_media = cat_dir / f"{standard_base}{suf}{ext}"
                             if not new_media.exists():
                                 old_media.rename(new_media)
-                                results["renames"].append({"old": f"{cat}/{old_media.name}", "new": new_media.name})
+                                results["renames"].append(
+                                    {
+                                        "old": f"{cat}/{old_media.name}",
+                                        "new": new_media.name,
+                                    }
+                                )
         except Exception as e:
             logger.error(f"Failed to rename global media assets: {e}")
 

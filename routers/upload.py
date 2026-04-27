@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import shutil
+
 """
 File upload router — VPinFE-style table import with individual typed file fields.
 Each file type has its own upload endpoint for proper routing into the
@@ -23,14 +26,14 @@ Table folder structure:
       └── cfg/
 """
 import io
-import os
-import zipfile
-from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks
-from typing import List, Optional, Union
 import logging
 import tempfile
-import shutil
+import zipfile
+from pathlib import Path
+from typing import List, Optional, Union
+
+from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
+
 from config import config
 
 # Optional archive support
@@ -69,29 +72,35 @@ def _ensure_table_subfolders(table_dir: Path):
         (table_dir / sub).mkdir(parents=True, exist_ok=True)
 
 
-
 @router.get("/import-nvram")
 async def import_nvram(name: str):
     """Fetch an NVRAM file from the master repository to be used in an upload slot."""
     nvram_repo_dir = Path(config.support_dir) / "nvrams"
     if not nvram_repo_dir.exists():
         raise HTTPException(status_code=404, detail="NVRAM repository not found")
-        
+
     # Search recursively for the filename
     target_file = next(nvram_repo_dir.rglob(name), None)
     if not target_file or not target_file.is_file():
-        raise HTTPException(status_code=404, detail=f"NVRAM {name} not found in repository")
-        
+        raise HTTPException(
+            status_code=404, detail=f"NVRAM {name} not found in repository"
+        )
+
     from fastapi.responses import FileResponse
-    return FileResponse(target_file, media_type="application/octet-stream", filename=name)
+
+    return FileResponse(
+        target_file, media_type="application/octet-stream", filename=name
+    )
 
 
 @router.post("/parse-vpx")
-async def parse_vpx(vpx_file: UploadFile = File(...), vps_id: Optional[str] = Form(None)):
+async def parse_vpx(
+    vpx_file: UploadFile = File(...), vps_id: Optional[str] = Form(None)
+):
     """Parse a .vpx file to extract expected ROMs before import."""
-    from services.vpx_parser import VPXParser
     import tempfile
-    import os
+
+    from services.vpx_parser import VPXParser
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".vpx") as tmp:
         content = await vpx_file.read()
@@ -99,20 +108,31 @@ async def parse_vpx(vpx_file: UploadFile = File(...), vps_id: Optional[str] = Fo
         tmp_path = tmp.name
 
     try:
-        roms = VPXParser.process_vpx_table(tmp_path, extract_sidecar=False, vps_id=vps_id)
-        logger.info(f"Analyzed VPX {vpx_file.filename} (VPS: {vps_id}), found ROMs: {roms}")
+        roms = VPXParser.process_vpx_table(
+            tmp_path, extract_sidecar=False, vps_id=vps_id
+        )
+        logger.info(
+            f"Analyzed VPX {vpx_file.filename} (VPS: {vps_id}), found ROMs: {roms}"
+        )
 
         # Check master NVRAM repo for matching files (recursive search)
         nvram_repo_dir = Path(config.support_dir) / "nvrams"
         matched_nvram = []
         if nvram_repo_dir.exists():
             # Index all files in the repo for fast lookup
-            all_repo_files = {f.name.lower(): f.name for f in nvram_repo_dir.rglob("*.nv") if f.is_file()}
-            
+            all_repo_files = {
+                f.name.lower(): f.name
+                for f in nvram_repo_dir.rglob("*.nv")
+                if f.is_file()
+            }
+
             for rom_obj in roms:
-                rom_name = rom_obj.get("version") if isinstance(rom_obj, dict) else rom_obj
-                if not rom_name: continue
-                
+                rom_name = (
+                    rom_obj.get("version") if isinstance(rom_obj, dict) else rom_obj
+                )
+                if not rom_name:
+                    continue
+
                 nv_key = f"{rom_name.lower()}.nv"
                 if nv_key in all_repo_files:
                     matched_nvram.append(all_repo_files[nv_key])
@@ -120,24 +140,27 @@ async def parse_vpx(vpx_file: UploadFile = File(...), vps_id: Optional[str] = Fo
         # NEW: Check for auto-patch via VBS Manager
         vbs_sidecar = Path(tmp_path).with_suffix(".vbs")
         patch_info = None
-        
+
         from services.vbs_manager import vbs_manager
+
         extract_result = await vbs_manager.extract_vbs(Path(tmp_path))
-        
+
         if extract_result.get("success") and vbs_sidecar.exists():
             vbs_hash = vbs_manager.calculate_vbs_hash(vbs_sidecar)
             if vbs_hash:
                 hashes = await vbs_manager.get_patch_hashes()
                 # Find original hash match
-                patch_entry = next((item for item in hashes if item.get("sha256") == vbs_hash), None)
+                patch_entry = next(
+                    (item for item in hashes if item.get("sha256") == vbs_hash), None
+                )
                 if patch_entry and patch_entry.get("patched", {}).get("url"):
                     patch_info = {
                         "vbs_hash": vbs_hash,
-                        "patch_url": patch_entry["patched"]["url"]
+                        "patch_url": patch_entry["patched"]["url"],
                     }
             if vbs_sidecar.exists():
                 try:
-                    vbs_sidecar.unlink() # Clean up extracted sidecar
+                    vbs_sidecar.unlink()  # Clean up extracted sidecar
                 except FileNotFoundError:
                     pass
 
@@ -145,18 +168,20 @@ async def parse_vpx(vpx_file: UploadFile = File(...), vps_id: Optional[str] = Fo
         altcolors = []
         if vps_id:
             from services.vps_matcher import vps_matcher
+
             altcolors = vps_matcher.get_altcolors_by_vps_id(vps_id)
 
         return {
-            "success": True, 
-            "roms": roms, 
+            "success": True,
+            "roms": roms,
             "altcolors": altcolors,
-            "nvram": matched_nvram, 
-            "patch_info": patch_info
+            "nvram": matched_nvram,
+            "patch_info": patch_info,
         }
     finally:
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
+
 
 @router.post("/import-table")
 async def import_table(
@@ -187,6 +212,7 @@ async def import_table(
     """
     import database as db
     from services.table_file_service import TableFileService
+
     tables_dir = config.expanded_tables_dir
     tables_dir.mkdir(parents=True, exist_ok=True)
 
@@ -212,7 +238,9 @@ async def import_table(
     vpx_target = table_dir / new_vpx_filename
     with open(vpx_target, "wb") as f:
         f.write(vpx_content)
-    results.append({"type": "vpx", "file": new_vpx_filename, "destination": str(vpx_target)})
+    results.append(
+        {"type": "vpx", "file": new_vpx_filename, "destination": str(vpx_target)}
+    )
 
     # 2. DirectB2S (optional) — save to table root with standardized name
     if directb2s_file and directb2s_file.filename:
@@ -223,7 +251,13 @@ async def import_table(
             b2s_target = table_dir / new_b2s_filename
             with open(b2s_target, "wb") as f:
                 f.write(b2s_content)
-            results.append({"type": "backglass", "file": new_b2s_filename, "destination": str(b2s_target)})
+            results.append(
+                {
+                    "type": "backglass",
+                    "file": new_b2s_filename,
+                    "destination": str(b2s_target),
+                }
+            )
 
     # 3. ROMs (optional) — save to pinmame/roms/
     for rf in rom_files:
@@ -234,7 +268,9 @@ async def import_table(
                 rom_target.parent.mkdir(parents=True, exist_ok=True)
                 with open(rom_target, "wb") as f:
                     f.write(rom_content)
-                results.append({"type": "rom", "file": rf.filename, "destination": str(rom_target)})
+                results.append(
+                    {"type": "rom", "file": rf.filename, "destination": str(rom_target)}
+                )
 
     # 4. PUP Pack (optional) — extract or save loose files
     if puppack_file:
@@ -259,7 +295,7 @@ async def import_table(
         # Determine if we should use a rom-specific subfolder
         # Priority: 1. User manual upload filename base, 2. First detected ROM name
         altcolor_base_dest = table_dir / "pinmame" / "altcolor"
-        
+
         # If we have a rom from detection or VPS, use it as a subfolder for better isolation
         rom_subfolder = ""
         if rom_files and rom_files[0].filename:
@@ -271,15 +307,17 @@ async def import_table(
             rom_res = next((r for r in results if r["type"] == "rom"), None)
             if rom_res:
                 rom_subfolder = Path(rom_res["file"]).stem
-        
+
         # Fallback to VPS rom version if available
         if not rom_subfolder and rom_files:
-             # This is a bit complex, let's keep it simple for now:
-             # Use pinmame/altcolor/<filename_stem> if it's a single file, 
-             # or pinmame/altcolor/ if it's a zip.
-             pass
+            # This is a bit complex, let's keep it simple for now:
+            # Use pinmame/altcolor/<filename_stem> if it's a single file,
+            # or pinmame/altcolor/ if it's a zip.
+            pass
 
-        result = await _process_slot_media(altcolor_file, altcolor_base_dest, "AltColor", wrap_in_subfolder=True)
+        result = await _process_slot_media(
+            altcolor_file, altcolor_base_dest, "AltColor", wrap_in_subfolder=True
+        )
         results.append(result)
 
     # 8. Sidecar Files (optional)
@@ -288,7 +326,9 @@ async def import_table(
         target = table_dir / f"{standard_name}.vbs"
         with open(target, "wb") as f:
             f.write(vbs_content)
-        results.append({"type": "vbs_override", "status": "saved", "destination": str(target)})
+        results.append(
+            {"type": "vbs_override", "status": "saved", "destination": str(target)}
+        )
 
     if ini_file and ini_file.filename:
         ini_content = await ini_file.read()
@@ -302,11 +342,11 @@ async def import_table(
             shutil.rmtree(old_ini_dir)
 
     # 8. NVRAM files (optional) — copy from master repo or save uploaded files to pinmame/nvram/
-    import shutil
+
     nvram_dest = table_dir / "pinmame" / "nvram"
-    
+
     if nvram_files:
-        nv_list = [f.strip() for f in nvram_files.split(',') if f.strip()]
+        nv_list = [f.strip() for f in nvram_files.split(",") if f.strip()]
         nvram_repo_dir = Path(config.support_dir) / "nvrams"
         nvram_dest.mkdir(parents=True, exist_ok=True)
         for nv in nv_list:
@@ -314,7 +354,9 @@ async def import_table(
             if source.exists():
                 target = nvram_dest / nv
                 shutil.copy2(source, target)
-                results.append({"type": "nvram", "file": nv, "destination": str(target)})
+                results.append(
+                    {"type": "nvram", "file": nv, "destination": str(target)}
+                )
 
     for file in uploaded_nvram_files:
         if file and file.filename:
@@ -324,52 +366,61 @@ async def import_table(
                 target = nvram_dest / file.filename
                 with open(target, "wb") as f:
                     f.write(content)
-                results.append({"type": "nvram", "file": file.filename, "destination": str(target)})
+                results.append(
+                    {"type": "nvram", "file": file.filename, "destination": str(target)}
+                )
 
     # Extract internal metadata from the saved VPX file
     from services.vpx_parser import VPXParser
+
     meta = VPXParser.get_metadata(vpx_target)
     vbs_hash = VPXParser.get_vbs_hash(vpx_target)
 
     # 9. Robustly extract VBS using VPinballX
     from services.vbs_manager import vbs_manager
+
     # Only auto-extract if a manual VBS wasn't uploaded
     if not vbs_file:
         await vbs_manager.extract_vbs(vpx_target)
     else:
-        logger.info(f"Skipping VBS extraction, using uploaded override for {new_vpx_filename}")
+        logger.info(
+            f"Skipping VBS extraction, using uploaded override for {new_vpx_filename}"
+        )
 
     # 10. Process VPX table for ROM detection (will read from the new .vbs file)
     VPXParser.process_vpx_table(vpx_target, extract_sidecar=False, vps_id=vps_id)
 
     # Persist to database
     display_name_to_save = meta.get("display_name") or table_name
-    table_id = await db.upsert_table({
-        "display_name": display_name_to_save,
-        "filename": new_vpx_filename,
-        "manufacturer": manufacturer,
-        "year": year,
-        "vps_id": vps_id,
-        "table_type": table_type,
-        "vps_version": vps_version,
-        "vps_table_url": vps_table_url,
-        "ipdb_id": ipdb_id,
-        "version": meta["version"] or vps_version,
-        "author": meta["author"],
-        "folder_path": str(table_dir),
-        "has_b2s": 1 if directb2s_file else 0,
-        "has_rom": 1 if rom_files else 0,
-        "vbs_hash": vbs_hash,
-    })
+    table_id = await db.upsert_table(
+        {
+            "display_name": display_name_to_save,
+            "filename": new_vpx_filename,
+            "manufacturer": manufacturer,
+            "year": year,
+            "vps_id": vps_id,
+            "table_type": table_type,
+            "vps_version": vps_version,
+            "vps_table_url": vps_table_url,
+            "ipdb_id": ipdb_id,
+            "version": meta["version"] or vps_version,
+            "author": meta["author"],
+            "folder_path": str(table_dir),
+            "has_b2s": 1 if directb2s_file else 0,
+            "has_rom": 1 if rom_files else 0,
+            "vbs_hash": vbs_hash,
+        }
+    )
 
     # Queue background task to download media
     from services.scraper_service import trigger_media_download
+
     background_tasks.add_task(
         trigger_media_download,
         table_id=table_id,
         vps_id=vps_id,
         table_name=display_name_to_save,
-        filename=new_vpx_filename
+        filename=new_vpx_filename,
     )
 
     return {
@@ -391,8 +442,8 @@ async def upload_file_to_table(
     Upload a single file to an existing table's folder.
     Handles 'safe replacement' by deleting or wiping existing content first.
     """
+
     import database as db
-    import shutil
 
     table = await db.get_table(table_id)
     if not table:
@@ -420,7 +471,7 @@ async def upload_file_to_table(
                 old_vbs.unlink()
             except Exception:
                 pass
-        
+
     elif file_type == "backglass":
         # Delete ANY existing .directb2s first
         for old in table_dir.glob("*.directb2s"):
@@ -508,8 +559,10 @@ async def upload_file_to_table(
 
     if file_type == "vpx":
         from services.vbs_manager import vbs_manager
+
         await vbs_manager.extract_vbs(target)
         from services.vpx_parser import VPXParser
+
         VPXParser.process_vpx_table(target, extract_sidecar=False)
 
     return {
@@ -520,68 +573,90 @@ async def upload_file_to_table(
     }
 
 
-async def _process_slot_media(file_input: Union[UploadFile, List[UploadFile]], dest: Path, label: str, wrap_in_subfolder: bool = False) -> dict:
+async def _process_slot_media(
+    file_input: Union[UploadFile, List[UploadFile]],
+    dest: Path,
+    label: str,
+    wrap_in_subfolder: bool = False,
+) -> dict:
     """Helper to process a slot that can be either an archive or a list of loose files."""
     if isinstance(file_input, list):
         # Multiple loose files
         dest.mkdir(parents=True, exist_ok=True)
         count = 0
         for f in file_input:
-            if not f.filename: continue
+            if not f.filename:
+                continue
             content = await f.read()
-            
+
             target_dest = dest
             if wrap_in_subfolder:
                 # Use filename stem as subfolder
                 target_dest = dest / Path(f.filename).stem
                 target_dest.mkdir(parents=True, exist_ok=True)
-                
+
             with open(target_dest / f.filename, "wb") as out:
                 out.write(content)
             count += 1
-        return {"type": label.lower().replace(" ", "_"), "status": f"saved_{count}_files", "destination": str(dest)}
-    
+        return {
+            "type": label.lower().replace(" ", "_"),
+            "status": f"saved_{count}_files",
+            "destination": str(dest),
+        }
+
     # Single item (UploadFile)
     if not file_input.filename:
         return {"type": label.lower().replace(" ", "_"), "status": "skipped"}
 
     ext = Path(file_input.filename).suffix.lower()
     content = await file_input.read()
-    
+
     # If it's a common archive, extract it
     if ext in [".zip", ".7z", ".rar"]:
-        return await _extract_archive_safely(content, file_input.filename, dest, label, wipe=True)
-    
+        return await _extract_archive_safely(
+            content, file_input.filename, dest, label, wipe=True
+        )
+
     # Otherwise, it's a single loose file
     target_dest = dest
     if wrap_in_subfolder:
         target_dest = dest / Path(file_input.filename).stem
-    
+
     target_dest.mkdir(parents=True, exist_ok=True)
     target = target_dest / file_input.filename
     with open(target, "wb") as f:
         f.write(content)
-    return {"type": label.lower().replace(" ", "_"), "status": "saved_file", "destination": str(target)}
+    return {
+        "type": label.lower().replace(" ", "_"),
+        "status": "saved_file",
+        "destination": str(target),
+    }
 
 
-async def _extract_archive_safely(content: bytes, filename: str, dest: Path, label: str, wipe: bool = False) -> dict:
+async def _extract_archive_safely(
+    content: bytes, filename: str, dest: Path, label: str, wipe: bool = False
+) -> dict:
     """Extract a zip, 7z, or rar file to the destination, optional wiping first."""
     if wipe and dest.exists():
         shutil.rmtree(dest)
-    
+
     dest.mkdir(parents=True, exist_ok=True)
     suffix = Path(filename).suffix.lower()
-    
+
     try:
         if suffix == ".zip":
             with zipfile.ZipFile(io.BytesIO(content), "r") as zf:
                 zf.extractall(dest)
         elif suffix == ".7z":
             if py7zr:
-                with py7zr.SevenZipFile(io.BytesIO(content), mode='r') as sz:
+                with py7zr.SevenZipFile(io.BytesIO(content), mode="r") as sz:
                     sz.extractall(dest)
             else:
-                return {"type": label.lower().replace(" ", "_"), "status": "error", "error": "7z support not installed (py7zr missing)"}
+                return {
+                    "type": label.lower().replace(" ", "_"),
+                    "status": "error",
+                    "error": "7z support not installed (py7zr missing)",
+                }
         elif suffix == ".rar":
             # patool is the most robust way to handle RAR if binaries exist
             if patoolib:
@@ -590,18 +665,39 @@ async def _extract_archive_safely(content: bytes, filename: str, dest: Path, lab
                     tmp_path = tmp.name
                 try:
                     patoolib.extract_archive(tmp_path, outdir=str(dest), verbosity=-1)
-                    return {"type": label.lower().replace(" ", "_"), "status": "extracted", "destination": str(dest)}
+                    return {
+                        "type": label.lower().replace(" ", "_"),
+                        "status": "extracted",
+                        "destination": str(dest),
+                    }
                 finally:
-                    if os.path.exists(tmp_path): os.unlink(tmp_path)
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
             else:
-                return {"type": label.lower().replace(" ", "_"), "status": "error", "error": f"RAR support missing (patoolib or unrar binary needed for {label})"}
+                return {
+                    "type": label.lower().replace(" ", "_"),
+                    "status": "error",
+                    "error": f"RAR support missing (patoolib or unrar binary needed for {label})",
+                }
         else:
-            return {"type": label.lower().replace(" ", "_"), "status": "error", "error": f"Unsupported archive format: {suffix}"}
-            
-        return {"type": label.lower().replace(" ", "_"), "status": "extracted", "destination": str(dest)}
+            return {
+                "type": label.lower().replace(" ", "_"),
+                "status": "error",
+                "error": f"Unsupported archive format: {suffix}",
+            }
+
+        return {
+            "type": label.lower().replace(" ", "_"),
+            "status": "extracted",
+            "destination": str(dest),
+        }
     except Exception as e:
         logger.error(f"{label} extraction failed: {e}")
-        return {"type": label.lower().replace(" ", "_"), "status": "error", "error": f"{label} extraction failed: {str(e)}"}
+        return {
+            "type": label.lower().replace(" ", "_"),
+            "status": "error",
+            "error": f"{label} extraction failed: {str(e)}",
+        }
 
 
 @router.post("/reset")

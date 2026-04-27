@@ -1,15 +1,17 @@
-from fastapi import APIRouter, File, UploadFile
-from pydantic import BaseModel
-from pathlib import Path
-import os
-import stat
-import zipfile
 import io
+import logging
+import os
 import shutil
+import stat
 import subprocess
 import xml.etree.ElementTree as ET
+import zipfile
+from pathlib import Path
+
+from fastapi import APIRouter, File, UploadFile
+from pydantic import BaseModel
+
 from config import config
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +19,10 @@ router = APIRouter(prefix="/api/tools", tags=["tools"])
 
 # ── NVRAM Repository Logic ──────────────────────────────────────────
 
+
 def get_nvram_repo_dir() -> Path:
     return Path(config.support_dir) / "nvrams"
+
 
 def ensure_nvram_repo():
     get_nvram_repo_dir().mkdir(parents=True, exist_ok=True)
@@ -42,7 +46,9 @@ async def upload_nvram(file: UploadFile = File(...)):
                         nv_filename = Path(zip_info.filename).name
                         if nv_filename:
                             target_path = get_nvram_repo_dir() / nv_filename
-                            with zf.open(zip_info) as source, open(target_path, "wb") as target:
+                            with zf.open(zip_info) as source, open(
+                                target_path, "wb"
+                            ) as target:
                                 shutil.copyfileobj(source, target)
                             added_count += 1
             return {"success": True, "added": added_count}
@@ -60,7 +66,10 @@ async def upload_nvram(file: UploadFile = File(...)):
         except Exception as e:
             return {"success": False, "error": f"Failed to save .nv file: {e}"}
 
-    return {"success": False, "error": "Unsupported file type. Please upload .nv or .zip files."}
+    return {
+        "success": False,
+        "error": "Unsupported file type. Please upload .nv or .zip files.",
+    }
 
 
 @router.get("/nvram/list")
@@ -69,16 +78,16 @@ async def list_nvrams():
     repo_dir = get_nvram_repo_dir()
     if not repo_dir.exists():
         return {"files": []}
-        
+
     files = []
     try:
         # Use rglob to be recursive in case of nested folders from zip uploads
         for f in repo_dir.rglob("*.nv"):
             if f.is_file():
                 files.append(f.name)
-        
+
         # Sort and return
-        files = sorted(list(set(files))) # deduplicate just in case
+        files = sorted(list(set(files)))  # deduplicate just in case
         logger.info(f"NVRAM Repo Scan: Found {len(files)} files in {repo_dir}")
         return {"files": files}
     except Exception as e:
@@ -106,55 +115,63 @@ async def install_nvrams():
     """Bulk install NVRAMs from repo to matching table folders."""
     import database as db
     from services.vpx_parser import VPXParser
-    
+
     repo_dir = get_nvram_repo_dir()
     if not repo_dir.exists():
         return {"success": False, "error": "NVRAM repository does not exist."}
-    
-    repo_files = {f.name.lower(): f for f in repo_dir.iterdir() if f.is_file() and f.suffix.lower() == ".nv"}
+
+    repo_files = {
+        f.name.lower(): f
+        for f in repo_dir.iterdir()
+        if f.is_file() and f.suffix.lower() == ".nv"
+    }
     if not repo_files:
         return {"success": False, "error": "NVRAM repository is empty."}
-    
-    tables = await db.get_tables(limit=2000) # Get all tables
+
+    tables = await db.get_tables(limit=2000)  # Get all tables
     installed_count = 0
     failures = []
-    
+
     for table in tables:
         try:
             folder_path = Path(table["folder_path"])
             if not folder_path.exists():
                 continue
-            
+
             # Identify ROMs for this table
             vpx_path = folder_path / table["filename"]
             if not vpx_path.exists():
                 continue
-                
+
             # detect_rom returns the most likely ROM name as a string
             rom_name = VPXParser.detect_rom(vpx_path, vps_id=table.get("vps_id"))
             if not rom_name:
                 continue
-            
+
             nv_filename = f"{rom_name.lower()}.nv"
             if nv_filename in repo_files:
                 # Target: <table_dir>/pinmame/nvram/<rom>.nv
                 nv_dest_dir = folder_path / "pinmame" / "nvram"
                 nv_dest_dir.mkdir(parents=True, exist_ok=True)
-                
+
                 # Copy with original case from repo if possible, though .nv is usually lowercase
-                shutil.copy2(repo_files[nv_filename], nv_dest_dir / repo_files[nv_filename].name)
+                shutil.copy2(
+                    repo_files[nv_filename], nv_dest_dir / repo_files[nv_filename].name
+                )
                 installed_count += 1
         except Exception as e:
             failures.append(f"Error installing for {table['display_name']}: {str(e)}")
-            
+
     return {"success": True, "installed": installed_count, "failures": failures}
 
 
 # ── ES-DE Integration Logic ──────────────────────────────────────────
 
+
 class ESDEIntegrationResponse(BaseModel):
     success: bool
     message: str
+
 
 @router.post("/esde-integration", response_model=ESDEIntegrationResponse)
 async def apply_esde_integration():
@@ -163,9 +180,9 @@ async def apply_esde_integration():
         esde_scripts_dir = Path.home() / "ES-DE" / "scripts"
         esde_scripts_dir.mkdir(parents=True, exist_ok=True)
         script_path = esde_scripts_dir / "launch_vpinball.sh"
-        
+
         vpx_path = config.vpx_standalone_app_path
-        
+
         # We need the binary path to call it directly so bash waits for it to exit
         if vpx_path.endswith(".app"):
             # If they provided an .app path, try to guess the binary inside
@@ -241,7 +258,7 @@ echo "Script completed successfully."
         subprocess.run(
             ["xattr", "-d", "com.apple.quarantine", str(script_path)],
             stderr=subprocess.DEVNULL,
-            check=False
+            check=False,
         )
 
         # 2. Remove legacy systeminfo.txt if it exists to prevent system overrides
@@ -257,7 +274,7 @@ echo "Script completed successfully."
         esde_dir = Path.home() / "ES-DE"
         custom_systems_dir = esde_dir / "custom_systems"
         custom_systems_dir.mkdir(parents=True, exist_ok=True)
-        
+
         find_rules_file = custom_systems_dir / "es_find_rules.xml"
         if find_rules_file.exists():
             parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
@@ -266,17 +283,17 @@ echo "Script completed successfully."
         else:
             fr_root = ET.Element("ruleList")
             fr_tree = ET.ElementTree(fr_root)
-            
+
         # Add or update VISUAL-PINBALL rule
         vp_rule = None
         for emu in fr_root.findall("emulator"):
             if emu.get("name") == "VISUAL-PINBALL":
                 vp_rule = emu
                 break
-                
+
         if vp_rule is None:
             vp_rule = ET.SubElement(fr_root, "emulator", name="VISUAL-PINBALL")
-            
+
         # Check if staticpath rule for our script exists
         rule_exists = False
         for rule in vp_rule.findall("rule"):
@@ -285,11 +302,11 @@ echo "Script completed successfully."
                     if entry.text == str(script_path):
                         rule_exists = True
                         break
-        
+
         if not rule_exists:
             new_rule = ET.SubElement(vp_rule, "rule", type="staticpath")
             ET.SubElement(new_rule, "entry").text = str(script_path)
-            
+
         fr_tree.write(find_rules_file, encoding="utf-8", xml_declaration=True)
 
         # 4. Modify ES-DE custom_systems.xml
@@ -340,25 +357,28 @@ echo "Script completed successfully."
         tree.write(xml_file, encoding="utf-8", xml_declaration=True)
 
         # 5. Pre-set the preferred emulator without UI by modifying es_settings.xml
-        for settings_path in [Path.home() / ".emulationstation" / "es_settings.xml", Path.home() / "ES-DE" / "settings" / "es_settings.xml"]:
+        for settings_path in [
+            Path.home() / ".emulationstation" / "es_settings.xml",
+            Path.home() / "ES-DE" / "settings" / "es_settings.xml",
+        ]:
             if settings_path.exists():
                 try:
                     parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
                     s_tree = ET.parse(settings_path, parser=parser)
                     s_root = s_tree.getroot()
-                    
+
                     found = False
                     for string_elem in s_root.findall("string"):
                         if string_elem.get("name") == "AlternativeEmulator_vpinball":
                             string_elem.set("value", "Visual Pinball X (Script)")
                             found = True
                             break
-                            
+
                     if not found:
                         new_string = ET.SubElement(s_root, "string")
                         new_string.set("name", "AlternativeEmulator_vpinball")
                         new_string.set("value", "Visual Pinball X (Script)")
-                        
+
                     s_tree.write(settings_path, encoding="utf-8", xml_declaration=True)
                 except Exception as e:
                     logger.warning(f"Could not update {settings_path}: {e}")
@@ -369,9 +389,9 @@ echo "Script completed successfully."
             with open(flatten_file, "w") as f:
                 f.write("")
 
-
-
-        return ESDEIntegrationResponse(success=True, message="ES-DE Integration applied successfully.")
+        return ESDEIntegrationResponse(
+            success=True, message="ES-DE Integration applied successfully."
+        )
     except Exception as e:
         logger.error(f"Error applying ES-DE integration: {e}")
         return ESDEIntegrationResponse(success=False, message=str(e))

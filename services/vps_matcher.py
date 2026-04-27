@@ -4,11 +4,13 @@ from __future__ import annotations
 VPS (Virtual Pinball Spreadsheet) database matcher.
 Fetches the VPS database and provides fuzzy matching for table identification.
 """
-import json
-import httpx
 import base64
-from pathlib import Path
+import json
 from difflib import SequenceMatcher
+from pathlib import Path
+
+import httpx
+
 from config import config
 from services.task_registry import task_registry
 
@@ -28,14 +30,22 @@ class VPSMatcher:
         if vps_path.exists():
             try:
                 import asyncio
+
                 def _read():
                     with open(vps_path, "r") as f:
                         return json.load(f)
+
                 data = await asyncio.to_thread(_read)
-                raw_list = data if isinstance(data, list) else data.get("tables", data.get("data", []))
+                raw_list = (
+                    data
+                    if isinstance(data, list)
+                    else data.get("tables", data.get("data", []))
+                )
                 self.vps_data = raw_list
                 # Build ID map for fast lookup
-                self.vps_id_map = {str(item.get("id", "")): item for item in raw_list if item.get("id")}
+                self.vps_id_map = {
+                    str(item.get("id", "")): item for item in raw_list if item.get("id")
+                }
                 self._build_search_index()
                 self._loaded = True
                 return True
@@ -45,7 +55,9 @@ class VPSMatcher:
 
     async def fetch_database(self) -> dict:
         """Fetch the latest VPS database and cache it locally."""
-        task_registry.start_task("vps_sync", total=1, message="Downloading VPS database...")
+        task_registry.start_task(
+            "vps_sync", total=1, message="Downloading VPS database..."
+        )
         try:
             async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
                 response = await client.get(VPS_DB_URL)
@@ -56,9 +68,11 @@ class VPSMatcher:
             vps_path = Path(config.vps_db_path)
             vps_path.parent.mkdir(parents=True, exist_ok=True)
             import asyncio
+
             def _write():
                 with open(vps_path, "w") as f:
                     json.dump(raw, f)
+
             await asyncio.to_thread(_write)
 
             # Parse into list
@@ -67,17 +81,21 @@ class VPSMatcher:
                 raw_list = raw
             elif isinstance(raw, dict):
                 raw_list = raw.get("tables", raw.get("data", []))
-            
+
             self.vps_data = raw_list
             # Build ID map for fast lookup
-            self.vps_id_map = {str(item.get("id", "")): item for item in raw_list if item.get("id")}
+            self.vps_id_map = {
+                str(item.get("id", "")): item for item in raw_list if item.get("id")
+            }
             self._build_search_index()
             self._loaded = True
-            
+
             # Log for debugging
             print(f"DEBUG: VPS Database synced. Loaded {len(self.vps_data)} entries.")
-            task_registry.complete_task("vps_sync", f"Synced {len(self.vps_data)} entries.")
-            
+            task_registry.complete_task(
+                "vps_sync", f"Synced {len(self.vps_data)} entries."
+            )
+
             return {
                 "success": True,
                 "count": len(self.vps_data),
@@ -99,7 +117,10 @@ class VPSMatcher:
                 continue
 
             # Must have at least one VPX format file available
-            if not any(f.get("tableFormat", "").upper() == "VPX" for f in entry.get("tableFiles", [])):
+            if not any(
+                f.get("tableFormat", "").upper() == "VPX"
+                for f in entry.get("tableFiles", [])
+            ):
                 continue
 
             name = entry.get("name", "")
@@ -119,9 +140,17 @@ class VPSMatcher:
                     # but in practice, VPSMatcher is loaded via _load_cached_async at app startup.
                     with open(vps_path, "r") as f:
                         data = json.load(f)
-                    raw_list = data if isinstance(data, list) else data.get("tables", data.get("data", []))
+                    raw_list = (
+                        data
+                        if isinstance(data, list)
+                        else data.get("tables", data.get("data", []))
+                    )
                     self.vps_data = raw_list
-                    self.vps_id_map = {str(item.get("id", "")): item for item in raw_list if item.get("id")}
+                    self.vps_id_map = {
+                        str(item.get("id", "")): item
+                        for item in raw_list
+                        if item.get("id")
+                    }
                     self._build_search_index()
                     self._loaded = True
                 except Exception as e:
@@ -158,27 +187,30 @@ class VPSMatcher:
         url = entry.get("ipdbUrl", "")
         if url:
             import re
+
             # Match id=1234 or machine.cgi?1234 (some older variants)
-            match = re.search(r'id=(\d+)', url)
+            match = re.search(r"id=(\d+)", url)
             if match:
                 return match.group(1)
-            
+
             # Fallback for URLs ending in the ID
-            match = re.search(r'/(\d+)$', url.strip('/'))
+            match = re.search(r"/(\d+)$", url.strip("/"))
             if match:
                 return match.group(1)
-                
+
         return ""
 
     def _format_entry(self, entry: dict, score: float = 0.0) -> dict:
         """Standardize a VPS entry into the format expected by the frontend."""
         table_files = entry.get("tableFiles", [])
         latest_vpx = self._get_latest_table(table_files)
-        
+
         return {
             "vps_id": entry.get("id", ""),
             "vps_file_id": latest_vpx.get("id", ""),
-            "vps_author": latest_vpx.get("authors", [""])[0] if latest_vpx.get("authors") else "",
+            "vps_author": (
+                latest_vpx.get("authors", [""])[0] if latest_vpx.get("authors") else ""
+            ),
             "name": entry.get("name", ""),
             "manufacturer": entry.get("manufacturer", ""),
             "year": str(entry.get("year", "")),
@@ -186,25 +218,73 @@ class VPSMatcher:
             "type": entry.get("type", ""),
             "ipdb_id": self._extract_ipdb_id(entry),
             "version": latest_vpx.get("version", ""),
-            "table_url": (latest_vpx.get("urls") or [{}])[0].get("url", "") if latest_vpx.get("urls") else "",
-            "roms": [{"version": r.get("version"), "url": (r.get("urls") or [{}])[0].get("url", "")} for r in entry.get("romFiles", []) if r.get("version")],
+            "table_url": (
+                (latest_vpx.get("urls") or [{}])[0].get("url", "")
+                if latest_vpx.get("urls")
+                else ""
+            ),
+            "roms": [
+                {
+                    "version": r.get("version"),
+                    "url": (r.get("urls") or [{}])[0].get("url", ""),
+                }
+                for r in entry.get("romFiles", [])
+                if r.get("version")
+            ],
             "altcolors": [
                 {
                     "version": c.get("version"),
                     "fileName": c.get("fileName"),
                     "folder": c.get("folder"),
                     "type": c.get("type"),
-                    "url": (c.get("urls") or [{}])[0].get("url", "")
+                    "url": (c.get("urls") or [{}])[0].get("url", ""),
                 }
-                for c in entry.get("altColorFiles", []) 
-                if (c.get("version") or c.get("fileName")) and self.is_usable_altcolor(c)
+                for c in entry.get("altColorFiles", [])
+                if (c.get("version") or c.get("fileName"))
+                and self.is_usable_altcolor(c)
             ],
-            "b2s": [{"version": b.get("version", ""), "author": (b.get("authors") or [""])[0], "url": (b.get("urls") or [{}])[0].get("url", "")} for b in entry.get("b2sFiles", []) if (b.get("urls") or b.get("version"))],
-            "altsound": [{"version": a.get("version", ""), "author": (a.get("authors") or [""])[0], "url": (a.get("urls") or [{}])[0].get("url", "")} for a in entry.get("altSoundFiles", []) if (a.get("urls") or a.get("version"))],
-            "puppack": [{"version": p.get("version", ""), "author": (p.get("authors") or [""])[0], "url": (p.get("urls") or [{}])[0].get("url", "")} for p in entry.get("pupPackFiles", []) if (p.get("urls") or p.get("version"))],
-            "music": [{"version": s.get("version", ""), "author": (s.get("authors") or [""])[0], "url": (s.get("urls") or [{}])[0].get("url", "")} for s in entry.get("soundFiles", []) if (s.get("urls") or s.get("version"))],
+            "b2s": [
+                {
+                    "version": b.get("version", ""),
+                    "author": (b.get("authors") or [""])[0],
+                    "url": (b.get("urls") or [{}])[0].get("url", ""),
+                }
+                for b in entry.get("b2sFiles", [])
+                if (b.get("urls") or b.get("version"))
+            ],
+            "altsound": [
+                {
+                    "version": a.get("version", ""),
+                    "author": (a.get("authors") or [""])[0],
+                    "url": (a.get("urls") or [{}])[0].get("url", ""),
+                }
+                for a in entry.get("altSoundFiles", [])
+                if (a.get("urls") or a.get("version"))
+            ],
+            "puppack": [
+                {
+                    "version": p.get("version", ""),
+                    "author": (p.get("authors") or [""])[0],
+                    "url": (p.get("urls") or [{}])[0].get("url", ""),
+                }
+                for p in entry.get("pupPackFiles", [])
+                if (p.get("urls") or p.get("version"))
+            ],
+            "music": [
+                {
+                    "version": s.get("version", ""),
+                    "author": (s.get("authors") or [""])[0],
+                    "url": (s.get("urls") or [{}])[0].get("url", ""),
+                }
+                for s in entry.get("soundFiles", [])
+                if (s.get("urls") or s.get("version"))
+            ],
             "vpx_tables": [
-                {"version": t.get("version", ""), "author": (t.get("authors") or [""])[0], "url": (t.get("urls") or [{}])[0].get("url", "")}
+                {
+                    "version": t.get("version", ""),
+                    "author": (t.get("authors") or [""])[0],
+                    "url": (t.get("urls") or [{}])[0].get("url", ""),
+                }
                 for t in entry.get("tableFiles", [])
                 if t.get("tableFormat", "").upper() == "VPX"
                 and (t.get("urls") or [])
@@ -244,7 +324,7 @@ class VPSMatcher:
                 partial = " ".join(words[:3])
                 partial_score = SequenceMatcher(None, partial, name_lower).ratio()
                 score = max(score, partial_score)
-            
+
             if score > 0.35:  # Minimum threshold
                 scored.append(self._format_entry(entry, score))
 
@@ -263,16 +343,23 @@ class VPSMatcher:
         entry = self.get_entry(vps_id)
         if not entry:
             return []
-        
+
         rom_files = entry.get("romFiles", [])
-        return [{"version": r.get("version"), "url": (r.get("urls") or [{}])[0].get("url", "")} for r in rom_files if r.get("version")]
+        return [
+            {
+                "version": r.get("version"),
+                "url": (r.get("urls") or [{}])[0].get("url", ""),
+            }
+            for r in rom_files
+            if r.get("version")
+        ]
 
     def get_altcolors_by_vps_id(self, vps_id: str) -> list[dict]:
         """Look up potential AltColor files for a table using its VPS ID."""
         entry = self.get_entry(vps_id)
         if not entry:
             return []
-        
+
         alt_files = entry.get("altColorFiles", [])
         return [
             {
@@ -280,9 +367,9 @@ class VPSMatcher:
                 "fileName": c.get("fileName"),
                 "folder": c.get("folder"),
                 "type": c.get("type"),
-                "url": (c.get("urls") or [{}])[0].get("url", "")
+                "url": (c.get("urls") or [{}])[0].get("url", ""),
             }
-            for c in alt_files 
+            for c in alt_files
             if (c.get("version") or c.get("fileName")) and self.is_usable_altcolor(c)
         ]
 
@@ -304,7 +391,7 @@ class VPSMatcher:
         if any(token in text_to_search for token in supported_tokens):
             return True
 
-        # If it's very generic but has a filename, we might allow it as a fallback, 
+        # If it's very generic but has a filename, we might allow it as a fallback,
         # but for now let's be strict to avoid clutter.
         return False
 
@@ -322,25 +409,29 @@ class VPSMatcher:
         """Find the table file entry with the highest version/newest date."""
         if not table_files:
             return {}
-        
+
         # VPX files are priority
-        vpx_files = [f for f in table_files if f.get("tableFormat", "").upper() == "VPX"]
+        vpx_files = [
+            f for f in table_files if f.get("tableFormat", "").upper() == "VPX"
+        ]
         if not vpx_files:
             vpx_files = table_files
 
         # Obfuscated filter list (base64 encoded to avoid direct detection)
         # QmlndXMx = Bigus1, QmlndXM= = Bigus
         _S_AUTHORS = ["QmlndXMx", "QmlndXM="]
-        
+
         def _is_s(authors_list: list[str]) -> bool:
-            if not authors_list: return False
+            if not authors_list:
+                return False
             for a in authors_list:
                 for s in _S_AUTHORS:
                     try:
                         decoded = base64.b64decode(s).decode().lower()
                         if decoded in a.lower():
                             return True
-                    except: pass
+                    except Exception:
+                        pass
             return False
 
         # Sort by version if possible

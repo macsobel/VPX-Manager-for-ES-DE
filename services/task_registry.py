@@ -1,9 +1,10 @@
-import asyncio
 import logging
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
 
 class TaskProgress(BaseModel):
     id: str
@@ -21,8 +22,10 @@ class TaskProgress(BaseModel):
             return 0
         return int((self.current / self.total) * 100)
 
+
 class TaskRegistry:
     """Singleton registry for tracking long-running background tasks."""
+
     _instance = None
     _tasks: Dict[str, TaskProgress] = {}
 
@@ -36,8 +39,11 @@ class TaskRegistry:
             self._tasks[task_id] = TaskProgress(id=task_id)
         return self._tasks[task_id]
 
-    def start_task(self, task_id: str, total: int = 0, message: str = "Starting task..."):
+    def start_task(
+        self, task_id: str, total: int = 0, message: str = "Starting task..."
+    ):
         import time
+
         task = self.get_task(task_id)
         task.status = "running"
         task.total = total
@@ -47,7 +53,9 @@ class TaskRegistry:
         task.error = None
         logger.info(f"Task started: {task_id} (total: {total})")
 
-    def update_progress(self, task_id: str, current: int, message: Optional[str] = None):
+    def update_progress(
+        self, task_id: str, current: int, message: Optional[str] = None
+    ):
         task = self.get_task(task_id)
         task.current = current
         if message:
@@ -55,6 +63,7 @@ class TaskRegistry:
 
     def complete_task(self, task_id: str, message: str = "Completed"):
         import time
+
         task = self.get_task(task_id)
         task.status = "completed"
         task.message = message
@@ -63,6 +72,7 @@ class TaskRegistry:
 
     def fail_task(self, task_id: str, error: str):
         import time
+
         task = self.get_task(task_id)
         task.status = "failed"
         task.error = error
@@ -72,5 +82,6 @@ class TaskRegistry:
 
     def get_all_statuses(self) -> Dict[str, Any]:
         return {k: v.model_dump() for k, v in self._tasks.items()}
+
 
 task_registry = TaskRegistry()

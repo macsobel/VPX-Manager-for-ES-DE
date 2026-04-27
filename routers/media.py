@@ -1,11 +1,16 @@
+from pathlib import Path
+
 """
 Media API router.
 """
-from fastapi import APIRouter, UploadFile, File, HTTPException
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from pathlib import Path
+
 import database as db
-from services.media_manager import get_media_status, get_all_media_status, save_uploaded_media, delete_media_file, get_media_file_path
+from services.media_manager import (delete_media_file, get_all_media_status,
+                                    get_media_file_path, get_media_status,
+                                    save_uploaded_media)
 
 router = APIRouter(prefix="/api/media", tags=["media"])
 
@@ -20,32 +25,34 @@ async def get_missing_media():
 @router.get("/tables-with-manuals")
 async def get_tables_with_manuals():
     """Get list of table IDs that have manuals."""
+
     from config import config
-    from pathlib import Path
-    
+
     manuals_dir = config.esde_media_base / "manuals"
     if not manuals_dir.exists():
         return []
-        
+
     tables = await db.get_tables(limit=2000)
     has_manual_ids = []
-    
+
     for t in tables:
         if not t.get("filename"):
             continue
-            
+
         stem = Path(t["filename"]).stem
-        folder_name = Path(t.get("folder_path", "")).name if t.get("folder_path") else ""
-        
+        folder_name = (
+            Path(t.get("folder_path", "")).name if t.get("folder_path") else ""
+        )
+
         # Check root
         if (manuals_dir / f"{stem}.pdf").exists():
             has_manual_ids.append(t["id"])
             continue
-            
+
         # Check nested
         if folder_name and (manuals_dir / folder_name / f"{stem}.pdf").exists():
             has_manual_ids.append(t["id"])
-            
+
     return has_manual_ids
 
 
@@ -66,9 +73,12 @@ async def upload_media(table_id: int, media_type: str, file: UploadFile = File(.
         raise HTTPException(status_code=404, detail="Table not found")
 
     from services.media_manager import ESDE_STATUS_TYPES
+
     valid_types = ESDE_STATUS_TYPES
     if media_type not in valid_types:
-        raise HTTPException(status_code=400, detail=f"Invalid media type. Must be one of: {valid_types}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid media type. Must be one of: {valid_types}"
+        )
 
     content = await file.read()
     result = await save_uploaded_media(table_id, media_type, file.filename, content)
@@ -83,13 +93,18 @@ async def delete_media(table_id: int, media_type: str):
         raise HTTPException(status_code=404, detail="Table not found")
 
     from services.media_manager import ESDE_STATUS_TYPES
+
     valid_types = ESDE_STATUS_TYPES
     if media_type not in valid_types:
-        raise HTTPException(status_code=400, detail=f"Invalid media type. Must be one of: {valid_types}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid media type. Must be one of: {valid_types}"
+        )
 
     result = await delete_media_file(table_id, media_type)
     if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Delete failed"))
+        raise HTTPException(
+            status_code=400, detail=result.get("error", "Delete failed")
+        )
     return result
 
 
@@ -97,9 +112,12 @@ async def delete_media(table_id: int, media_type: str):
 async def delete_all_media(table_id: int):
     """Delete all media for a table."""
     from services.media_manager import delete_all_media_by_id
+
     result = await delete_all_media_by_id(table_id)
     if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Delete failed"))
+        raise HTTPException(
+            status_code=400, detail=result.get("error", "Delete failed")
+        )
     return result
 
 
@@ -109,11 +127,11 @@ async def serve_table_manual(table_id: int):
     file_path = await get_media_file_path(table_id, "manuals")
     if not file_path or not file_path.exists():
         raise HTTPException(status_code=404, detail="Manual not found")
-    
+
     return FileResponse(
-        file_path, 
+        file_path,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{file_path.name}"'}
+        headers={"Content-Disposition": f'inline; filename="{file_path.name}"'},
     )
 
 
@@ -131,7 +149,10 @@ async def serve_esde_media_file(table_id: int, media_type: str):
 async def rotate_table_media(table_id: int, media_type: str, angle: int = 90):
     """Rotate a specific media file for a table."""
     from services.media_manager import rotate_media
+
     result = await rotate_media(table_id, media_type, angle)
     if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Rotation failed"))
+        raise HTTPException(
+            status_code=400, detail=result.get("error", "Rotation failed")
+        )
     return result

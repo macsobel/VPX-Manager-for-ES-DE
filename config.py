@@ -2,16 +2,19 @@
 Application configuration with Pydantic settings.
 Persists to ~/Library/Application Support/VPX Manager for ES-DE/vpx_manager.json.
 """
+
+import base64
 import json
 import marshal
-import sys
-import base64
-import shutil
-import platform
 import os
+import platform
+import shutil
+import sys
 from pathlib import Path
 from typing import Optional
+
 from pydantic import BaseModel, validator
+
 
 def _load_version():
     """Load version from version.txt or environment variable."""
@@ -22,13 +25,14 @@ def _load_version():
             return v_file.read_text().strip()
         except Exception:
             pass
-            
+
     # Check for environment variable (GitHub Actions)
     env_v = os.environ.get("GITHUB_RUN_NUMBER")
     if env_v:
         return env_v
-        
+
     return "Dev Build"
+
 
 VERSION = _load_version()
 
@@ -36,7 +40,9 @@ VERSION = _load_version()
 # Cross-platform support directory detection
 if platform.system() == "Darwin":
     # Standard macOS location for the user
-    APP_SUPPORT_DIR = Path.home() / "Library" / "Application Support" / "VPX Manager for ES-DE"
+    APP_SUPPORT_DIR = (
+        Path.home() / "Library" / "Application Support" / "VPX Manager for ES-DE"
+    )
 else:
     # Fallback for Linux, GitHub Actions, or AI Agents (like Jules)
     # Uses a local 'app_data' directory in the project root
@@ -93,8 +99,10 @@ def migrate_legacy_data():
     legacy_log = Path.home() / "vpx_manager.log"
     legacy_support_old = Path.home() / "Library" / "Application Support" / "VPinballX"
     legacy_launcher_dir = Path.home() / ".vpinmanager"
-    legacy_support_empty = Path.home() / "Library" / "Application Support" / "VPX Manager"
-    
+    legacy_support_empty = (
+        Path.home() / "Library" / "Application Support" / "VPX Manager"
+    )
+
     # Create new support dir
     APP_SUPPORT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -117,7 +125,7 @@ def migrate_legacy_data():
                 print(f"Migrated database to {new_db}")
             except Exception as e:
                 print(f"Error migrating database: {e}")
-        
+
         # VPS DB
         old_vps = legacy_support_old / "vpsdb.json"
         new_vps = APP_SUPPORT_DIR / "vpsdb.json"
@@ -165,10 +173,16 @@ migrate_legacy_data()
 class AppConfig(BaseModel):
     tables_dir: str = "~/ROMs/vpinball"
     # ES-DE Integration Settings
-    vpx_standalone_app_path: str = "/Applications/VPinballX_BGFX.app" if platform.system() == "Darwin" else "vpinballx"
+    vpx_standalone_app_path: str = (
+        "/Applications/VPinballX_BGFX.app"
+        if platform.system() == "Darwin"
+        else "vpinballx"
+    )
     vpx_use_flavor: str = "BGFX"
     vpx_display_mode: str = "Desktop"
-    esde_app_path: str = "/Applications/ES-DE.app" if platform.system() == "Darwin" else "es-de"
+    esde_app_path: str = (
+        "/Applications/ES-DE.app" if platform.system() == "Darwin" else "es-de"
+    )
     media_storage_mode: str = "standard"  # Options: "portable", "standard", "custom"
     esde_media_dir: str = "~/ES-DE/downloaded_media/vpinball"
     # New: Separate directory for ES-DE gamelists (typically ~/ES-DE/gamelists/vpinball)
@@ -176,44 +190,51 @@ class AppConfig(BaseModel):
     # ScreenScraper integration
     screenscraper_username: str = ""
     screenscraper_password: str = ""  # This will be encoded in the JSON
-    screenscraper_devid: str = ""    # Not saved to JSON
-    screenscraper_devpassword: str = "" # Not saved to JSON
-    screenscraper_dev_user: str = ""    # Fallback (geoferret) — Not saved to JSON
-    screenscraper_dev_pass: str = ""    # Fallback password — Not saved to JSON
+    screenscraper_devid: str = ""  # Not saved to JSON
+    screenscraper_devpassword: str = ""  # Not saved to JSON
+    screenscraper_dev_user: str = ""  # Fallback (geoferret) — Not saved to JSON
+    screenscraper_dev_pass: str = ""  # Fallback password — Not saved to JSON
 
     # Media Preferences
     media_preferences: dict = {
         "covers": [
-            {"source": "vpinmediadb",  "key": "wheel.png"},
+            {"source": "vpinmediadb", "key": "wheel.png"},
             {"source": "screenscraper", "key": "wheel-tarcisios"},
             {"source": "screenscraper", "key": "wheel"},
         ],
         "fanart": [
-            {"source": "vpinmediadb",  "key": "1k/bg.png"},
-            {"source": "vpinmediadb",  "key": "1k/table.png"},
-            {"source": "vpinmediadb",  "key": "4k/table.png"},
+            {"source": "vpinmediadb", "key": "1k/bg.png"},
+            {"source": "vpinmediadb", "key": "1k/table.png"},
+            {"source": "vpinmediadb", "key": "4k/table.png"},
         ],
         "manuals": [
             {"source": "screenscraper", "key": "manuel"},
         ],
         "marquees": [
             {"source": "screenscraper", "key": "wheel"},
-            {"source": "vpinmediadb",  "key": "wheel.png"},
+            {"source": "vpinmediadb", "key": "wheel.png"},
         ],
         "screenshots": [
-            {"source": "vpinmediadb",  "key": "1k/table.png"},
-            {"source": "vpinmediadb",  "key": "4k/table.png"},
+            {"source": "vpinmediadb", "key": "1k/table.png"},
+            {"source": "vpinmediadb", "key": "4k/table.png"},
             {"source": "screenscraper", "key": "ss"},
         ],
         "videos": [
-            {"source": "vpinmediadb",  "key": "1k/video.mp4"},
+            {"source": "vpinmediadb", "key": "1k/video.mp4"},
             {"source": "screenscraper", "key": "videotable"},
             {"source": "screenscraper", "key": "video-normalized"},
-        ]
+        ],
     }
 
-
-    @validator("tables_dir", "vpx_standalone_app_path", "esde_app_path", "esde_media_dir", "esde_gamelists_dir", pre=True, always=True)
+    @validator(
+        "tables_dir",
+        "vpx_standalone_app_path",
+        "esde_app_path",
+        "esde_media_dir",
+        "esde_gamelists_dir",
+        pre=True,
+        always=True,
+    )
     def expand_paths(cls, v):
         if isinstance(v, str) and v.startswith("~"):
             return str(Path(v).expanduser())
@@ -256,8 +277,13 @@ class AppConfig(BaseModel):
         """Dynamically resolved ES-DE gamelists directory."""
         if not self.esde_gamelists_dir:
             # Auto-derive from media dir if in standard mode
-            if self.media_storage_mode == "standard" and "downloaded_media" in self.esde_media_dir:
-                return Path(self.esde_media_dir.replace("downloaded_media", "gamelists")).expanduser()
+            if (
+                self.media_storage_mode == "standard"
+                and "downloaded_media" in self.esde_media_dir
+            ):
+                return Path(
+                    self.esde_media_dir.replace("downloaded_media", "gamelists")
+                ).expanduser()
             return self.expanded_tables_dir
         return Path(self.esde_gamelists_dir).expanduser()
 
@@ -282,13 +308,12 @@ def _scramble_dev(data: str) -> str:
 def load_config() -> AppConfig:
     """Load config from disk, falling back to defaults."""
     cfg_data = {}
-    
+
     # 1. Start with defaults
-    cfg = AppConfig()
 
     # 2. Check for obfuscated baked-in credentials
-    dat_path = Path(getattr(sys, '_MEIPASS', '.')) / "config.dat"
-    if not dat_path.exists() and getattr(sys, 'frozen', False):
+    dat_path = Path(getattr(sys, "_MEIPASS", ".")) / "config.dat"
+    if not dat_path.exists() and getattr(sys, "frozen", False):
         dat_path = Path(sys.executable).parent.parent / "Resources" / "config.dat"
 
     if dat_path.exists():
@@ -311,25 +336,38 @@ def load_config() -> AppConfig:
         try:
             with open(CONFIG_FILE, "r") as f:
                 user_data = json.load(f)
-            
+
             # Map legacy keys if any
             if "vpinballx_support_dir" in user_data and "support_dir" not in user_data:
                 user_data["support_dir"] = user_data.pop("vpinballx_support_dir")
-            
+
             # Decode password if present
             if "screenscraper_password" in user_data:
-                user_data["screenscraper_password"] = decode_password(user_data["screenscraper_password"])
+                user_data["screenscraper_password"] = decode_password(
+                    user_data["screenscraper_password"]
+                )
 
             # Update with user data, filtering for valid fields (ignoring legacy paths)
-            valid_user_data = {k: v for k, v in user_data.items() if k in AppConfig.model_fields}
-            
+            valid_user_data = {
+                k: v for k, v in user_data.items() if k in AppConfig.model_fields
+            }
+
             # Explicitly ensure internal paths are NOT taken from JSON
             for key in ["support_dir", "vps_db_path", "db_path"]:
                 valid_user_data.pop(key, None)
-            
+
             # CRITICAL: Do not let empty user strings override baked-in developer credentials
-            for key in ["screenscraper_devid", "screenscraper_devpassword", "screenscraper_username", "screenscraper_password"]:
-                if key in valid_user_data and not valid_user_data[key] and cfg_data.get(key):
+            for key in [
+                "screenscraper_devid",
+                "screenscraper_devpassword",
+                "screenscraper_username",
+                "screenscraper_password",
+            ]:
+                if (
+                    key in valid_user_data
+                    and not valid_user_data[key]
+                    and cfg_data.get(key)
+                ):
                     valid_user_data.pop(key)
 
             cfg_data.update(valid_user_data)
@@ -343,11 +381,13 @@ def save_config(cfg: AppConfig) -> None:
     """Persist config to disk."""
     try:
         data = cfg.model_dump()
-        
+
         # Security: Encode user password
         if data.get("screenscraper_password"):
-            data["screenscraper_password"] = encode_password(data["screenscraper_password"])
-            
+            data["screenscraper_password"] = encode_password(
+                data["screenscraper_password"]
+            )
+
         # Security: Never save dev credentials to JSON
         data.pop("screenscraper_devid", None)
         data.pop("screenscraper_devpassword", None)
@@ -368,4 +408,3 @@ def save_config(cfg: AppConfig) -> None:
 config = load_config()
 # Proactive save to ensure all credentials on disk are immediately obfuscated in the new format
 save_config(config)
-

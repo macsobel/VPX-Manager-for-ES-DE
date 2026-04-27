@@ -34,8 +34,9 @@ Expected structure (VPinFE convention):
 """
 import logging
 from pathlib import Path
-from config import config
+
 import database as db
+from config import config
 
 logger = logging.getLogger(__name__)
 
@@ -90,43 +91,60 @@ async def scan_tables_directory() -> dict:
                 if sub.is_file() and sub.suffix.lower() == ".vpx":
                     vpx_files.append((sub, item))
 
-    task_registry.start_task("scanner", total=len(vpx_files), message="Scanning tables...")
+    task_registry.start_task(
+        "scanner", total=len(vpx_files), message="Scanning tables..."
+    )
 
     try:
         existing_db = await db.get_db()
         try:
-            cursor = await existing_db.execute("SELECT id, filename, mtime, vps_id FROM tables")
+            cursor = await existing_db.execute(
+                "SELECT id, filename, mtime, vps_id FROM tables"
+            )
             rows = await cursor.fetchall()
             # Store existing info: {filename_lower: (id, mtime_in_db, vps_id)}
-            existing_meta = {row["filename"].lower(): (row["id"], row["mtime"], row["vps_id"]) for row in rows}
+            existing_meta = {
+                row["filename"].lower(): (row["id"], row["mtime"], row["vps_id"])
+                for row in rows
+            }
         finally:
             await existing_db.close()
 
         tables_to_upsert = []
         found_filenames = set(v[0].name.lower() for v in vpx_files)
-        
+
         import asyncio
-        semaphore = asyncio.Semaphore(10) # Process up to 10 tables concurrently
-        
+
+        semaphore = asyncio.Semaphore(10)  # Process up to 10 tables concurrently
+
         async def process_single_vpx(vpx_path, folder_path, idx):
             nonlocal new_count, updated_count
             async with semaphore:
-                task_registry.update_progress("scanner", idx + 1, f"Scanning: {vpx_path.name}")
+                task_registry.update_progress(
+                    "scanner", idx + 1, f"Scanning: {vpx_path.name}"
+                )
                 try:
                     # Check if we can skip parsing
                     current_mtime = str(vpx_path.stat().st_mtime)
                     existing_info = existing_meta.get(vpx_path.name.lower())
-                    
+
                     if existing_info and existing_info[1] == current_mtime:
                         return None
 
                     # Extract metadata from VPX file
                     from services.vpx_parser import VPXParser
+
                     # These OLE operations are CPU/IO bound, but we can offload them
                     # Use a timeout to prevent hanging on malformed files
                     try:
-                        meta = await asyncio.wait_for(asyncio.to_thread(VPXParser.get_metadata, vpx_path), timeout=30.0)
-                        vbs_hash = await asyncio.wait_for(asyncio.to_thread(VPXParser.get_vbs_hash, vpx_path), timeout=30.0)
+                        meta = await asyncio.wait_for(
+                            asyncio.to_thread(VPXParser.get_metadata, vpx_path),
+                            timeout=30.0,
+                        )
+                        vbs_hash = await asyncio.wait_for(
+                            asyncio.to_thread(VPXParser.get_vbs_hash, vpx_path),
+                            timeout=30.0,
+                        )
                     except asyncio.TimeoutError:
                         logger.error(f"Timeout scanning {vpx_path.name}")
                         errors.append(f"Timeout scanning {vpx_path.name}")
@@ -149,33 +167,50 @@ async def scan_tables_directory() -> dict:
                                 if rom.suffix.lower() == ".zip":
                                     has_rom = True
                                     break
-                            if has_rom: break
+                            if has_rom:
+                                break
 
                     # Check for PUP Pack (must have a subfolder inside pupvideos)
                     pup_dir = folder_path / "pupvideos"
-                    has_pup = pup_dir.exists() and pup_dir.is_dir() and any(d.is_dir() for d in pup_dir.iterdir())
-                    
+                    has_pup = (
+                        pup_dir.exists()
+                        and pup_dir.is_dir()
+                        and any(d.is_dir() for d in pup_dir.iterdir())
+                    )
+
                     # Check for AltColor
                     has_altcolor = False
-                    altcolor_dirs = [folder_path / "pinmame" / "altcolor", folder_path / "altcolor"]
+                    altcolor_dirs = [
+                        folder_path / "pinmame" / "altcolor",
+                        folder_path / "altcolor",
+                    ]
                     for d in altcolor_dirs:
                         if d.exists() and d.is_dir() and any(d.iterdir()):
                             has_altcolor = True
                             break
-                            
+
                     # Check for AltSound
                     has_altsound = False
-                    altsound_dirs = [folder_path / "pinmame" / "altsound", folder_path / "altsound"]
+                    altsound_dirs = [
+                        folder_path / "pinmame" / "altsound",
+                        folder_path / "altsound",
+                    ]
                     for d in altsound_dirs:
                         if d.exists() and d.is_dir() and any(d.iterdir()):
                             has_altsound = True
                             break
-                            
+
                     # Check for Music
-                    has_music = (folder_path / "music").exists() and (folder_path / "music").is_dir() and any((folder_path / "music").iterdir())
+                    has_music = (
+                        (folder_path / "music").exists()
+                        and (folder_path / "music").is_dir()
+                        and any((folder_path / "music").iterdir())
+                    )
 
                     # Build display name
-                    display_name = meta.get("display_name") or stem.replace("_", " ").replace("-", " ")
+                    display_name = meta.get("display_name") or stem.replace(
+                        "_", " "
+                    ).replace("-", " ")
                     manufacturer = ""
                     year = ""
                     parts = display_name.split("(")
@@ -205,7 +240,7 @@ async def scan_tables_directory() -> dict:
                         "has_music": 1 if has_music else 0,
                         "folder_path": str(folder_path),
                         "vbs_hash": vbs_hash,
-                        "mtime": current_mtime
+                        "mtime": current_mtime,
                     }
 
                     if not vps_id or vps_id == "":
@@ -226,26 +261,31 @@ async def scan_tables_directory() -> dict:
                     return None
 
         # Run all tasks concurrently
-        tasks = [process_single_vpx(vpx_path, folder_path, i) for i, (vpx_path, folder_path) in enumerate(vpx_files)]
+        tasks = [
+            process_single_vpx(vpx_path, folder_path, i)
+            for i, (vpx_path, folder_path) in enumerate(vpx_files)
+        ]
         results = await asyncio.gather(*tasks)
         tables_to_upsert = [t for t in results if t is not None]
 
         # Perform batch upsert
         if tables_to_upsert:
             await db.upsert_tables_batch(tables_to_upsert)
-            
+
             # Scanned medias (still individual for now, but we can batch this later if needed)
             # We need to get the IDs of new tables. Simplest is to reload existing_meta
             existing_db = await db.get_db()
             try:
-                cursor = await existing_db.execute("SELECT id, filename, folder_path FROM tables")
+                cursor = await existing_db.execute(
+                    "SELECT id, filename, folder_path FROM tables"
+                )
                 all_rows = await cursor.fetchall()
-                
+
                 upserted_filenames = {t["filename"] for t in tables_to_upsert}
                 for row in all_rows:
                     # Only scan if it was in our upsert list
                     if row["filename"] in upserted_filenames:
-                         await _scan_medias_folder(row["id"], Path(row["folder_path"]))
+                        await _scan_medias_folder(row["id"], Path(row["folder_path"]))
             finally:
                 await existing_db.close()
 
@@ -254,16 +294,20 @@ async def scan_tables_directory() -> dict:
         try:
             cursor = await existing_db.execute("SELECT id, filename FROM tables")
             all_existing = await cursor.fetchall()
-            
+
             for row in all_existing:
                 if row["filename"].lower() not in found_filenames:
                     # Need to delete this table!
-                    from services.media_manager import delete_all_media_for_table
                     from services.gamelist_manager import GamelistManager
+                    from services.media_manager import \
+                        delete_all_media_for_table
+
                     try:
                         gm = GamelistManager(str(config.get_gamelist_xml_path()))
-                        gm.remove_game(f"./{row['filename']}") # simple relative fallback
-                    except:
+                        gm.remove_game(
+                            f"./{row['filename']}"
+                        )  # simple relative fallback
+                    except Exception:
                         pass
                     await delete_all_media_for_table(row["filename"])
                     await db.delete_table(row["id"])
@@ -274,11 +318,12 @@ async def scan_tables_directory() -> dict:
 
     except Exception as e:
         import traceback
+
         error_msg = f"Scan failed: {str(e)}"
         try:
             logger.error(error_msg)
             logger.error(traceback.format_exc())
-        except:
+        except Exception:
             print(error_msg)
         task_registry.fail_task("scanner", error_msg)
         errors.append(error_msg)
@@ -314,6 +359,10 @@ async def _scan_medias_folder(table_id: int, folder_path: Path):
                 await db.upsert_media(table_id, media_type, str(f))
             elif media_type == "audio" and ext in AUDIO_EXTS:
                 await db.upsert_media(table_id, media_type, str(f))
-            elif media_type in ("wheel", "backglass", "playfield", "dmd", "cab", "flyer", "realdmd") and ext in IMAGE_EXTS:
+            elif (
+                media_type
+                in ("wheel", "backglass", "playfield", "dmd", "cab", "flyer", "realdmd")
+                and ext in IMAGE_EXTS
+            ):
                 await db.upsert_media(table_id, media_type, str(f))
             break

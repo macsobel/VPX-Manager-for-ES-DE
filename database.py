@@ -4,20 +4,25 @@ from __future__ import annotations
 SQLite database layer using aiosqlite.
 Manages tables, media, and collections.
 """
-import aiosqlite
-import sqlite3
 import json
 import os
-from pathlib import Path
+import sqlite3
 from datetime import datetime
+from pathlib import Path
+
+import aiosqlite
+
 from config import config, relativize_path
 
 DB_PATH = config.db_path
 
+
 def _expand_path(p: str | None) -> str:
     """Expand user-relative paths (~/) to absolute paths."""
-    if not p: return ""
+    if not p:
+        return ""
     return os.path.expanduser(p)
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tables (
@@ -87,6 +92,7 @@ CREATE INDEX IF NOT EXISTS idx_media_table ON media(table_id);
 
 _shared_db: aiosqlite.Connection | None = None
 
+
 async def get_db() -> aiosqlite.Connection:
     """Get a database connection."""
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
@@ -96,6 +102,7 @@ async def get_db() -> aiosqlite.Connection:
     await db.execute("PRAGMA foreign_keys=ON")
     await db.execute("PRAGMA synchronous=NORMAL")
     return db
+
 
 async def close_db():
     """No-op for compatibility, connections now close per-request."""
@@ -107,52 +114,72 @@ async def init_db():
     db = await get_db()
     try:
         await db.executescript(SCHEMA)
-        
+
         # Migration: Add columns if missing
         cursor = await db.execute("PRAGMA table_info(tables)")
         columns = [row[1] for row in await cursor.fetchall()]
-        
+
         if "vps_version" not in columns:
-            await db.execute("ALTER TABLE tables ADD COLUMN vps_version TEXT DEFAULT ''")
+            await db.execute(
+                "ALTER TABLE tables ADD COLUMN vps_version TEXT DEFAULT ''"
+            )
         if "vps_table_url" not in columns:
-            await db.execute("ALTER TABLE tables ADD COLUMN vps_table_url TEXT DEFAULT ''")
+            await db.execute(
+                "ALTER TABLE tables ADD COLUMN vps_table_url TEXT DEFAULT ''"
+            )
         if "version" not in columns:
             await db.execute("ALTER TABLE tables ADD COLUMN version TEXT DEFAULT ''")
         if "author" not in columns:
             await db.execute("ALTER TABLE tables ADD COLUMN author TEXT DEFAULT ''")
         if "vps_file_id" not in columns:
-            await db.execute("ALTER TABLE tables ADD COLUMN vps_file_id TEXT DEFAULT ''")
+            await db.execute(
+                "ALTER TABLE tables ADD COLUMN vps_file_id TEXT DEFAULT ''"
+            )
         if "ignored_version" not in columns:
-            await db.execute("ALTER TABLE tables ADD COLUMN ignored_version TEXT DEFAULT ''")
+            await db.execute(
+                "ALTER TABLE tables ADD COLUMN ignored_version TEXT DEFAULT ''"
+            )
         if "vbs_hash" not in columns:
             await db.execute("ALTER TABLE tables ADD COLUMN vbs_hash TEXT DEFAULT ''")
         if "ss_id" not in columns:
             await db.execute("ALTER TABLE tables ADD COLUMN ss_id TEXT DEFAULT ''")
         if "has_manual" not in columns:
-            await db.execute("ALTER TABLE tables ADD COLUMN has_manual INTEGER DEFAULT 0")
+            await db.execute(
+                "ALTER TABLE tables ADD COLUMN has_manual INTEGER DEFAULT 0"
+            )
         if "mtime" not in columns:
             await db.execute("ALTER TABLE tables ADD COLUMN mtime INTEGER DEFAULT 0")
         if "has_pup" not in columns:
             await db.execute("ALTER TABLE tables ADD COLUMN has_pup INTEGER DEFAULT 0")
         if "has_altcolor" not in columns:
-            await db.execute("ALTER TABLE tables ADD COLUMN has_altcolor INTEGER DEFAULT 0")
+            await db.execute(
+                "ALTER TABLE tables ADD COLUMN has_altcolor INTEGER DEFAULT 0"
+            )
         if "has_altsound" not in columns:
-            await db.execute("ALTER TABLE tables ADD COLUMN has_altsound INTEGER DEFAULT 0")
+            await db.execute(
+                "ALTER TABLE tables ADD COLUMN has_altsound INTEGER DEFAULT 0"
+            )
         if "has_music" not in columns:
-            await db.execute("ALTER TABLE tables ADD COLUMN has_music INTEGER DEFAULT 0")
+            await db.execute(
+                "ALTER TABLE tables ADD COLUMN has_music INTEGER DEFAULT 0"
+            )
         try:
             await db.execute("ALTER TABLE tables ADD COLUMN theme TEXT DEFAULT ''")
         except sqlite3.OperationalError:
-            pass # Column already exists
-            
+            pass  # Column already exists
+
         try:
             await db.execute("ALTER TABLE tables ADD COLUMN players TEXT DEFAULT '1'")
         except sqlite3.OperationalError:
             pass
-            
+
         # Migration: Relativize paths for portability
-        await db.execute("UPDATE tables SET folder_path = '~/ROMs/vpinball/' || SUBSTR(folder_path, INSTR(folder_path, '/ROMs/vpinball/') + 15) WHERE folder_path LIKE '%/ROMs/vpinball/%' AND folder_path NOT LIKE '~/%%'")
-        await db.execute("UPDATE media SET file_path = '~/ROMs/vpinball/' || SUBSTR(file_path, INSTR(file_path, '/ROMs/vpinball/') + 15) WHERE file_path LIKE '%/ROMs/vpinball/%' AND file_path NOT LIKE '~/%%'")
+        await db.execute(
+            "UPDATE tables SET folder_path = '~/ROMs/vpinball/' || SUBSTR(folder_path, INSTR(folder_path, '/ROMs/vpinball/') + 15) WHERE folder_path LIKE '%/ROMs/vpinball/%' AND folder_path NOT LIKE '~/%%'"
+        )
+        await db.execute(
+            "UPDATE media SET file_path = '~/ROMs/vpinball/' || SUBSTR(file_path, INSTR(file_path, '/ROMs/vpinball/') + 15) WHERE file_path LIKE '%/ROMs/vpinball/%' AND file_path NOT LIKE '~/%%'"
+        )
 
         await db.commit()
     finally:
@@ -161,21 +188,24 @@ async def init_db():
 
 # ── Table CRUD ──────────────────────────────────────────────────────
 
+
 async def upsert_table(data: dict) -> int:
     """Insert or update a table record. Returns the row id."""
     db = await get_db()
     try:
         table_id = data.get("id")
         row = None
-        
+
         # 1. Check if exists by ID
         if table_id:
             cursor = await db.execute("SELECT id FROM tables WHERE id = ?", (table_id,))
             row = await cursor.fetchone()
-        
+
         # 2. Check if exists by filename (if not found by ID or ID not provided)
         if not row and "filename" in data:
-            cursor = await db.execute("SELECT id FROM tables WHERE filename = ?", (data["filename"],))
+            cursor = await db.execute(
+                "SELECT id FROM tables WHERE filename = ?", (data["filename"],)
+            )
             row = await cursor.fetchone()
             if row:
                 table_id = row[0]
@@ -200,7 +230,7 @@ async def upsert_table(data: dict) -> int:
             data.setdefault("date_added", datetime.now().isoformat())
             if "filename" in data:
                 data.setdefault("display_name", Path(data["filename"]).stem)
-            
+
             # Relativize folder_path on save
             if "folder_path" in data:
                 data["folder_path"] = _relativize_path(data["folder_path"])
@@ -218,6 +248,7 @@ async def upsert_table(data: dict) -> int:
         raise e
     finally:
         await db.close()
+
 
 async def upsert_tables_batch(tables_data: list[dict]):
     """Batch upsert tables in a single transaction."""
@@ -242,16 +273,21 @@ async def upsert_tables_batch(tables_data: list[dict]):
         # as different items might have different subsets of columns
         for item in processed:
             filename = item.get("filename")
-            if not filename: continue
+            if not filename:
+                continue
 
             # Check existence (case-insensitive for macOS compatibility)
-            cursor = await db.execute("SELECT id FROM tables WHERE filename = ? COLLATE NOCASE", (filename,))
+            cursor = await db.execute(
+                "SELECT id FROM tables WHERE filename = ? COLLATE NOCASE", (filename,)
+            )
             row = await cursor.fetchone()
 
             if row:
                 # Update
                 table_id = row[0]
-                fields = {k: v for k, v in item.items() if k != "id" and k != "filename"}
+                fields = {
+                    k: v for k, v in item.items() if k != "id" and k != "filename"
+                }
                 if fields:
                     set_clause = ", ".join(f"{k} = ?" for k in fields)
                     await db.execute(
@@ -266,7 +302,7 @@ async def upsert_tables_batch(tables_data: list[dict]):
                     f"INSERT INTO tables ({cols}) VALUES ({placeholders})",
                     tuple(item.values()),
                 )
-        
+
         await db.commit()
     except Exception as e:
         await db.rollback()
@@ -350,7 +386,8 @@ async def get_table(table_id: int) -> dict | None:
     try:
         cursor = await db.execute("SELECT * FROM tables WHERE id = ?", (table_id,))
         row = await cursor.fetchone()
-        if not row: return None
+        if not row:
+            return None
         res = dict(row)
         if res.get("folder_path"):
             res["folder_path"] = _expand_path(res["folder_path"])
@@ -358,12 +395,16 @@ async def get_table(table_id: int) -> dict | None:
     finally:
         await db.close()
 
+
 async def get_table_by_filename(filename: str) -> dict | None:
     db = await get_db()
     try:
-        cursor = await db.execute("SELECT * FROM tables WHERE filename = ?", (filename,))
+        cursor = await db.execute(
+            "SELECT * FROM tables WHERE filename = ?", (filename,)
+        )
         row = await cursor.fetchone()
-        if not row: return None
+        if not row:
+            return None
         res = dict(row)
         if res.get("folder_path"):
             res["folder_path"] = _expand_path(res["folder_path"])
@@ -391,7 +432,7 @@ async def get_table_count(search: str = "", vps_matched: bool | None = None) -> 
         if search:
             where_clauses.append("(display_name LIKE ? OR filename LIKE ?)")
             params.extend([f"%{search}%", f"%{search}%"])
-        
+
         if vps_matched is True:
             where_clauses.append("vps_id != ''")
         elif vps_matched is False:
@@ -427,7 +468,10 @@ async def get_distinct_values(column: str) -> list[str]:
 
 # ── Media CRUD ──────────────────────────────────────────────────────
 
-async def upsert_media(table_id: int, media_type: str, file_path: str, thumbnail_path: str = "") -> int:
+
+async def upsert_media(
+    table_id: int, media_type: str, file_path: str, thumbnail_path: str = ""
+) -> int:
     db = await get_db()
     try:
         cursor = await db.execute(
@@ -457,9 +501,7 @@ async def upsert_media(table_id: int, media_type: str, file_path: str, thumbnail
 async def get_media_for_table(table_id: int) -> list[dict]:
     db = await get_db()
     try:
-        cursor = await db.execute(
-            "SELECT * FROM media WHERE table_id = ?", (table_id,)
-        )
+        cursor = await db.execute("SELECT * FROM media WHERE table_id = ?", (table_id,))
         rows = await cursor.fetchall()
         results = [dict(r) for r in rows]
         for r in results:
@@ -470,17 +512,22 @@ async def get_media_for_table(table_id: int) -> list[dict]:
         await db.close()
 
 
-
-
-
 # ── Collection CRUD ─────────────────────────────────────────────────
 
-async def create_collection(name: str, description: str = "", filter_rules: dict = None) -> int:
+
+async def create_collection(
+    name: str, description: str = "", filter_rules: dict = None
+) -> int:
     db = await get_db()
     try:
         cursor = await db.execute(
             "INSERT INTO collections (name, description, filter_rules, created_at) VALUES (?, ?, ?, ?)",
-            (name, description, json.dumps(filter_rules or {}), datetime.now().isoformat()),
+            (
+                name,
+                description,
+                json.dumps(filter_rules or {}),
+                datetime.now().isoformat(),
+            ),
         )
         await db.commit()
         return cursor.lastrowid
@@ -522,7 +569,12 @@ async def get_collection(collection_id: int) -> dict | None:
         await db.close()
 
 
-async def update_collection(collection_id: int, name: str = None, description: str = None, filter_rules: dict = None) -> bool:
+async def update_collection(
+    collection_id: int,
+    name: str = None,
+    description: str = None,
+    filter_rules: dict = None,
+) -> bool:
     db = await get_db()
     try:
         fields = {}
@@ -548,7 +600,9 @@ async def update_collection(collection_id: int, name: str = None, description: s
 async def delete_collection(collection_id: int) -> bool:
     db = await get_db()
     try:
-        cursor = await db.execute("DELETE FROM collections WHERE id = ?", (collection_id,))
+        cursor = await db.execute(
+            "DELETE FROM collections WHERE id = ?", (collection_id,)
+        )
         await db.commit()
         return cursor.rowcount > 0
     finally:

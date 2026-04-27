@@ -1,13 +1,15 @@
 """
 VPS (Virtual Pinball Spreadsheet) API router.
 """
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
 import database as db
 from services.vps_matcher import vps_matcher
-from services.vbs_manager import vbs_manager
 
 router = APIRouter(prefix="/api/vps", tags=["vps"])
+
 
 class MatchRequest(BaseModel):
     vps_id: str
@@ -20,8 +22,11 @@ class MatchRequest(BaseModel):
     ipdb_id: str = ""
     players: str = "1"
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+
 from services.task_registry import task_registry
+
 
 @router.post("/sync")
 async def sync_databases(background_tasks: BackgroundTasks):
@@ -30,9 +35,10 @@ async def sync_databases(background_tasks: BackgroundTasks):
     task = task_registry.get_task("vps_sync")
     if task.status == "running":
         return {"success": False, "message": "Database sync already in progress"}
-        
+
     background_tasks.add_task(vps_matcher.fetch_database)
     return {"success": True, "message": "Database sync started in background"}
+
 
 @router.get("/sync/status")
 async def get_sync_status():
@@ -92,9 +98,10 @@ async def match_table(table_id: int, match: MatchRequest):
         update_data["players"] = match.players
 
     await db.upsert_table(update_data)
-    
+
     # NEW: Automatically rename files/folders to standardized format
     from services.table_file_service import TableFileService
+
     await TableFileService.standardize_names(table_id)
 
     updated = await db.get_table(table_id)
@@ -108,11 +115,9 @@ async def unmatch_table(table_id: int):
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
 
-    await db.upsert_table({
-        "filename": table["filename"],
-        "vps_id": None,
-        "vps_file_id": None
-    })
+    await db.upsert_table(
+        {"filename": table["filename"], "vps_id": None, "vps_file_id": None}
+    )
     updated = await db.get_table(table_id)
     return {"success": True, "table": updated}
 
@@ -123,5 +128,5 @@ async def get_vps_entry(vps_id: str):
     entry = vps_matcher.get_entry(vps_id)
     if not entry:
         raise HTTPException(status_code=404, detail="VPS entry not found")
-    
+
     return vps_matcher._format_entry(entry)

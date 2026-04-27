@@ -1,7 +1,8 @@
 from __future__ import annotations
-import httpx
+
 import logging
-from config import load_config
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -10,14 +11,15 @@ REPO_RAW_BASE = "https://raw.githubusercontent.com/superhac/vpinmediadb/main"
 
 # Sources we care about based on priority
 SOURCES_TO_CHECK = [
-    "wheel.png",        # Covers / Marquees
-    "1k/table.png",     # Fanart / Screenshots
-    "4k/table.png",     # Fanart / Screenshots
-    "1k/bg.png",        # Fanart
-    "1k/video.mp4",     # Videos
-    "1k/table.mp4",     # Videos (Alternative)
-    "4k/table.mp4",     # Videos (4K)
+    "wheel.png",  # Covers / Marquees
+    "1k/table.png",  # Fanart / Screenshots
+    "4k/table.png",  # Fanart / Screenshots
+    "1k/bg.png",  # Fanart
+    "1k/video.mp4",  # Videos
+    "1k/table.mp4",  # Videos (Alternative)
+    "4k/table.mp4",  # Videos (4K)
 ]
+
 
 async def check_availability(vps_id: str) -> dict:
     """
@@ -42,8 +44,9 @@ async def check_availability(vps_id: str) -> dict:
                         available["1k/video.mp4"] = url
             except Exception as e:
                 logger.debug(f"vpinmediadb: {source} check failed: {e}")
-                
+
     return available
+
 
 async def scrape_vpinmediadb(table_id: int, vps_id: str, table_filename: str) -> dict:
     """Legacy compatibility function, do not use directly. Use scraper_service."""

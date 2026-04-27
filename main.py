@@ -2,24 +2,27 @@
 VPX Manager for ES-DE — FastAPI Application Entry Point
 A web-based table management app for Visual Pinball X on macOS.
 """
-import uvicorn
-import uvicorn.config
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from pathlib import Path
-import os
-
-import database as db
-from config import LOG_FILE, VERSION
-from routers import tables, upload, vps, media, collections, settings as settings_router, scraper, patches, tools, vbs_manager, ini_manager, updates
-import socket
 
 # ── Logging & Security ──────────────────────────────────────────────
 import logging
+import os
 import re
+import socket
+from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+import uvicorn
+import uvicorn.config
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+import database as db
+from config import LOG_FILE, VERSION
+from routers import collections, ini_manager, media, patches, scraper
+from routers import settings as settings_router
+from routers import tables, tools, updates, upload, vbs_manager, vps
 
 # Delete legacy server.log if it exists in the project root
 legacy_server_log = Path(__file__).parent / "server.log"
@@ -29,23 +32,26 @@ if legacy_server_log.exists():
     except Exception:
         pass
 
+
 class RedactingFilter(logging.Filter):
     """
     Global filter to redact sensitive credentials from all log messages.
     Scans for patterns like devid=..., sspassword=..., etc.
     """
+
     def filter(self, record):
         msg = record.getMessage()
         # Sensitive keys to watch for
         keys = ["devid", "devpassword", "ssid", "sspassword"]
         for key in keys:
             # Match key=value, key:value, or key="value"
-            pattern = rf'({key}[=:\(\"\'\s]+)([^&\s\)\"\',]+)'
-            msg = re.sub(pattern, r'\1[REDACTED]', msg, flags=re.IGNORECASE)
-        
+            pattern = rf"({key}[=:\(\"\'\s]+)([^&\s\)\"\',]+)"
+            msg = re.sub(pattern, r"\1[REDACTED]", msg, flags=re.IGNORECASE)
+
         record.msg = msg
         record.args = None
         return True
+
 
 # Configure standard logging
 logging.basicConfig(
@@ -53,8 +59,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         RotatingFileHandler(LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3),
-        logging.StreamHandler()
-    ]
+        logging.StreamHandler(),
+    ],
 )
 
 # Apply filter to ALL handlers in the root logger
@@ -65,8 +71,11 @@ for handler in logging.root.handlers:
 UVICORN_LOG_CONFIG = uvicorn.config.LOGGING_CONFIG
 for name in ["access", "default"]:
     if f"uvicorn.{name}" not in UVICORN_LOG_CONFIG["loggers"]:
-        UVICORN_LOG_CONFIG["loggers"][f"uvicorn.{name}"] = {"handlers": ["default"], "level": "INFO"}
-    
+        UVICORN_LOG_CONFIG["loggers"][f"uvicorn.{name}"] = {
+            "handlers": ["default"],
+            "level": "INFO",
+        }
+
 # We need to make sure the uvicorn handlers also get the filter
 # But uvicorn config is a dict, so we'll have to inject it into uvicorn.run or similar.
 # Actually, the simplest way to catch uvicorn logs is to ensure they propagate.
@@ -80,13 +89,15 @@ logger.info("VPX Manager for ES-DE starting up...")
 # Try to set the process name for Activity Monitor / macOS UI
 try:
     import setproctitle
-    setproctitle.setproctitle('VPX Manager for ES-DE')
-    
+
+    setproctitle.setproctitle("VPX Manager for ES-DE")
+
     import ctypes
     import ctypes.util
-    libc = ctypes.CDLL(ctypes.util.find_library('c'))
-    if hasattr(libc, 'setprogname'):
-        libc.setprogname(b'VPX Manager for ES-DE')
+
+    libc = ctypes.CDLL(ctypes.util.find_library("c"))
+    if hasattr(libc, "setprogname"):
+        libc.setprogname(b"VPX Manager for ES-DE")
 except Exception:
     pass
 
@@ -102,7 +113,9 @@ async def lifespan(app: FastAPI):
         s.connect(("8.8.8.8", 80))
         local_ip = s.getsockname()[0]
         s.close()
-        logger.info(f"VPX Manager for ES-DE is accessible on your local network at: http://{local_ip}:8746")
+        logger.info(
+            f"VPX Manager for ES-DE is accessible on your local network at: http://{local_ip}:8746"
+        )
     except Exception:
         logger.info("VPX Manager for ES-DE is running locally.")
 
@@ -132,6 +145,7 @@ app.include_router(updates.router)
 
 # ── Static Frontend ─────────────────────────────────────────────────
 from config import APP_SUPPORT_DIR
+
 MOBILE_BUILDS_DIR = APP_SUPPORT_DIR / "Mobile Builds"
 MOBILE_BUILDS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -173,12 +187,13 @@ async def catch_all(path: str):
     return {"message": "VPX Manager for ES-DE API"}
 
 
-import threading
-import sys
 import asyncio
+import sys
+import threading
 
 # Global server reference for graceful shutdown
 server_instance = None
+
 
 def run_server():
     global server_instance
@@ -193,14 +208,16 @@ def run_server():
     server_instance = uvicorn.Server(config)
     server_instance.run()
 
+
 if __name__ == "__main__":
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
 
     # Try to launch the macOS menubar app
     try:
-        import rumps
         import os
+
+        import rumps
 
         class VPXMenuBarApp(rumps.App):
             def __init__(self):
@@ -209,16 +226,18 @@ if __name__ == "__main__":
                 # Asset resolution for the icon
                 icon_path = None
                 icon_filename = "MenuBarIconColor.png"
-                if getattr(sys, 'frozen', False):
+                if getattr(sys, "frozen", False):
                     # PyInstaller path
                     base_path = sys._MEIPASS
-                    icon_path = os.path.join(base_path, 'resources', icon_filename)
+                    icon_path = os.path.join(base_path, "resources", icon_filename)
                 else:
                     # Running from script
-                    icon_path = os.path.join(os.path.dirname(__file__), 'resources', icon_filename)
+                    icon_path = os.path.join(
+                        os.path.dirname(__file__), "resources", icon_filename
+                    )
 
                 if os.path.exists(icon_path):
-                    # Set the icon. rumps handles absolute paths well, 
+                    # Set the icon. rumps handles absolute paths well,
                     # but we ensure it's not treated as a template.
                     self.icon = icon_path
                     self.template = False
@@ -232,28 +251,32 @@ if __name__ == "__main__":
                     self.status_item,
                     None,  # Separator
                     rumps.MenuItem("About VPX Manager", callback=self.about_window),
-                    rumps.MenuItem("Check for Updates...", callback=self.check_for_updates),
+                    rumps.MenuItem(
+                        "Check for Updates...", callback=self.check_for_updates
+                    ),
                     None,  # Separator
                     rumps.MenuItem("Open Web Interface", callback=self.open_web_ui),
                     rumps.MenuItem("Open Emulation Station", callback=self.open_es),
                     None,  # Separator
                     rumps.MenuItem("Restart", callback=self.restart),
-                    rumps.MenuItem("Quit", callback=self.quit_app)
+                    rumps.MenuItem("Quit", callback=self.quit_app),
                 ]
 
             def open_web_ui(self, sender):
                 import webbrowser
+
                 webbrowser.open("http://localhost:8746")
 
             def about_window(self, sender):
                 rumps.alert(
                     title="VPX Manager for ES-DE",
                     message=f"Version {VERSION}\n\nA Visual Pinball file management system for macOS and Linux with media file management for Emulation Station. Let's make some macOS pincabs!\n\nDeveloped by Aaron Sobel",
-                    ok="Close"
+                    ok="Close",
                 )
 
             def check_for_updates(self, sender):
                 from services.update_service import update_service
+
                 try:
                     result = asyncio.run(update_service.check_for_updates())
                     if result.get("update_available"):
@@ -261,14 +284,18 @@ if __name__ == "__main__":
                             title="Update Available",
                             message=f"A new version ({result['latest_version']}) is available.\n\nWould you like to open the download page?",
                             ok="Download",
-                            cancel="Later"
+                            cancel="Later",
                         ):
                             import webbrowser
+
                             webbrowser.open(result["download_url"])
                     elif result.get("error"):
                         rumps.alert("Update Check Failed", result["error"])
                     else:
-                        rumps.alert("Up to Date", f"You are running the latest version ({VERSION}).")
+                        rumps.alert(
+                            "Up to Date",
+                            f"You are running the latest version ({VERSION}).",
+                        )
                 except Exception as e:
                     logger.error(f"Error checking for updates from menubar: {e}")
                     rumps.alert("Update Check Failed", str(e))
@@ -285,9 +312,11 @@ if __name__ == "__main__":
 
             def open_es(self, sender):
                 from config import config
+
                 es_path = config.esde_app_path
                 try:
                     import subprocess
+
                     subprocess.run(["open", es_path], check=False)
                 except Exception as e:
                     logger.error(f"Failed to open Emulation Station: {e}")
@@ -302,7 +331,8 @@ if __name__ == "__main__":
             def restart(self, sender):
                 try:
                     import subprocess
-                    if getattr(sys, 'frozen', False):
+
+                    if getattr(sys, "frozen", False):
                         # Executable / .app bundle
                         bundle_path = sys.executable
                         # If inside a macOS .app, sys.executable is .../Contents/MacOS/VPX_Manager
@@ -331,6 +361,7 @@ if __name__ == "__main__":
         try:
             while True:
                 import time
+
                 time.sleep(1)
         except KeyboardInterrupt:
             sys.exit(0)

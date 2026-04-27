@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 ScreenScraper API client for media scraping.
 Modeled after ES-DE's ScreenScraper.cpp implementation.
@@ -6,13 +7,13 @@ Modeled after ES-DE's ScreenScraper.cpp implementation.
 Uses the ScreenScraper v2 API to search for Visual Pinball games
 and download media assets into ES-DE's downloaded_media folder structure.
 """
-import httpx
-import asyncio
-import re
 import logging
-from typing import Union, Optional, List, Dict
+import re
 from pathlib import Path
-import urllib.parse
+from typing import List, Optional
+
+import httpx
+
 from config import config, load_config
 
 logger = logging.getLogger(__name__)
@@ -24,39 +25,45 @@ DEFAULT_HEADERS = {"Accept-Encoding": "identity"}
 
 # ScreenScraper media type → (folder, suffix)
 MEDIA_TYPE_MAP = {
-    "wheel":              ("marquees", ""),
-    "wheel-hd":           ("marquees", ""),
-    "wheel-carbon":       ("marquees", ""),
-    "wheel-steel":        ("marquees", ""),
-    "wheel-tarcisios":    ("covers",   ""),   # Tarcisio's Wheel → Covers
-    "screenmarquee":      ("marquees", ""),
-    "ss":                 ("screenshots", ""),
-    "sstitle":            ("screenshots", ""),
-    "sstable":            ("screenshots", ""), # Table Screenshot (Pincab)
-    "ssfronton1-1":       ("screenshots", ""), # Front-End 1:1 Screenshot (Pincab)
-    "fanart":             ("fanart", ""),
-    "video":              ("videos", ""),
-    "video-normalized":   ("videos", ""),
-    "videotable":         ("videos", ""),     # Table Video FullHD
-    "box-2D":             ("covers", ""),
-    "box-3D":             ("covers", ""),
-    "box-2D-dos":         ("covers", ""),
-    "support-2D":         ("covers", ""),
-    "support-pdf":        ("manuals", ""),
-    "manuel":             ("manuals", ""),    # SS PDF manual (correct key)
-    "mixrbv1":            ("covers", ""),
-    "mixrbv2":            ("covers", ""),
+    "wheel": ("marquees", ""),
+    "wheel-hd": ("marquees", ""),
+    "wheel-carbon": ("marquees", ""),
+    "wheel-steel": ("marquees", ""),
+    "wheel-tarcisios": ("covers", ""),  # Tarcisio's Wheel → Covers
+    "screenmarquee": ("marquees", ""),
+    "ss": ("screenshots", ""),
+    "sstitle": ("screenshots", ""),
+    "sstable": ("screenshots", ""),  # Table Screenshot (Pincab)
+    "ssfronton1-1": ("screenshots", ""),  # Front-End 1:1 Screenshot (Pincab)
+    "fanart": ("fanart", ""),
+    "video": ("videos", ""),
+    "video-normalized": ("videos", ""),
+    "videotable": ("videos", ""),  # Table Video FullHD
+    "box-2D": ("covers", ""),
+    "box-3D": ("covers", ""),
+    "box-2D-dos": ("covers", ""),
+    "support-2D": ("covers", ""),
+    "support-pdf": ("manuals", ""),
+    "manuel": ("manuals", ""),  # SS PDF manual (correct key)
+    "mixrbv1": ("covers", ""),
+    "mixrbv2": ("covers", ""),
 }
 
 # The media types we actually want to download, in priority order
 DESIRED_MEDIA_TYPES = [
-    "wheel-tarcisios", "wheel-hd", "wheel",  # marquee/wheel/covers
-    "sstable", "ssfronton1-1", "ss",         # screenshots (Table first, then regular)
-    "videotable", "video",                    # video (FullHD then regular)
-    "video-normalized",                       # fallback video
-    "box-2D",                                 # cover
-    "fanart",                                 # fan art
-    "manuel", "support-pdf",                  # manual
+    "wheel-tarcisios",
+    "wheel-hd",
+    "wheel",  # marquee/wheel/covers
+    "sstable",
+    "ssfronton1-1",
+    "ss",  # screenshots (Table first, then regular)
+    "videotable",
+    "video",  # video (FullHD then regular)
+    "video-normalized",  # fallback video
+    "box-2D",  # cover
+    "fanart",  # fan art
+    "manuel",
+    "support-pdf",  # manual
 ]
 
 # Region priority (matching ES-DE's approach)
@@ -94,16 +101,16 @@ def _clean_game_name(filename: str) -> str:
     """
     name = Path(filename).stem
     # Remove parenthetical info like (Manufacturer Year)
-    name = re.sub(r'\s*\([^)]*\)\s*', ' ', name)
+    name = re.sub(r"\s*\([^)]*\)\s*", " ", name)
     # Remove brackets like [Author]
-    name = re.sub(r'\s*\[[^\]]*\]\s*', ' ', name)
+    name = re.sub(r"\s*\[[^\]]*\]\s*", " ", name)
     # Remove version patterns like v1.0, V2.1, 1.0.0
-    name = re.sub(r'\s*[vV]?\d+\.\d+(\.\d+)?\s*', ' ', name)
+    name = re.sub(r"\s*[vV]?\d+\.\d+(\.\d+)?\s*", " ", name)
     # Remove common suffixes
-    for tag in ['VPW', 'VPX', 'VP10', 'MOD', 'Premium', 'LE', 'CE', 'Pro']:
-        name = re.sub(rf'\b{tag}\b', '', name, flags=re.IGNORECASE)
+    for tag in ["VPW", "VPX", "VP10", "MOD", "Premium", "LE", "CE", "Pro"]:
+        name = re.sub(rf"\b{tag}\b", "", name, flags=re.IGNORECASE)
     # Collapse whitespace
-    name = re.sub(r'\s+', ' ', name).strip()
+    name = re.sub(r"\s+", " ", name).strip()
     return name
 
 
@@ -143,10 +150,7 @@ async def test_credentials() -> dict:
     try:
         async with httpx.AsyncClient(timeout=15.0, headers=DEFAULT_HEADERS) as client:
             # Use ssuserInfos to validate credentials
-            resp = await client.get(
-                f"{API_BASE}/ssuserInfos.php",
-                params=params
-            )
+            resp = await client.get(f"{API_BASE}/ssuserInfos.php", params=params)
 
             if resp.status_code == 200:
                 data = resp.json()
@@ -154,15 +158,15 @@ async def test_credentials() -> dict:
                 user = data.get("response", {}).get("ssuser")
                 if not user:
                     user = data.get("ssuser", {})
-                
+
                 # Try to find a display name; ScreenScraper usually uses 'pseudo'
                 display_name = user.get("pseudo") or user.get("id")
-                
+
                 # Fallback to the username we sent if the API didn't give us one back
                 # but the status was 200 (Success)
                 if not display_name and params.get("ssid"):
                     display_name = params["ssid"]
-                
+
                 if not display_name:
                     display_name = "Unknown"
 
@@ -178,7 +182,10 @@ async def test_credentials() -> dict:
             elif resp.status_code == 401 or resp.status_code == 403:
                 return {"success": False, "message": "Invalid username or password"}
             else:
-                return {"success": False, "message": f"API error: HTTP {resp.status_code}"}
+                return {
+                    "success": False,
+                    "message": f"API error: HTTP {resp.status_code}",
+                }
 
     except httpx.TimeoutException:
         return {"success": False, "message": "Connection timed out"}
@@ -186,7 +193,9 @@ async def test_credentials() -> dict:
         return {"success": False, "message": f"Connection error: {str(e)}"}
 
 
-async def search_game(game_name: str, filename: str = "", ss_id: Optional[str] = None) -> dict:
+async def search_game(
+    game_name: str, filename: str = "", ss_id: Optional[str] = None
+) -> dict:
     """
     Search ScreenScraper for a Visual Pinball game.
     Tries gameid search first, then exact ROM name, then falls back to text search.
@@ -196,7 +205,9 @@ async def search_game(game_name: str, filename: str = "", ss_id: Optional[str] =
     params["systemeid"] = str(SYSTEM_ID_VPINBALL)
 
     clean_name = _clean_game_name(game_name)
-    logger.info(f"ScreenScraper search: '{game_name}' (ss_id: {ss_id}) → cleaned: '{clean_name}'")
+    logger.info(
+        f"ScreenScraper search: '{game_name}' (ss_id: {ss_id}) → cleaned: '{clean_name}'"
+    )
 
     result = None
 
@@ -205,7 +216,9 @@ async def search_game(game_name: str, filename: str = "", ss_id: Optional[str] =
         if ss_id:
             try:
                 search_params = {**params, "gameid": ss_id}
-                resp = await client.get(f"{API_BASE}/jeuInfos.php", params=search_params)
+                resp = await client.get(
+                    f"{API_BASE}/jeuInfos.php", params=search_params
+                )
                 if resp.status_code == 200:
                     data = resp.json()
                     game = data.get("response", {}).get("jeu", {})
@@ -219,7 +232,9 @@ async def search_game(game_name: str, filename: str = "", ss_id: Optional[str] =
         if not result and filename:
             try:
                 search_params = {**params, "romnom": filename}
-                resp = await client.get(f"{API_BASE}/jeuInfos.php", params=search_params)
+                resp = await client.get(
+                    f"{API_BASE}/jeuInfos.php", params=search_params
+                )
                 if resp.status_code == 200:
                     data = resp.json()
                     game = data.get("response", {}).get("jeu", {})
@@ -232,7 +247,9 @@ async def search_game(game_name: str, filename: str = "", ss_id: Optional[str] =
         if not result and len(clean_name) >= 4:
             try:
                 search_params = {**params, "recherche": clean_name}
-                resp = await client.get(f"{API_BASE}/jeuRecherche.php", params=search_params)
+                resp = await client.get(
+                    f"{API_BASE}/jeuRecherche.php", params=search_params
+                )
                 if resp.status_code == 200:
                     data = resp.json()
                     jeux = data.get("response", {}).get("jeux", [])
@@ -245,11 +262,13 @@ async def search_game(game_name: str, filename: str = "", ss_id: Optional[str] =
         # Strategy 3: Try with even more cleaned name
         if not result:
             # Strip "The" prefix, common in pinball names
-            alt_name = re.sub(r'^The\s+', '', clean_name, flags=re.IGNORECASE)
+            alt_name = re.sub(r"^The\s+", "", clean_name, flags=re.IGNORECASE)
             if alt_name != clean_name and len(alt_name) >= 4:
                 try:
                     search_params = {**params, "recherche": alt_name}
-                    resp = await client.get(f"{API_BASE}/jeuRecherche.php", params=search_params)
+                    resp = await client.get(
+                        f"{API_BASE}/jeuRecherche.php", params=search_params
+                    )
                     if resp.status_code == 200:
                         data = resp.json()
                         jeux = data.get("response", {}).get("jeux", [])
@@ -284,11 +303,12 @@ def _parse_game_result(game: dict) -> dict:
     # Extract media list
     medias = game.get("medias", [])
     available_media = {}
-    
+
     # Expose ALL medias, mapped by their exact ss_type for fallback logic
     for m in medias:
         ss_type = m.get("type")
-        if not ss_type: continue
+        if not ss_type:
+            continue
         best = _pick_best_media(medias, ss_type)
         if best and best.get("url"):
             if ss_type not in available_media:
@@ -300,8 +320,10 @@ def _parse_game_result(game: dict) -> dict:
                     "folder": folder_tuple[0],
                     "suffix": folder_tuple[1],
                 }
-    
-    logger.info(f"ScreenScraper available media types for '{game_name}': {list(available_media.keys())}")
+
+    logger.info(
+        f"ScreenScraper available media types for '{game_name}': {list(available_media.keys())}"
+    )
 
     # Extract metadata for gamelist.xml
     metadata = {}
@@ -312,14 +334,16 @@ def _parse_game_result(game: dict) -> dict:
     LANG_PRIORITY = ["en", "wor", "us", "eu"]
     for lang in LANG_PRIORITY:
         for s in synopses:
-            if not isinstance(s, dict): continue
+            if not isinstance(s, dict):
+                continue
             s_lang = s.get("langue", "").lower() or s.get("region", "").lower()
             if s_lang == lang:
                 desc = s.get("text", "")
                 break
-        if desc: break
-    
-    if desc: 
+        if desc:
+            break
+
+    if desc:
         metadata["desc"] = desc
 
     # Robustly handle rating (note)
@@ -340,9 +364,25 @@ def _parse_game_result(game: dict) -> dict:
             rel_date = first_date.get("text", "")[:4]
     metadata["releasedate"] = rel_date
 
-    metadata["developer"] = game.get("developpeur", {}).get("text", "") if isinstance(game.get("developpeur"), dict) else ""
-    metadata["publisher"] = game.get("editeur", {}).get("text", "") if isinstance(game.get("editeur"), dict) else ""
-    metadata["genre"] = game.get("genres", [{}])[0].get("text", "") if (isinstance(game.get("genres"), list) and game["genres"] and isinstance(game["genres"][0], dict)) else ""
+    metadata["developer"] = (
+        game.get("developpeur", {}).get("text", "")
+        if isinstance(game.get("developpeur"), dict)
+        else ""
+    )
+    metadata["publisher"] = (
+        game.get("editeur", {}).get("text", "")
+        if isinstance(game.get("editeur"), dict)
+        else ""
+    )
+    metadata["genre"] = (
+        game.get("genres", [{}])[0].get("text", "")
+        if (
+            isinstance(game.get("genres"), list)
+            and game["genres"]
+            and isinstance(game["genres"][0], dict)
+        )
+        else ""
+    )
     players_raw = game.get("joueurs", "1")
     if isinstance(players_raw, dict):
         metadata["players"] = str(players_raw.get("text", "1"))
@@ -384,20 +424,27 @@ async def download_media_for_table(
     cfg = load_config()
     esde_base = Path(cfg.esde_media_base)
     from services.gamelist_manager import GamelistManager
+
     # FIX: Use the actual gamelist.xml path, not the tables directory
     gm = GamelistManager(str(cfg.get_gamelist_xml_path()))
 
     # 1. Search ScreenScraper
     search_result = await search_game(table_name, filename)
-    
+
     if not search_result.get("success"):
-        return {"success": False, "error": search_result.get("message", "Game not found"), "downloaded": []}
-        
-    ss_id = search_result.get("ss_id")
+        return {
+            "success": False,
+            "error": search_result.get("message", "Game not found"),
+            "downloaded": [],
+        }
 
     available = search_result.get("available_media", {})
     if not available:
-        return {"success": False, "error": "No media available on ScreenScraper", "downloaded": []}
+        return {
+            "success": False,
+            "error": "No media available on ScreenScraper",
+            "downloaded": [],
+        }
 
     # Determine which types to download
     to_download = {}
@@ -406,26 +453,35 @@ async def download_media_for_table(
             to_download[key] = media_info
 
     if not to_download:
-        return {"success": True, "message": "All requested media already present", "downloaded": []}
+        return {
+            "success": True,
+            "message": "All requested media already present",
+            "downloaded": [],
+        }
 
     # Build the naming info for ES-DE
     import database as db
+
     table_data = await db.get_table(table_id)
     if not table_data:
         return {"success": False, "error": "Table not found"}
-        
+
     game_stem = Path(table_data["filename"]).stem
     folder_name = Path(table_data["folder_path"]).name
-    
+
     from services.media_manager import save_media_dual
 
     downloaded = []
     errors = []
 
-    async with httpx.AsyncClient(timeout=60.0, follow_redirects=True, headers=DEFAULT_HEADERS) as client:
+    async with httpx.AsyncClient(
+        timeout=60.0, follow_redirects=True, headers=DEFAULT_HEADERS
+    ) as client:
         for key, media_info in to_download.items():
             media_url = media_info["url"]
-            file_ext = f".{media_info['format']}" if media_info.get("format") else ".png"
+            file_ext = (
+                f".{media_info['format']}" if media_info.get("format") else ".png"
+            )
             rel_folder = media_info["folder"]
             suffix = media_info["suffix"]
 
@@ -448,20 +504,34 @@ async def download_media_for_table(
                 if resp.status_code == 200 and len(resp.content) > 100:
                     with open(temp_path, "wb") as f:
                         f.write(resp.content)
-                        
+
                     # Apply specific user rotation rules (applies to any category except videos)
                     if rel_folder != "videos":
-                        from services.media_processor import process_downloaded_image
-                        import asyncio
-                        await asyncio.to_thread(process_downloaded_image, str(temp_path), "screenscraper", key)
-                    
+
+                        from services.media_processor import \
+                            process_downloaded_image
+
+                        await asyncio.to_thread(
+                            process_downloaded_image,
+                            str(temp_path),
+                            "screenscraper",
+                            key,
+                        )
+
                     # Normalize and rotate video
                     if rel_folder == "videos":
-                        from services.media_processor import normalize_video, process_downloaded_video
-                        import asyncio
+
+                        from services.media_processor import (
+                            normalize_video, process_downloaded_video)
+
                         await asyncio.to_thread(normalize_video, str(temp_path))
-                        await asyncio.to_thread(process_downloaded_video, str(temp_path), "screenscraper", key)
-                    
+                        await asyncio.to_thread(
+                            process_downloaded_video,
+                            str(temp_path),
+                            "screenscraper",
+                            key,
+                        )
+
                     # Apply dual-path saving
                     final_paths = await save_media_dual(
                         media_base=media_base,
@@ -469,17 +539,21 @@ async def download_media_for_table(
                         folder_name=folder_name,
                         game_stem=game_stem,
                         ext=file_ext,
-                        source_path=temp_path
+                        source_path=temp_path,
                     )
-                    
-                    downloaded.append({
-                        "type": rel_folder,
-                        "suffix": suffix,
-                        "path": str(final_paths[1]),
-                        "size": len(resp.content),
-                        "ss_type": media_info["ss_type"],
-                    })
-                    logger.info(f"Downloaded and duplicated {rel_folder} for '{table_name}'")
+
+                    downloaded.append(
+                        {
+                            "type": rel_folder,
+                            "suffix": suffix,
+                            "path": str(final_paths[1]),
+                            "size": len(resp.content),
+                            "ss_type": media_info["ss_type"],
+                        }
+                    )
+                    logger.info(
+                        f"Downloaded and duplicated {rel_folder} for '{table_name}'"
+                    )
                     if progress_callback:
                         await progress_callback(key, "complete")
                 else:
@@ -501,12 +575,15 @@ async def download_media_for_table(
         xml_updates = search_result.get("xml_metadata", {}).copy()
 
         from database import get_table
+
         table_data = await get_table(table_id)
         if table_data:
             # FIX: Build correct rom_rel_path for nested folders
             # If the filename in DB is "Game.vpx" and it's in "Game (1993)" folder
             vpx_filename = table_data.get("filename", filename)
-            table_folder = game_stem # ES-DE uses the filename stem as the folder name by default
+            table_folder = (
+                game_stem  # ES-DE uses the filename stem as the folder name by default
+            )
             rom_rel_path = f"./{table_folder}/{vpx_filename}"
 
             # Map downloaded files to XML tags
@@ -516,7 +593,7 @@ async def download_media_for_table(
                 "fanart": "fanart",
                 "marquees": "marquee",
                 "videos": "video",
-                "manuals": "manual"
+                "manuals": "manual",
             }
 
             for d in downloaded:
@@ -525,17 +602,18 @@ async def download_media_for_table(
                 if tag:
                     # Format path based on storage mode
                     if cfg.media_storage_mode == "portable":
-                        target_filename = Path(d['path']).name
+                        target_filename = Path(d["path"]).name
                         rel_media_path = f"./media/{media_type}/{target_filename}"
                     else:
                         # Absolute path with forward slashes
-                        rel_media_path = str(Path(d['path'])).replace("\\", "/")
+                        rel_media_path = str(Path(d["path"])).replace("\\", "/")
                     xml_updates[tag] = rel_media_path
 
             if xml_updates:
-                logger.info(f"Applying XML updates for {rom_rel_path}: {list(xml_updates.keys())}")
+                logger.info(
+                    f"Applying XML updates for {rom_rel_path}: {list(xml_updates.keys())}"
+                )
                 gm.update_game(rom_rel_path, xml_updates)
-
 
     return {
         "success": True,
@@ -550,10 +628,8 @@ async def download_media_for_table(
 
 
 # Global cache for quota info to avoid hitting the API too many times (e.g. from UI polling)
-_quota_cache = {
-    "data": None,
-    "timestamp": 0
-}
+_quota_cache = {"data": None, "timestamp": 0}
+
 
 def clear_quota_cache():
     """Invalidate the quota cache, forcing a fresh fetch on the next request."""
@@ -561,16 +637,22 @@ def clear_quota_cache():
     _quota_cache["data"] = None
     _quota_cache["timestamp"] = 0
 
+
 async def get_quota_info(force_refresh: bool = False) -> dict:
     """
     Get current ScreenScraper API quota information.
     Caches results for 5 minutes by default to prevent API exhaustion via UI polling.
     """
     import time
+
     global _quota_cache
-    
+
     current_time = time.time()
-    if not force_refresh and _quota_cache["data"] and (current_time - _quota_cache["timestamp"]) < 300:
+    if (
+        not force_refresh
+        and _quota_cache["data"]
+        and (current_time - _quota_cache["timestamp"]) < 300
+    ):
         return _quota_cache["data"]
 
     result = await test_credentials()
@@ -585,13 +667,13 @@ async def get_quota_info(force_refresh: bool = False) -> dict:
         }
         _quota_cache = {"data": quota_data, "timestamp": current_time}
         return quota_data
-    
+
     # Even if API test fails, we might still have credentials saved locally
     params = _get_auth_params()
     has_creds = bool(params.get("ssid") and params.get("sspassword"))
-    
+
     return {
-        "authenticated": False, 
+        "authenticated": False,
         "has_credentials": has_creds,
-        "message": result.get("message", "")
+        "message": result.get("message", ""),
     }

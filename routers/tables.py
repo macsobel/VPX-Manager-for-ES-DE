@@ -1,17 +1,22 @@
+import os
+
 """
 Tables API router — CRUD, scanning, filtering.
 """
-from fastapi import APIRouter, Query, HTTPException, BackgroundTasks
-from pydantic import BaseModel
-from typing import Optional
-from pathlib import Path
-import shutil
+
 import logging
-import database as db
-from config import config, APP_SUPPORT_DIR
-from services.scanner import scan_tables_directory
-from services.gamelist_manager import GamelistManager
+import shutil
+from pathlib import Path
+from typing import Optional
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
+
+import database as db
+from config import APP_SUPPORT_DIR, config
+from services.gamelist_manager import GamelistManager
+from services.scanner import scan_tables_directory
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +32,7 @@ class TableUpdate(BaseModel):
     notes: Optional[str] = None
     ss_id: Optional[str] = None
     players: Optional[str] = None
+
 
 class IgnoreRequest(BaseModel):
     version: str
@@ -60,25 +66,30 @@ async def list_tables(
         offset=offset,
     )
     total = await db.get_table_count(search=search, vps_matched=vps_matched)
-    
+
     # Enrich with latest VPS versions from cache and physical media status
     from services.vps_matcher import vps_matcher
+
     if not vps_matcher._loaded:
         await vps_matcher._load_cached_async()
-        
+
     esde_base = config.esde_media_base
     fanart_dir = esde_base / "fanart"
-    
+
     enriched_tables = []
     for t in tables:
         t_dict = dict(t)
-        
+
         # Override the database has_fanart with actual physical file existence
         has_fanart = 0
         if fanart_dir.exists() and t_dict.get("filename"):
             stem = Path(t_dict["filename"]).stem
-            folder_name = Path(t_dict.get("folder_path", "")).name if t_dict.get("folder_path") else ""
-            
+            folder_name = (
+                Path(t_dict.get("folder_path", "")).name
+                if t_dict.get("folder_path")
+                else ""
+            )
+
             for ext in [".png", ".jpg", ".jpeg", ".webp"]:
                 # Check root folder
                 if (fanart_dir / f"{stem}{ext}").exists():
@@ -89,30 +100,50 @@ async def list_tables(
                     has_fanart = 1
                     break
         t_dict["has_fanart"] = has_fanart
-        
+
         if t_dict.get("vps_id"):
             entry = vps_matcher.get_entry(t_dict["vps_id"])
             if entry:
                 # If matched to a specific file, use that. Otherwise use the best guess.
                 file_entry = None
                 if t_dict.get("vps_file_id"):
-                    file_entry = vps_matcher.get_file_entry(t_dict["vps_id"], t_dict["vps_file_id"])
-                
+                    file_entry = vps_matcher.get_file_entry(
+                        t_dict["vps_id"], t_dict["vps_file_id"]
+                    )
+
                 if not file_entry:
-                    file_entry = vps_matcher._get_latest_table(entry.get("tableFiles", []))
-                
+                    file_entry = vps_matcher._get_latest_table(
+                        entry.get("tableFiles", [])
+                    )
+
                 t_dict["latest_vps_version"] = file_entry.get("version", "")
-                t_dict["vps_file_url"] = (file_entry.get("urls") or [{}])[0].get("url", "") if file_entry.get("urls") else ""
-                
+                t_dict["vps_file_url"] = (
+                    (file_entry.get("urls") or [{}])[0].get("url", "")
+                    if file_entry.get("urls")
+                    else ""
+                )
+
                 # Global latest (Community)
-                community_entry = vps_matcher._get_latest_table(entry.get("tableFiles", []))
+                community_entry = vps_matcher._get_latest_table(
+                    entry.get("tableFiles", [])
+                )
                 t_dict["community_vps_version"] = community_entry.get("version", "")
-                t_dict["community_vps_author"] = community_entry.get("authors", [""])[0] if community_entry.get("authors") else ""
-                t_dict["community_vps_url"] = (community_entry.get("urls") or [{}])[0].get("url", "") if community_entry.get("urls") else ""
+                t_dict["community_vps_author"] = (
+                    community_entry.get("authors", [""])[0]
+                    if community_entry.get("authors")
+                    else ""
+                )
+                t_dict["community_vps_url"] = (
+                    (community_entry.get("urls") or [{}])[0].get("url", "")
+                    if community_entry.get("urls")
+                    else ""
+                )
                 t_dict["community_vps_file_id"] = community_entry.get("id", "")
-                t_dict["is_community_newer"] = community_entry.get("id") != file_entry.get("id")
+                t_dict["is_community_newer"] = community_entry.get(
+                    "id"
+                ) != file_entry.get("id")
         enriched_tables.append(t_dict)
-        
+
     return {"tables": enriched_tables, "total": total, "limit": limit, "offset": offset}
 
 
@@ -133,20 +164,24 @@ async def get_stats():
     matched = await db.get_table_count(vps_matched=True)
     unmatched = await db.get_table_count(vps_matched=False)
     from services.media_manager import get_all_media_status
+
     media_statuses = await get_all_media_status()
     missing_media_count = sum(1 for s in media_statuses if s.get("missing_types"))
-    
+
     # VBS stats
     db_conn = await db.get_db()
     cursor = await db_conn.execute("SELECT COUNT(*) FROM tables WHERE vbs_hash != ''")
     row_extracted = await cursor.fetchone()
     vbs_extracted = row_extracted[0] if row_extracted else 0
-    
+
     # Check for patches via the hashes.json
     from services.vbs_manager import vbs_manager
+
     hashes = await vbs_manager.get_patch_hashes()
-    patch_final_hashes = {item["patched"]["sha256"] for item in hashes if "patched" in item}
-    
+    patch_final_hashes = {
+        item["patched"]["sha256"] for item in hashes if "patched" in item
+    }
+
     cursor = await db_conn.execute("SELECT vbs_hash FROM tables WHERE vbs_hash != ''")
     vbs_rows = await cursor.fetchall()
     vbs_patched = sum(1 for r in vbs_rows if r["vbs_hash"] in patch_final_hashes)
@@ -157,7 +192,7 @@ async def get_stats():
         "vps_unmatched": unmatched,
         "missing_media": missing_media_count,
         "vbs_extracted": vbs_extracted,
-        "vbs_patched": vbs_patched
+        "vbs_patched": vbs_patched,
     }
 
 
@@ -173,33 +208,50 @@ async def get_table(table_id: int):
     table = await db.get_table(table_id)
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
-    
+
     media = await db.get_media_for_table(table_id)
     table["media"] = media
-    
+
     # Check for updates if VPS matched
     if table.get("vps_id"):
         from services.vps_matcher import vps_matcher
+
         entry = vps_matcher.get_entry(table["vps_id"])
         if entry:
             file_entry = None
             if table.get("vps_file_id"):
-                file_entry = vps_matcher.get_file_entry(table["vps_id"], table["vps_file_id"])
-            
+                file_entry = vps_matcher.get_file_entry(
+                    table["vps_id"], table["vps_file_id"]
+                )
+
             if not file_entry:
                 file_entry = vps_matcher._get_latest_table(entry.get("tableFiles", []))
 
             table["latest_vps_version"] = file_entry.get("version", "")
-            table["vps_file_url"] = (file_entry.get("urls") or [{}])[0].get("url", "") if file_entry.get("urls") else ""
+            table["vps_file_url"] = (
+                (file_entry.get("urls") or [{}])[0].get("url", "")
+                if file_entry.get("urls")
+                else ""
+            )
 
             # Global latest (Community)
             community_entry = vps_matcher._get_latest_table(entry.get("tableFiles", []))
             table["community_vps_version"] = community_entry.get("version", "")
-            table["community_vps_author"] = community_entry.get("authors", [""])[0] if community_entry.get("authors") else ""
-            table["community_vps_url"] = (community_entry.get("urls") or [{}])[0].get("url", "") if community_entry.get("urls") else ""
+            table["community_vps_author"] = (
+                community_entry.get("authors", [""])[0]
+                if community_entry.get("authors")
+                else ""
+            )
+            table["community_vps_url"] = (
+                (community_entry.get("urls") or [{}])[0].get("url", "")
+                if community_entry.get("urls")
+                else ""
+            )
             table["community_vps_file_id"] = community_entry.get("id", "")
-            table["is_community_newer"] = community_entry.get("id") != file_entry.get("id")
-            
+            table["is_community_newer"] = community_entry.get("id") != file_entry.get(
+                "id"
+            )
+
     # Enrich with Gamelist metadata (rating, desc)
     try:
         folder_name = Path(table["folder_path"]).name
@@ -211,7 +263,6 @@ async def get_table(table_id: int):
             # Rating: Only overwrite if XML rating is > 0
             if game_meta.get("rating"):
                 try:
-                    xml_rating_float = float(game_meta["rating"])
                     # if xml_rating_float > 0:
                     #     # Map ES-DE (0.0-1.0) back to stars (0-5)
                     #     table["rating"] = int(xml_rating_float * 5)
@@ -219,7 +270,7 @@ async def get_table(table_id: int):
                     pass
                 except (ValueError, TypeError):
                     pass
-            
+
             # Description: Only overwrite if DB is empty or XML is significantly different
             xml_desc = game_meta.get("desc")
             if xml_desc and len(xml_desc.strip()) > 0:
@@ -229,7 +280,7 @@ async def get_table(table_id: int):
                     logger.debug(f"Enriched notes from XML for {table_id}")
     except Exception as e:
         logger.warning(f"Failed to load gamelist meta for {table_id}: {e}")
-            
+
     return table
 
 
@@ -239,30 +290,34 @@ async def analyze_table(table_id: int):
     table = await db.get_table(table_id)
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
-    
+
     if not table.get("folder_path") or not table.get("filename"):
         raise HTTPException(status_code=400, detail="Table file information missing")
 
-    from services.vpx_parser import VPXParser
     from services.vbs_manager import vbs_manager
     from services.vps_matcher import vps_matcher
-    import os
+    from services.vpx_parser import VPXParser
 
     table_path = Path(table["folder_path"]) / table["filename"]
     if not table_path.exists():
         raise HTTPException(status_code=404, detail="Physical table file not found")
 
     # 1. ROMs via VPXParser
-    rom_info = VPXParser.process_vpx_table(str(table_path), extract_sidecar=False, vps_id=table.get("vps_id"))
-    
+    rom_info = VPXParser.process_vpx_table(
+        str(table_path), extract_sidecar=False, vps_id=table.get("vps_id")
+    )
+
     # 2. NVRAM search in master repo
     nvram_repo_dir = Path(config.support_dir) / "nvrams"
     matched_nvram = []
     if nvram_repo_dir.exists():
-        all_repo_files = {f.name.lower(): f.name for f in nvram_repo_dir.rglob("*.nv") if f.is_file()}
+        all_repo_files = {
+            f.name.lower(): f.name for f in nvram_repo_dir.rglob("*.nv") if f.is_file()
+        }
         for rom_obj in rom_info:
             rom_name = rom_obj.get("version") if isinstance(rom_obj, dict) else rom_obj
-            if not rom_name: continue
+            if not rom_name:
+                continue
             nv_key = f"{rom_name.lower()}.nv"
             if nv_key in all_repo_files:
                 matched_nvram.append(all_repo_files[nv_key])
@@ -278,15 +333,18 @@ async def analyze_table(table_id: int):
             if vbs_hash:
                 hashes = await vbs_manager.get_patch_hashes()
                 # Find original hash match
-                patch_entry = next((item for item in hashes if item.get("sha256") == vbs_hash), None)
+                patch_entry = next(
+                    (item for item in hashes if item.get("sha256") == vbs_hash), None
+                )
                 if patch_entry and patch_entry.get("patched", {}).get("url"):
                     patch_info = {
                         "vbs_hash": vbs_hash,
-                        "patch_url": patch_entry["patched"]["url"]
+                        "patch_url": patch_entry["patched"]["url"],
                     }
             try:
-                vbs_sidecar.unlink() # Cleanup temporary extraction
-            except: pass
+                vbs_sidecar.unlink()  # Cleanup temporary extraction
+            except Exception:
+                pass
 
     # 4. AltColors via VPS (if vps_id known)
     altcolors = []
@@ -298,7 +356,7 @@ async def analyze_table(table_id: int):
         "roms": rom_info,
         "altcolors": altcolors,
         "nvram": matched_nvram,
-        "patch_info": patch_info
+        "patch_info": patch_info,
     }
 
 
@@ -350,14 +408,18 @@ async def export_to_mobile(table_id: int):
             shutil.move(str(zip_file), str(roms_dir / zip_file.name))
 
         # Create zip archive
-        safe_name = "".join(c for c in table.get("display_name", f"table_{table_id}") if c.isalnum() or c in " _-").strip()
+        safe_name = "".join(
+            c
+            for c in table.get("display_name", f"table_{table_id}")
+            if c.isalnum() or c in " _-"
+        ).strip()
         if not safe_name:
             safe_name = f"table_{table_id}"
 
         archive_base = str(mobile_builds_dir / safe_name)
 
         # shutil.make_archive adds .zip automatically
-        zip_path = shutil.make_archive(archive_base, 'zip', str(temp_dir))
+        zip_path = shutil.make_archive(archive_base, "zip", str(temp_dir))
 
         # Rename .zip to .vpxz
         vpxz_path = Path(zip_path).with_suffix(".vpxz")
@@ -369,7 +431,7 @@ async def export_to_mobile(table_id: int):
         return {
             "success": True,
             "filename": vpxz_path.name,
-            "size": vpxz_path.stat().st_size
+            "size": vpxz_path.stat().st_size,
         }
     finally:
         # Clean up the temp directory after creating the archive
@@ -385,7 +447,6 @@ async def launch_table(table_id: int):
     """Launch the table via the standalone app."""
     import subprocess
     from pathlib import Path
-    import os
 
     table = await db.get_table(table_id)
     if not table:
@@ -397,16 +458,20 @@ async def launch_table(table_id: int):
     # Expand ~ in paths
     folder_path = Path(table["folder_path"]).expanduser()
     table_path = (folder_path / table["filename"]).resolve()
-    
+
     logger.debug(f"Resolved table path: {table_path}")
 
     if not table_path.exists():
         logger.error(f"Table file not found: {table_path}")
-        raise HTTPException(status_code=404, detail=f"Table file not found: {table_path}")
+        raise HTTPException(
+            status_code=404, detail=f"Table file not found: {table_path}"
+        )
 
     if table_path.suffix.lower() != ".vpx":
         logger.error(f"Invalid table file type: {table_path}")
-        raise HTTPException(status_code=400, detail="Table file must have a .vpx extension")
+        raise HTTPException(
+            status_code=400, detail="Table file must have a .vpx extension"
+        )
 
     app_path = os.path.expanduser(config.vpx_standalone_app_path)
 
@@ -433,18 +498,29 @@ async def launch_table(table_id: int):
             if getattr(config, "vpx_display_mode", "Desktop") == "Desktop":
                 cmd.append("-EnableTrueFullscreen")
             logger.info(f"Launching via 'open': {' '.join(cmd)}")
-            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
         else:
             cmd = [exec_path, "-play", str(table_path)]
             if getattr(config, "vpx_display_mode", "Desktop") == "Desktop":
                 cmd.append("-EnableTrueFullscreen")
             logger.info(f"Launching via binary: {' '.join(cmd)}")
-            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
 
         return {"success": True, "message": "Launched successfully"}
     except Exception as e:
         logger.error(f"Failed to launch table: {e}")
         return {"success": False, "error": str(e)}
+
 
 @router.post("/{table_id}/ignore")
 async def ignore_version(table_id: int, req: IgnoreRequest):
@@ -452,11 +528,10 @@ async def ignore_version(table_id: int, req: IgnoreRequest):
     table = await db.get_table(table_id)
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
-        
-    await db.upsert_table({
-        "filename": table["filename"],
-        "ignored_version": req.version
-    })
+
+    await db.upsert_table(
+        {"filename": table["filename"], "ignored_version": req.version}
+    )
     return {"success": True}
 
 
@@ -466,13 +541,14 @@ async def get_table_inventory(table_id: int):
     table = await db.get_table(table_id)
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
-    
+
     table_dir = Path(table["folder_path"])
     if not table_dir.exists():
         return {"exists": False, "error": "Folder not found"}
-    
+
     def get_files(path: Path, glob: str) -> list[str]:
-        if not path.exists(): return []
+        if not path.exists():
+            return []
         return [f.name for f in path.glob(glob) if not f.name.startswith(".")]
 
     inventory = {
@@ -481,13 +557,41 @@ async def get_table_inventory(table_id: int):
         "vbs": get_files(table_dir, "*.vbs"),
         "ini": get_files(table_dir, "*.ini"),
         "rom": get_files(table_dir / "pinmame" / "roms", "*.zip"),
-        "puppack": [d.name for d in (table_dir / "pupvideos").iterdir() if d.is_dir()] if (table_dir / "pupvideos").exists() else [],
-        "music": [f.name for f in (table_dir / "music").iterdir() if not f.name.startswith(".")] if (table_dir / "music").exists() else [],
-        "altsound": [f.name for f in (table_dir / "pinmame" / "altsound").iterdir() if not f.name.startswith(".")] if (table_dir / "pinmame" / "altsound").exists() else [],
-        "altcolor": [f.name for f in (table_dir / "pinmame" / "altcolor").iterdir() if not f.name.startswith(".")] if (table_dir / "pinmame" / "altcolor").exists() else [],
+        "puppack": (
+            [d.name for d in (table_dir / "pupvideos").iterdir() if d.is_dir()]
+            if (table_dir / "pupvideos").exists()
+            else []
+        ),
+        "music": (
+            [
+                f.name
+                for f in (table_dir / "music").iterdir()
+                if not f.name.startswith(".")
+            ]
+            if (table_dir / "music").exists()
+            else []
+        ),
+        "altsound": (
+            [
+                f.name
+                for f in (table_dir / "pinmame" / "altsound").iterdir()
+                if not f.name.startswith(".")
+            ]
+            if (table_dir / "pinmame" / "altsound").exists()
+            else []
+        ),
+        "altcolor": (
+            [
+                f.name
+                for f in (table_dir / "pinmame" / "altcolor").iterdir()
+                if not f.name.startswith(".")
+            ]
+            if (table_dir / "pinmame" / "altcolor").exists()
+            else []
+        ),
         "medias": get_files(table_dir / "medias", "*.*"),
     }
-    
+
     return {"exists": True, "inventory": inventory}
 
 
@@ -506,7 +610,7 @@ async def update_table(table_id: int, update: TableUpdate):
         if field in update_dict and update_dict[field] != existing.get(field):
             needs_rename = True
             break
-    
+
     # We want to ensure rating and notes are always in data if they are in update
     # even if they are 0 or empty string.
     data.update(update_dict)
@@ -520,37 +624,45 @@ async def update_table(table_id: int, update: TableUpdate):
         folder_name = Path(existing["folder_path"]).name
         rom_path = f"./{folder_name}/{existing['filename']}"
         gm = GamelistManager(str(config.get_gamelist_xml_path()))
-        
+
         xml_meta = {}
-        if update.display_name: xml_meta["display_name"] = update.display_name
-        if update.manufacturer: 
+        if update.display_name:
+            xml_meta["display_name"] = update.display_name
+        if update.manufacturer:
             xml_meta["manufacturer"] = update.manufacturer
             xml_meta["publisher"] = update.manufacturer
             xml_meta["genre"] = update.manufacturer
-        if update.year: xml_meta["year"] = str(update.year)
-        if update.players: xml_meta["players"] = str(update.players)
-        
+        if update.year:
+            xml_meta["year"] = str(update.year)
+        if update.players:
+            xml_meta["players"] = str(update.players)
+
         # Map stars (0-5) to ES-DE rating (0.0-1.0)
         if update.rating is not None:
             xml_meta["rating"] = round(update.rating / 5.0, 2)
-            
+
         # Map notes to ES-DE description
         if update.notes is not None:
             xml_meta["desc"] = update.notes
-            
+
         if xml_meta:
-            logger.info(f"Syncing {len(xml_meta)} fields to gamelist.xml for {rom_path}")
+            logger.info(
+                f"Syncing {len(xml_meta)} fields to gamelist.xml for {rom_path}"
+            )
             logger.debug(f"Sync payload: {xml_meta}")
             gm.update_game(rom_path, xml_meta)
-            
+
     except Exception as e:
         logger.error(f"Failed to sync gamelist.xml for {table_id}: {e}")
 
     if needs_rename:
         from services.table_file_service import TableFileService
+
         rename_result = await TableFileService.standardize_names(table_id)
         if not rename_result.get("success"):
-            logger.error(f"Failed to automatically rename table files: {rename_result.get('error')}")
+            logger.error(
+                f"Failed to automatically rename table files: {rename_result.get('error')}"
+            )
 
     return await db.get_table(table_id)
 
@@ -562,9 +674,8 @@ async def delete_table(table_id: int, delete_files: bool = False):
         raise HTTPException(status_code=404, detail="Table not found")
 
     if delete_files:
-        import os
         from pathlib import Path
-        
+
         # 1. Folder deletion
         if existing["folder_path"]:
             folder = Path(existing["folder_path"])
@@ -577,6 +688,7 @@ async def delete_table(table_id: int, delete_files: bool = False):
 
         # 2. Global media cleanup
         from services.media_manager import delete_all_media_for_table
+
         if existing["filename"]:
             await delete_all_media_for_table(existing["filename"])
 
@@ -620,7 +732,7 @@ async def delete_table_file(table_id: int, path: str = Query(...)):
             shutil.rmtree(target)
         else:
             target.unlink()
-        
+
         # Update DB flags if necessary
         if path.endswith(".directb2s") or "backglass" in path:
             # Check if any other b2s remain
@@ -638,6 +750,7 @@ async def delete_table_file(table_id: int, path: str = Query(...)):
 
 from services.task_registry import task_registry
 
+
 @router.post("/scan")
 async def scan_tables(background_tasks: BackgroundTasks):
     """Trigger a full scan of the tables directory in the background."""
@@ -645,9 +758,10 @@ async def scan_tables(background_tasks: BackgroundTasks):
     task = task_registry.get_task("scanner")
     if task.status == "running":
         return {"success": False, "message": "Scan already in progress"}
-        
+
     background_tasks.add_task(scan_tables_directory)
     return {"success": True, "message": "Scan started in background"}
+
 
 @router.get("/scan/status")
 async def get_scan_status():
@@ -659,34 +773,34 @@ async def get_scan_status():
 async def download_mobile_export(filename: str):
     # Define the mobile exports directory
     MOBILE_BUILDS_DIR = APP_SUPPORT_DIR / "Mobile Builds"
-    
+
     # Sanitize filename to prevent path traversal
-    safe_filename = filename.replace('/', '').replace('\\', '').replace('..', '')
-    if not safe_filename.endswith('.vpxz'):
+    safe_filename = filename.replace("/", "").replace("\\", "").replace("..", "")
+    if not safe_filename.endswith(".vpxz"):
         raise HTTPException(status_code=400, detail="Invalid file type")
 
     file_path = (MOBILE_BUILDS_DIR / safe_filename).resolve()
-    
+
     # Security check
     if not file_path.is_relative_to(MOBILE_BUILDS_DIR) or not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
     # Standard FileResponse works for Safari/Firefox and serves as the source for the Chrome Blob sidepath
     return FileResponse(
-        path=file_path,
-        filename=safe_filename,
-        media_type="application/zip"
+        path=file_path, filename=safe_filename, media_type="application/zip"
     )
+
 
 @router.post("/reveal-builds")
 async def reveal_builds_folder():
     """Open the Mobile Builds folder in Finder (macOS)."""
     import subprocess
+
     mobile_builds_dir = APP_SUPPORT_DIR / "Mobile Builds"
     mobile_builds_dir.mkdir(parents=True, exist_ok=True)
-    
+
     logger.info(f"Reveal in Finder requested for: {mobile_builds_dir}")
-    
+
     try:
         # Use Popen to avoid blocking the API while Finder opens
         logger.info("Executing 'open' command...")

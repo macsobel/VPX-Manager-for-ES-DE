@@ -1,9 +1,12 @@
 """
 Collections API router.
 """
+
+from typing import List, Optional
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional, List
+
 import database as db
 
 router = APIRouter(prefix="/api/collections", tags=["collections"])
