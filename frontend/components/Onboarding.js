@@ -45,25 +45,25 @@ const Onboarding = {
                 id: 'scan', 
                 title: 'Scan Table Library', 
                 desc: 'Find your .vpx files and populate the database.',
-                link: '#tables'
+                link: '#tables/list'
             },
             { 
                 id: 'vps', 
                 title: 'Match with VPS', 
                 desc: 'Connect your tables to the VPS for automated media and metadata.',
-                link: '#tables'
+                link: '#tables/list'
             },
             { 
                 id: 'media', 
                 title: 'Scrape Artwork', 
                 desc: 'Download flyers, backglass images, and wheel art.',
-                link: '#scraper'
+                link: '#tables/media'
             },
             { 
                 id: 'play', 
                 title: 'Launch & Play', 
                 desc: 'You\'re all set! Launch a table and enjoy.',
-                link: '#tables'
+                link: '#tables/list'
             }
         ]
     },

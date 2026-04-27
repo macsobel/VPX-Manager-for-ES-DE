@@ -71,15 +71,15 @@ const DocumentationPage = {
                             </div>
                             <div class="doc-step">
                                 <h4 style="color: var(--text-primary); margin-bottom: 6px;">6. Scan Table Library</h4>
-                                <p>Head to the <a href="#tables">Tables</a> page and perform a library scan. The manager will walk through your folders and identify your .vpx files.</p>
+                                <p>Head to the <a href="#tables/list">Tables</a> page and perform a library scan. The manager will walk through your folders and identify your .vpx files.</p>
                             </div>
                             <div class="doc-step">
                                 <h4 style="color: var(--text-primary); margin-bottom: 6px;">7. Match with VPS</h4>
-                                <p>Link your local tables to the <a href="#tables">VPS Database</a> to unlock automated media scraping and community metadata.</p>
+                                <p>Link your local tables to the <a href="#tables/list">VPS Database</a> to unlock automated media scraping and community metadata.</p>
                             </div>
                             <div class="doc-step">
                                 <h4 style="color: var(--text-primary); margin-bottom: 6px;">8. Scrape Media & Artwork</h4>
-                                <p>Use the <a href="#scraper">Media Scraper</a> to automatically download flyers, backglass images, and wheel art for your library.</p>
+                                <p>Use the <a href="#tables/media">Media Scraper</a> to automatically download flyers, backglass images, and wheel art for your library.</p>
                             </div>
                             <div class="doc-step">
                                 <h4 style="color: var(--text-primary); margin-bottom: 6px;">9. Launch & Play</h4>

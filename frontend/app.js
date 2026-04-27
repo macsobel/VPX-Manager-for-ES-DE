@@ -102,6 +102,24 @@ const App = {
             return;
         }
 
+        // Handle tables sub-views (deep linking)
+        const tablesViewMatch = hash.match(/^tables\/(list|grid|media)$/);
+        if (tablesViewMatch) {
+            const view = tablesViewMatch[1];
+            const viewMap = { 'list': 'table', 'grid': 'card', 'media': 'media' };
+            TablesPage.state.view = viewMap[view];
+            this.currentPage = 'tables';
+            Nav.setActive('tables');
+            
+            const container = document.getElementById('page-container');
+            container.style.animation = 'none';
+            container.offsetHeight;
+            container.style.animation = '';
+            
+            TablesPage.render();
+            return;
+        }
+
         // Handle ini-manager/{tableId} route
         const iniMatch = hash.match(/^ini-manager\/(\d+)$/);
         if (iniMatch) {

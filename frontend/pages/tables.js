@@ -1217,23 +1217,15 @@ const TablesPage = {
             };
         });
 
-        // View toggle
+        // View toggle (Use hash navigation for deep linking)
         document.getElementById('view-table').onclick = () => {
-            this.state.view = 'table';
-            this.state.offset = 0;
-            this.render();
+            window.location.hash = '#tables/list';
         };
-
         document.getElementById('view-card').onclick = () => {
-            this.state.view = 'card';
-            this.state.offset = 0;
-            this.render();
+            window.location.hash = '#tables/grid';
         };
-
         document.getElementById('view-media-grid').onclick = () => {
-            this.state.view = 'media';
-            this.state.offset = 0;
-            this.render();
+            window.location.hash = '#tables/media';
         };
 
         // Scraper buttons
