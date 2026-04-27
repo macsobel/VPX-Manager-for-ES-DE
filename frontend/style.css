@@ -1707,7 +1707,7 @@ select.input-field option {
 /* Mobile Content Stacking (Navigation remains Sidebar) */
 @media (max-width: 768px) {
     .page-container {
-        padding: var(--space-md);
+        padding: var(--space-sm);
     }
 
     .page-header {
@@ -1819,6 +1819,48 @@ select.input-field option {
     .settings-section .btn {
         width: 100% !important;
         justify-content: center !important;
+    }
+
+    /* Manuals: Hide Fullscreen on mobile */
+    #btn-fullscreen {
+        display: none !important;
+    }
+
+    /* INI Manager: Fix description cutoffs */
+    .ini-editor-footer div[style*="max-width: 150px"] {
+        max-width: 100% !important;
+        margin-bottom: var(--space-xs);
+        text-align: left;
+    }
+
+    /* Tables: Ensure scrape button doesn't overflow */
+    #btn-scrape-all {
+        width: 100%;
+        margin-top: var(--space-sm);
+    }
+
+    /* Toast Notification Positioning */
+    #toast-container {
+        width: calc(100% - 100px) !important; /* Adjust for sidebar */
+        left: 80px !important;
+        right: 10px !important;
+    }
+
+    /* Documentation / Getting Started Fixes */
+    .documentation-content, .card {
+        width: 100% !important;
+        overflow-x: hidden !important;
+    }
+
+    .documentation-content p, .documentation-content li {
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+        hyphens: auto;
+    }
+
+    /* Force all flex containers to wrap on mobile if they overflow */
+    [style*="display: flex"] {
+        flex-wrap: wrap !important;
     }
 }
 
