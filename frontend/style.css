@@ -1746,6 +1746,80 @@ select.input-field option {
     .input-group .btn {
         width: 100%;
     }
+
+    /* VBS/INI Manager Specific Mobile Fixes */
+    .vbs-editor-footer, .ini-editor-footer {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: var(--space-md);
+    }
+
+    #quick-fixes-container {
+        width: 100% !important;
+        flex-direction: column !important;
+    }
+
+    .vbs-save-button-align, #btn-save-ini {
+        width: 100% !important;
+        margin-top: var(--space-sm);
+    }
+
+    /* Header action stacking */
+    .page-header > div:last-child {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-sm);
+    }
+
+    .page-header > div:last-child > * {
+        width: 100%;
+    }
+
+    /* Settings Page Mobile Overrides */
+    .settings-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: var(--space-md) !important;
+    }
+
+    /* Path picker containers */
+    .input-group > div[style*="display: flex"] {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    .btn-pick-path {
+        width: 100% !important;
+    }
+
+    /* Section headers (Title + Link) */
+    .settings-section [style*="justify-content: space-between"] {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: var(--space-sm) !important;
+    }
+
+    /* ScreenScraper grid override */
+    [style*="grid-template-columns: 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* System Status grid override */
+    [style*="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))"] {
+        grid-template-columns: 1fr !important;
+        gap: var(--space-lg) !important;
+    }
+
+    /* Maintenance button row */
+    .settings-section [style*="display: flex; gap: var(--space-md); flex-wrap: wrap;"] {
+        flex-direction: column !important;
+    }
+
+    .settings-section .btn {
+        width: 100% !important;
+        justify-content: center !important;
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════
