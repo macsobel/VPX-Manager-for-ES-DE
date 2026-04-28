@@ -7,10 +7,15 @@ import os
 
 # Helper to read VERSION without importing the whole module (avoids Analysis path issues)
 def get_version():
+    if os.path.exists('version.txt'):
+        with open('version.txt', 'r') as f:
+            return f.read().strip()
     with open('config.py', 'r') as f:
         for line in f:
             if 'VERSION = ' in line:
-                return line.split('=')[1].strip().replace('"', '').replace("'", "")
+                val = line.split('=')[1].strip().replace('"', '').replace("'", "")
+                if '(' not in val: # Avoid function calls like _load_version()
+                    return val
     return "Dev Build"
 
 VERSION = get_version()
