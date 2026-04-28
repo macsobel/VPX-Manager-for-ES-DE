@@ -70,8 +70,10 @@ class VPSMatcher:
             import asyncio
 
             def _write():
-                with open(vps_path, "w") as f:
+                temp_path = vps_path.with_suffix(".tmp")
+                with open(temp_path, "w") as f:
                     json.dump(raw, f)
+                temp_path.replace(vps_path)
 
             await asyncio.to_thread(_write)
 
@@ -214,7 +216,7 @@ class VPSMatcher:
             "name": entry.get("name", ""),
             "manufacturer": entry.get("manufacturer", ""),
             "year": str(entry.get("year", "")),
-            "theme": " • ".join(entry.get("theme") or []),
+            "theme": " • ".join(str(t) for t in (entry.get("theme") or []) if t),
             "type": entry.get("type", ""),
             "ipdb_id": self._extract_ipdb_id(entry),
             "version": latest_vpx.get("version", ""),

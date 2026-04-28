@@ -206,6 +206,7 @@ async def import_table(
     ini_file: Optional[UploadFile] = File(None),
     nvram_files: Optional[str] = Form(None),
     uploaded_nvram_files: List[UploadFile] = File([]),
+    auto_scrape: bool = Form(False),
 ):
     """
     Import a new table with all associated files in one operation.
@@ -427,17 +428,30 @@ async def import_table(
     from services.table_file_service import TableFileService
     await TableFileService.standardize_names(table_id)
 
-    # Queue background task to download media (using updated names after standardization)
-    table_updated = await db.get_table(table_id)
-    from services.scraper_service import trigger_media_download
+    # 11. Optional: Auto-scrape media (blocking if requested)
+    scrape_result = None
+    if auto_scrape:
+        from services.scraper_service import trigger_media_download
 
-    background_tasks.add_task(
-        trigger_media_download,
-        table_id=table_id,
-        vps_id=vps_id,
-        table_name=table_updated["display_name"],
-        filename=table_updated["filename"],
-    )
+        table_updated = await db.get_table(table_id)
+        scrape_result = await trigger_media_download(
+            table_id=table_id,
+            vps_id=vps_id,
+            table_name=table_updated["display_name"],
+            filename=table_updated["filename"],
+            missing_only=True,
+        )
+        
+        # Persist downloaded files into the media table
+        if scrape_result.get("success") and scrape_result.get("downloaded"):
+            for dl_item in scrape_result["downloaded"]:
+                cat = dl_item.get("type")
+                path = dl_item.get("path")
+                if cat and path:
+                    try:
+                        await db.upsert_media(table_id, cat, path)
+                    except Exception as db_err:
+                        logger.error(f"Failed to persist media [{cat}] during import: {db_err}")
 
     return {
         "success": True,
@@ -445,6 +459,7 @@ async def import_table(
         "folder": folder_name,
         "path": str(table_dir),
         "results": results,
+        "scraped": scrape_result
     }
 
 

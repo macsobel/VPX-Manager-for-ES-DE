@@ -85,7 +85,14 @@ const UploadPage = {
                 </div>
 
                 <!-- Import Button -->
-                <div style="display: flex; gap: var(--space-md); align-items: center; margin-top: var(--space-lg);">
+                <div class="form-checkbox-group" id="group-scrape-media">
+                    <input type="checkbox" id="import-scrape-media" checked>
+                    <label class="form-checkbox-label" for="import-scrape-media">
+                        Search for media automatically
+                        <span class="form-checkbox-sublabel">Downloads wheels, videos, and backglass from VPMediaDB & ScreenScraper</span>
+                    </label>
+                </div>
+                <div style="display: flex; gap: var(--space-md); align-items: center; margin-top: var(--space-md);">
                     <button class="btn btn-primary btn-lg" id="btn-do-import" disabled>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                         Add New Table
@@ -945,6 +952,15 @@ const UploadPage = {
             formData.append('vps_table_url', this._state.vpsTableUrl || '');
             formData.append('ipdb_id', this._state.ipdbId || '');
             formData.append('vpx_file', this._state.vpxFile);
+            
+            const autoScrape = document.getElementById('import-scrape-media')?.checked;
+            formData.append('auto_scrape', autoScrape || false);
+            
+            if (autoScrape) {
+                progressText.textContent = 'Importing table & searching for media...';
+            } else {
+                progressText.textContent = 'Uploading files...';
+            }
 
             if (this._state.b2sFile) formData.append('directb2s_file', this._state.b2sFile);
             if (this._state.romFiles && this._state.romFiles.length > 0) {
@@ -984,7 +1000,6 @@ const UploadPage = {
                 }
             }
 
-            progressText.textContent = 'Uploading files...';
 
             const data = await apiFetch('/api/upload/import-table', {
                 method: 'POST',
@@ -994,6 +1009,11 @@ const UploadPage = {
             if (data.success) {
                 const vpsNote = this._state.vpsId ? ' (VPS matched)' : '';
                 Toast.success(`Table imported: ${data.folder}${vpsNote}`);
+                
+                if (data.scraped && data.scraped.downloaded && data.scraped.downloaded.length > 0) {
+                    Toast.success(`Successfully downloaded ${data.scraped.downloaded.length} media assets!`);
+                }
+                
                 progressText.textContent = 'Import complete! Updating library...';
                 
                 // Trigger a table scan refresh

@@ -297,11 +297,20 @@ async def delete_all_media_for_table(table_filename: str, folder_path: str = Non
         for file_path in media_dir.glob(f"{table_stem}.*"):
             try:
                 file_path.unlink()
-                logger.info(f"Deleted global media (root): {file_path}")
+                logger.info(f"Deleted global media (root-stem): {file_path}")
             except Exception as e:
                 logger.error(f"Failed to delete global media {file_path}: {e}")
 
-        # 2. Delete nested folder matching table's folder name
+        # 2. Delete root files matching folder_name (ES-DE folder representation)
+        if folder_name:
+            for file_path in media_dir.glob(f"{folder_name}.*"):
+                try:
+                    file_path.unlink()
+                    logger.info(f"Deleted global media (root-folder): {file_path}")
+                except Exception as e:
+                    logger.error(f"Failed to delete global media {file_path}: {e}")
+
+        # 3. Delete nested folder matching table's folder name
         if folder_name:
             nested_dir = media_dir / folder_name
             if nested_dir.exists() and nested_dir.is_dir():

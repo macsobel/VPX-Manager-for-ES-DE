@@ -212,6 +212,7 @@ async def system_status(request: Request):
         },
         "is_local": check_is_local(request),
         "version": VERSION,
+        "platform": sys.platform,
     }
 
 

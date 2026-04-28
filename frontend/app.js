@@ -22,11 +22,27 @@ const App = {
 
     currentPage: null,
 
-    init() {
+    async init() {
         Nav.init();
         if (window.Onboarding) Onboarding.init();
         window.addEventListener('hashchange', () => this.route());
         this.route();
+        this.updateVersion();
+    },
+
+    async updateVersion() {
+        try {
+            const res = await fetch('/api/system/status');
+            const info = await res.json();
+            const el = document.querySelector('.sidebar-version');
+            if (el) {
+                const os = info.platform === 'darwin' ? 'macOS' : (info.platform === 'linux' ? 'Linux' : info.platform);
+                const versionPrefix = (info.version && !info.version.toLowerCase().startsWith('v') && !isNaN(info.version.charAt(0))) ? 'v' : '';
+                el.textContent = `${versionPrefix}${info.version} · ${os}`;
+            }
+        } catch (e) {
+            console.error('Failed to load version', e);
+        }
     },
 
     route() {

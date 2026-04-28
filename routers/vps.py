@@ -56,18 +56,22 @@ async def search_vps(q: str = "", limit: int = 20):
 @router.get("/suggestions/{table_id}")
 async def suggest_matches(table_id: int, limit: int = 10):
     """Auto-suggest VPS matches for a table."""
-    table = await db.get_table(table_id)
-    if not table:
-        raise HTTPException(status_code=404, detail="Table not found")
+    try:
+        table = await db.get_table(table_id)
+        if not table:
+            return {"error": "Table not found", "suggestions": []}
 
-    print(f"DEBUG: Suggesting matches for table {table_id}: '{table['display_name']}'")
-    suggestions = vps_matcher.suggest_matches(table["display_name"], limit=limit)
-    print(f"DEBUG: Found {len(suggestions)} suggestions")
-    return {
-        "table_id": table_id,
-        "table_name": table["display_name"],
-        "suggestions": suggestions,
-    }
+        print(f"DEBUG: Suggesting matches for table {table_id}: '{table['display_name']}'")
+        suggestions = vps_matcher.suggest_matches(table["display_name"], limit=limit)
+        print(f"DEBUG: Found {len(suggestions)} suggestions")
+        return {
+            "table_id": table_id,
+            "table_name": table["display_name"],
+            "suggestions": suggestions,
+        }
+    except Exception as e:
+        print(f"ERROR in suggest_matches: {e}")
+        return {"error": str(e), "suggestions": []}
 
 
 @router.post("/match/{table_id}")

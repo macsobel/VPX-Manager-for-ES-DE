@@ -289,7 +289,7 @@ if __name__ == "__main__":
                 def about_window(self, sender):
                     rumps.alert(
                         title="VPX Manager for ES-DE",
-                        message=f"Version {VERSION}\n\nA Visual Pinball file management system for macOS and Linux with media file management for Emulation Station. Let's make some macOS pincabs!\n\nDeveloped by Aaron Sobel",
+                        message=f"Version {VERSION}\n\nA Visual Pinball file management system for macOS and Linux with media file management for Emulation Station.\n\nDeveloped by Aaron Sobel",
                         ok="Close",
                     )
 

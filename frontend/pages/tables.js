@@ -1058,7 +1058,21 @@ const TablesPage = {
         }
         try {
             const res = await fetch(`/api/vps/suggestions/${tableId}`);
-            const data = await res.json();
+            let data;
+            try {
+                data = await res.json();
+            } catch (parseError) {
+                const text = await res.text();
+                if (text.includes('<!DOCTYPE html>') || text.includes('<html>')) {
+                    throw new Error(`Server returned an HTML error page (Status ${res.status}). Check backend logs.`);
+                }
+                throw new Error(`Invalid server response (Status ${res.status}): ${text.substring(0, 100)}`);
+            }
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
             console.log('DEBUG: VPS suggestions data:', data);
 
             let searchHtml = `

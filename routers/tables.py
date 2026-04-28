@@ -690,7 +690,7 @@ async def delete_table(table_id: int, delete_files: bool = False):
         from services.media_manager import delete_all_media_for_table
 
         if existing["filename"]:
-            await delete_all_media_for_table(existing["filename"])
+            await delete_all_media_for_table(existing["filename"], existing["folder_path"])
 
         # 3. gamelist.xml cleanup
         # Calculate relative path: ./Folder Name/GameName.vpx
