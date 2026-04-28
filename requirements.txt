@@ -12,4 +12,5 @@ py7zr
 rarfile
 patool
 rumps; sys_platform == "darwin"
+pystray; sys_platform == "linux"
 imageio-ffmpeg

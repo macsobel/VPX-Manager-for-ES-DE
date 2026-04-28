@@ -1,0 +1,88 @@
+{
+    "tables_dir": "~/ROMs/vpinball",
+    "vpx_standalone_app_path": "vpinballx",
+    "vpx_use_flavor": "BGFX",
+    "vpx_display_mode": "Desktop",
+    "esde_app_path": "es-de",
+    "media_storage_mode": "standard",
+    "esde_media_dir": "~/ES-DE/downloaded_media/vpinball",
+    "esde_gamelists_dir": "",
+    "screenscraper_username": "",
+    "screenscraper_password": "",
+    "screenscraper_dev_user": "",
+    "screenscraper_dev_pass": "",
+    "media_preferences": {
+        "covers": [
+            {
+                "source": "vpinmediadb",
+                "key": "wheel.png"
+            },
+            {
+                "source": "screenscraper",
+                "key": "wheel-tarcisios"
+            },
+            {
+                "source": "screenscraper",
+                "key": "wheel"
+            }
+        ],
+        "fanart": [
+            {
+                "source": "vpinmediadb",
+                "key": "1k/bg.png"
+            },
+            {
+                "source": "vpinmediadb",
+                "key": "1k/table.png"
+            },
+            {
+                "source": "vpinmediadb",
+                "key": "4k/table.png"
+            }
+        ],
+        "manuals": [
+            {
+                "source": "screenscraper",
+                "key": "manuel"
+            }
+        ],
+        "marquees": [
+            {
+                "source": "screenscraper",
+                "key": "wheel"
+            },
+            {
+                "source": "vpinmediadb",
+                "key": "wheel.png"
+            }
+        ],
+        "screenshots": [
+            {
+                "source": "vpinmediadb",
+                "key": "1k/table.png"
+            },
+            {
+                "source": "vpinmediadb",
+                "key": "4k/table.png"
+            },
+            {
+                "source": "screenscraper",
+                "key": "ss"
+            }
+        ],
+        "videos": [
+            {
+                "source": "vpinmediadb",
+                "key": "1k/video.mp4"
+            },
+            {
+                "source": "screenscraper",
+                "key": "videotable"
+            },
+            {
+                "source": "screenscraper",
+                "key": "video-normalized"
+            }
+        ]
+    }
+}

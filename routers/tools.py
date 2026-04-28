@@ -228,7 +228,8 @@ cd "$VP_MAC_OS_DIR" || exit 1
 
 echo "Visual Pinball has exited."
 
-# Bring ES-DE back to the front
+# Bring ES-DE back to the front only on macOS
+if [ "$(uname)" = "Darwin" ]; then
 osascript <<'EOF'
 tell application "System Events"
     try
@@ -244,6 +245,7 @@ tell application "System Events"
     end try
 end tell
 EOF
+fi
 
 echo "Script completed successfully."
 """

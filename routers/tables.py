@@ -802,9 +802,15 @@ async def reveal_builds_folder():
     logger.info(f"Reveal in Finder requested for: {mobile_builds_dir}")
 
     try:
-        # Use Popen to avoid blocking the API while Finder opens
+        import sys
+        # Use Popen to avoid blocking the API while Finder/File Manager opens
         logger.info("Executing 'open' command...")
-        subprocess.Popen(["open", str(mobile_builds_dir)])
+
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", str(mobile_builds_dir)])
+        elif sys.platform == "linux":
+            subprocess.Popen(["xdg-open", str(mobile_builds_dir)])
+
         return {"success": True}
     except Exception as e:
         logger.error(f"Failed to open builds folder: {e}")
