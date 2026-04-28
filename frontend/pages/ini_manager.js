@@ -553,8 +553,12 @@ const IniManagerPage = {
         document.getElementById('ini-workspace')?.classList.remove('content-active');
     },
 
-    unload() {
+    unmount() {
         if (this.state.pollingInterval) clearInterval(this.state.pollingInterval);
+        if (this.state.editor) {
+            this.state.editor.destroy();
+            this.state.editor = null;
+        }
     }
 };
 

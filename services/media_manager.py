@@ -161,10 +161,17 @@ async def get_media_file_path(table_id: int, media_type: str) -> Optional[Path]:
 async def delete_media_file(table_id: int, media_type: str) -> dict:
     """
     Delete a specific ES-DE media file and its database record.
+    Ensures both root and nested paths are cleaned up.
     """
-    file_path = await get_media_file_path(table_id, media_type)
+    table = await db.get_table(table_id)
+    if not table:
+        return {"success": False, "error": "Table not found"}
 
-    # Delete from database first (or always, to ensure sync)
+    filename = table.get("filename", "")
+    stem = Path(filename).stem if filename else ""
+    folder_name = Path(table["folder_path"]).name if table.get("folder_path") else ""
+
+    # 1. Delete from database
     try:
         conn = await db.get_db()
         await conn.execute(
@@ -174,24 +181,51 @@ async def delete_media_file(table_id: int, media_type: str) -> dict:
         await conn.commit()
     except Exception as db_err:
         import logging
+        logging.getLogger(__name__).error(f"Failed to delete DB record for media: {db_err}")
 
-        logging.getLogger(__name__).error(
-            f"Failed to delete DB record for media: {db_err}"
-        )
+    # 2. Delete from physical storage (All potential paths)
+    esde_base = config.esde_media_base
+    folder_path = esde_base / media_type
+    
+    deleted_paths = []
+    if stem and folder_path.exists():
+        if media_type == "videos":
+            exts = ESDE_EXTENSIONS["videos"]
+        elif media_type == "manuals":
+            exts = ESDE_EXTENSIONS["manuals"]
+        else:
+            exts = ESDE_EXTENSIONS["images"]
 
-    if file_path and file_path.exists():
-        try:
-            file_path.unlink()
-            return {
-                "success": True,
-                "message": f"Deleted {file_path.name} and removed database record",
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        for ext in exts:
+            # Root path
+            p1 = folder_path / f"{stem}{ext}"
+            if p1.exists():
+                p1.unlink()
+                deleted_paths.append(str(p1))
+            
+            # Nested path
+            if folder_name:
+                p2 = folder_path / folder_name / f"{stem}{ext}"
+                if p2.exists():
+                    p2.unlink()
+                    deleted_paths.append(str(p2))
+
+        # Cleanup nested folder if it's now empty
+        if folder_name:
+            nested_dir = folder_path / folder_name
+            if nested_dir.exists() and nested_dir.is_dir():
+                try:
+                    # Check if directory is empty (ignoring .DS_Store etc if possible, but simple check first)
+                    if not any(nested_dir.iterdir()):
+                        nested_dir.rmdir()
+                        import logging
+                        logging.getLogger(__name__).info(f"Deleted empty nested media folder: {nested_dir}")
+                except Exception:
+                    pass # Directory not empty or permission error
 
     return {
         "success": True,
-        "message": "Database record removed (file was already missing)",
+        "message": f"Deleted {len(deleted_paths)} file(s) and removed database record",
     }
 
 
@@ -241,25 +275,41 @@ async def rotate_media(table_id: int, media_type: str, angle: int) -> dict:
         return {"success": False, "error": str(e)}
 
 
-async def delete_all_media_for_table(table_filename: str) -> None:
+async def delete_all_media_for_table(table_filename: str, folder_path: str = None) -> None:
     """
     Deletes all global ES-DE media associated with a table filename.
+    Ensures both root files and nested folders are removed.
     """
     table_stem = Path(table_filename).stem
+    folder_name = Path(folder_path).name if folder_path else ""
     media_base = config.esde_media_base
     import logging
+    import shutil
 
     logger = logging.getLogger(__name__)
 
     for sub in ESDE_STATUS_TYPES:
         media_dir = media_base / sub
-        if media_dir.exists():
-            for file_path in media_dir.glob(f"{table_stem}.*"):
+        if not media_dir.exists():
+            continue
+
+        # 1. Delete root files matching stem
+        for file_path in media_dir.glob(f"{table_stem}.*"):
+            try:
+                file_path.unlink()
+                logger.info(f"Deleted global media (root): {file_path}")
+            except Exception as e:
+                logger.error(f"Failed to delete global media {file_path}: {e}")
+
+        # 2. Delete nested folder matching table's folder name
+        if folder_name:
+            nested_dir = media_dir / folder_name
+            if nested_dir.exists() and nested_dir.is_dir():
                 try:
-                    file_path.unlink()
-                    logger.info(f"Deleted global media: {file_path}")
+                    shutil.rmtree(nested_dir)
+                    logger.info(f"Deleted global media (nested folder): {nested_dir}")
                 except Exception as e:
-                    logger.error(f"Failed to delete global media {file_path}: {e}")
+                    logger.error(f"Failed to delete nested media folder {nested_dir}: {e}")
 
 
 async def delete_all_media_by_id(table_id: int) -> dict:
@@ -272,7 +322,7 @@ async def delete_all_media_by_id(table_id: int) -> dict:
     if not filename:
         return {"success": False, "error": "Table has no filename"}
 
-    await delete_all_media_for_table(filename)
+    await delete_all_media_for_table(filename, table.get("folder_path"))
     return {
         "success": True,
         "message": f"Deleted all media for {table.get('display_name')}",

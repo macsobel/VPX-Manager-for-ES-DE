@@ -212,8 +212,7 @@ const UploadPage = {
             return;
         }
         try {
-            const res = await fetch(`/api/vps/search?q=${encodeURIComponent(query)}&limit=8`);
-            const data = await res.json();
+            const data = await apiFetch(`/api/vps/search?q=${encodeURIComponent(query)}&limit=8`);
             this._showSearchResults(data.results || []);
         } catch (e) {
             this._hideSearchResults();
@@ -495,11 +494,10 @@ const UploadPage = {
             if (this._state.vpsId) {
                 formData.append('vps_id', this._state.vpsId);
             }
-            const response = await fetch('/api/upload/parse-vpx', {
+            const data = await apiFetch('/api/upload/parse-vpx', {
                 method: 'POST',
                 body: formData
             });
-            const data = await response.json();
             console.info('VPIN-MANAGER: VPX Parse Response:', data);
             
             if (data.success) {
@@ -988,12 +986,10 @@ const UploadPage = {
 
             progressText.textContent = 'Uploading files...';
 
-            const res = await fetch('/api/upload/import-table', {
+            const data = await apiFetch('/api/upload/import-table', {
                 method: 'POST',
                 body: formData,
             });
-
-            const data = await res.json();
 
             if (data.success) {
                 const vpsNote = this._state.vpsId ? ' (VPS matched)' : '';
@@ -1049,8 +1045,8 @@ const UploadPage = {
             const inv = invData.inventory || {};
 
             // Check for updates
-            const isDirect = t.latest_vps_version && t.version && t.latest_vps_version !== t.version && t.latest_vps_version !== t.ignored_version;
-            const isCommunity = t.is_community_newer && t.community_vps_version && t.version && t.community_vps_version !== t.version && t.community_vps_version !== t.ignored_version;
+            const isDirect = t.latest_vps_version && t.version && !versionsAreEqual(t.latest_vps_version, t.version) && !versionsAreEqual(t.latest_vps_version, t.ignored_version);
+            const isCommunity = t.is_community_newer && t.community_vps_version && t.version && !versionsAreEqual(t.community_vps_version, t.version) && !versionsAreEqual(t.community_vps_version, t.ignored_version);
 
             let html = `
                 <div class="import-form">

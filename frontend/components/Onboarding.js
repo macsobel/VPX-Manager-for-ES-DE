@@ -88,6 +88,35 @@ const Onboarding = {
         if (this.state.visible) {
             this.render();
             this.setupDraggable();
+            this.ensureInBounds();
+            
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                this.ensureInBounds();
+            });
+        }
+    },
+
+    ensureInBounds() {
+        const el = document.getElementById('onboarding-widget');
+        if (!el) return;
+
+        let x = this.state.pos.x;
+        let y = this.state.pos.y;
+
+        const maxX = window.innerWidth - el.offsetWidth;
+        const maxY = window.innerHeight - el.offsetHeight;
+
+        if (x > maxX) x = maxX;
+        if (y > maxY) y = maxY;
+        if (x < 0) x = 0;
+        if (y < 0) y = 0;
+
+        if (x !== this.state.pos.x || y !== this.state.pos.y) {
+            this.state.pos = { x, y };
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            this.save();
         }
     },
 
@@ -126,6 +155,8 @@ const Onboarding = {
     restart() {
         this.state.visible = true;
         this.state.minimized = false;
+        // Reset all steps
+        this.state.steps.forEach(s => s.completed = false);
         this.render();
         this.setupDraggable();
         this.save();
@@ -138,7 +169,9 @@ const Onboarding = {
 
     setupDraggable() {
         const el = document.getElementById('onboarding-widget');
+        if (!el) return;
         const header = el.querySelector('.onboarding-header');
+        if (!header) return;
         
         let isDragging = false;
         let startX, startY;
@@ -148,28 +181,31 @@ const Onboarding = {
             startX = e.clientX - el.offsetLeft;
             startY = e.clientY - el.offsetTop;
             header.style.cursor = 'grabbing';
-        };
-
-        document.onmousemove = (e) => {
-            if (!isDragging) return;
-            let x = e.clientX - startX;
-            let y = e.clientY - startY;
             
-            // Constrain to window
-            x = Math.max(0, Math.min(window.innerWidth - el.offsetWidth, x));
-            y = Math.max(0, Math.min(window.innerHeight - el.offsetHeight, y));
-            
-            el.style.left = x + 'px';
-            el.style.top = y + 'px';
-            this.state.pos = { x, y };
-        };
+            const onMouseMove = (e) => {
+                if (!isDragging) return;
+                let x = e.clientX - startX;
+                let y = e.clientY - startY;
+                
+                // Constrain to window
+                x = Math.max(0, Math.min(window.innerWidth - el.offsetWidth, x));
+                y = Math.max(0, Math.min(window.innerHeight - el.offsetHeight, y));
+                
+                el.style.left = x + 'px';
+                el.style.top = y + 'px';
+                this.state.pos = { x, y };
+            };
 
-        document.onmouseup = () => {
-            if (isDragging) {
+            const onMouseUp = () => {
                 isDragging = false;
                 header.style.cursor = 'grab';
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
                 this.save();
-            }
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
         };
     },
 
@@ -217,17 +253,17 @@ const Onboarding = {
                 <ul class="onboarding-list">
                     ${this.state.steps.map(step => `
                         <li class="onboarding-item ${step.completed ? 'completed' : ''}">
-                            <div class="onboarding-checkbox" onclick="Onboarding.toggleStep('${step.id}')">
-                                ${step.completed ? '✓' : ''}
-                            </div>
-                            <div class="onboarding-text">
-                                <div class="onboarding-step-title">${step.title}</div>
-                                <div class="onboarding-step-desc">${step.desc}</div>
-                                <a href="${step.link}" 
-                                   ${step.external ? 'target="_blank"' : ''} 
-                                   class="onboarding-step-action">
-                                   ${step.external ? 'Open External Site' : 'Go to Page'} →
-                                </a>
+                            <div class="onboarding-item-main">
+                                <div class="onboarding-checkbox" onclick="Onboarding.toggleStep('${step.id}')">
+                                    ${step.completed ? '✓' : ''}
+                                </div>
+                                <div class="onboarding-item-info">
+                                    <div class="onboarding-item-title">${step.title}</div>
+                                    <div class="onboarding-item-desc">${step.desc}</div>
+                                    <a href="${step.link}" class="onboarding-item-link" ${step.external ? 'target="_blank"' : ''}>
+                                        ${step.external ? 'Open External Site →' : 'Go to Page →'}
+                                    </a>
+                                </div>
                             </div>
                         </li>
                     `).join('')}
@@ -241,6 +277,8 @@ const Onboarding = {
                 ` : ''}
             </div>
         `;
+
+        this.setupDraggable();
     }
 };
 

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import aiosqlite
 
-from config import config, relativize_path
+from config import config, relativize_path as _relativize_path
 
 DB_PATH = config.db_path
 
@@ -264,7 +264,7 @@ async def upsert_tables_batch(tables_data: list[dict]):
         for d in tables_data:
             item = d.copy()
             if "folder_path" in item:
-                item["folder_path"] = relativize_path(item["folder_path"])
+                item["folder_path"] = _relativize_path(item["folder_path"])
             if "date_added" not in item:
                 item["date_added"] = datetime.now().isoformat()
             processed.append(item)

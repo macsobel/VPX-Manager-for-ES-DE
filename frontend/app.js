@@ -161,3 +161,70 @@ const App = {
 
 // Boot the app
 document.addEventListener('DOMContentLoaded', () => App.init());
+
+/**
+ * Normalizes and compares version strings.
+ * Returns true if mathematically equal (e.g. "1.4.0" == "1.4")
+ */
+window.versionsAreEqual = function(v1, v2) {
+    if (v1 === v2) return true;
+    if (v1 == null || v2 == null) return v1 === v2;
+
+    const parts1 = String(v1).split('.');
+    const parts2 = String(v2).split('.');
+    const length = Math.max(parts1.length, parts2.length);
+
+    for (let i = 0; i < length; i++) {
+        let p1 = (parts1[i] || '0').trim();
+        let p2 = (parts2[i] || '0').trim();
+
+        // If both are strictly numeric, compare as numbers
+        if (/^\d+$/.test(p1) && /^\d+$/.test(p2)) {
+            if (parseInt(p1, 10) !== parseInt(p2, 10)) return false;
+        } else {
+            // Otherwise string compare
+            if (p1.toLowerCase() !== p2.toLowerCase()) return false;
+        }
+    }
+    return true;
+};
+
+/**
+ * Robust fetch wrapper that handles non-JSON responses and HTTP errors gracefully.
+ */
+window.apiFetch = async function(url, options = {}) {
+    try {
+        const res = await fetch(url, options);
+        const contentType = res.headers.get('content-type');
+        
+        let data;
+        if (contentType && contentType.includes('application/json')) {
+            data = await res.json();
+        } else {
+            // Not JSON, probably an error page or plain text
+            const text = await res.text();
+            if (!res.ok) {
+                // If it looks like HTML, give a cleaner error
+                if (text.includes('<!DOCTYPE html>') || text.includes('<html>')) {
+                    throw new Error(`Server returned an HTML error page (Status ${res.status}). Check backend logs.`);
+                }
+                throw new Error(text || `Server returned ${res.status}: ${res.statusText}`);
+            }
+            return text; // Return as text if not JSON but OK
+        }
+
+        if (!res.ok) {
+            // Handle structured error from API if available
+            const errorMsg = data.detail || data.error || data.message || `Server error (${res.status})`;
+            throw new Error(errorMsg);
+        }
+
+        return data;
+    } catch (e) {
+        // Pass through existing Error objects, wrap others
+        if (e instanceof TypeError && e.message === 'Failed to fetch') {
+            throw new Error('Network error: Could not connect to the server.');
+        }
+        throw e;
+    }
+};

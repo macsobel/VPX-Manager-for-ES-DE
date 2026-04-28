@@ -199,13 +199,16 @@ const ManualsPage = {
         if (table.has_manual) {
             // Already has manual: Show controls and Delete button
             if (leftActionsArea) {
+                const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
                 leftActionsArea.innerHTML = `
+                    ${!isTouchDevice ? `
                     <button class="btn btn-secondary btn-sm" id="btn-fullscreen" title="Toggle Fullscreen">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
                         </svg>
                         Fullscreen
                     </button>
+                    ` : ''}
                     <div id="zoom-controls" style="display: none; gap: 0.5rem; margin-left: 0.5rem; align-items: center; border-left: 1px solid var(--border-color); padding-left: 0.75rem;">
                         <button class="btn btn-secondary btn-sm" id="pdf-zoom-out" title="Zoom Out">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
@@ -264,7 +267,7 @@ const ManualsPage = {
         const contentArea = document.getElementById('manual-content-area');
         contentArea.innerHTML = '<div class="pdf-loading-overlay"><div class="spinner"></div><span>Loading manual...</span></div>';
 
-        document.getElementById('btn-fullscreen').addEventListener('click', () => this.toggleFullscreen());
+        document.getElementById('btn-fullscreen')?.addEventListener('click', () => this.toggleFullscreen());
         
         document.getElementById('pdf-zoom-in')?.addEventListener('click', () => {
             if (this.state.zoomLevel < 1.0) {
@@ -387,7 +390,9 @@ const ManualsPage = {
     },
 
     toggleFullscreen() {
-        const content = document.querySelector('.manual-content');
+        const content = document.getElementById('manual-content-area');
+        if (!content) return;
+
         if (!document.fullscreenElement) {
             content.requestFullscreen().catch(err => {
                 console.error(`Error attempting to enable full-screen mode: ${err.message}`);
@@ -430,10 +435,12 @@ const ManualsPage = {
             const res = await fetch(`/api/scraper/manuals/${tableId}`, { method: 'POST' });
             const data = await res.json();
 
-            if (data.success) {
+            if (data.success && data.downloaded && data.downloaded.length > 0) {
                 Toast.show('Manual downloaded successfully', 'success');
                 await this.loadData();
                 this.selectTable(tableId);
+            } else if (data.success) {
+                Toast.show(data.message || 'No manual was found to download', 'info');
             } else {
                 Toast.show(data.error || 'Failed to download manual', 'error');
             }

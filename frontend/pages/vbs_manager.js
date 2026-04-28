@@ -76,7 +76,7 @@ const VbsManagerPage = {
                 </div>
 
                 <!-- Right: Detail Workspace -->
-                <div class="adaptive-content" id="vbs-detail-workspace">
+                <div class="adaptive-content" id="vbs-detail-workspace" style="display: none;">
                     <!-- Detail Header -->
                     <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); background: var(--bg-tertiary); display: flex; justify-content: space-between; align-items: flex-start;">
                         <div style="display: flex; gap: 1rem; align-items: center;">
@@ -111,7 +111,7 @@ const VbsManagerPage = {
                 </div>
 
                 <!-- Empty State for Detail (Desktop Only) -->
-                <div id="vbs-detail-empty" style="flex: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color); color: var(--text-muted);">
+                <div id="vbs-detail-empty" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color); color: var(--text-muted);">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom: 1rem; opacity: 0.5;">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                         <polyline points="14 2 14 8 20 8"></polyline>

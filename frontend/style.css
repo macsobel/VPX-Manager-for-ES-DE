@@ -2773,6 +2773,15 @@ select.input-field option {
     box-shadow: var(--shadow-lg), 0 0 40px rgba(0, 0, 0, 0.4);
     animation: fadeIn var(--transition-base);
     transition: max-height var(--transition-base), width var(--transition-base), opacity var(--transition-base);
+    background: rgba(15, 23, 42, 0.95) !important; /* Solidified background */
+    backdrop-filter: blur(20px);
+}
+
+@media (max-width: 600px) {
+    .onboarding-checklist {
+        width: 280px !important;
+        max-height: 70vh;
+    }
 }
 
 .onboarding-checklist.minimized {

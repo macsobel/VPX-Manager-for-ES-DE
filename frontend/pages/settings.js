@@ -372,18 +372,93 @@ const SettingsPage = {
 
     bindEvents() {
         document.getElementById('btn-rescan').onclick = async () => {
-            Toast.info('Scanning...');
-            const res = await fetch('/api/tables/scan', { method: 'POST' });
-            const data = await res.json();
-            Toast.success(`Scan complete: ${data.scanned} scanned, ${data.new} new`);
-            this.loadSystemStatus();
+            const btn = document.getElementById('btn-rescan');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width: 14px; height: 14px;"></div> Scanning...';
+            
+            try {
+                Toast.info('Scanning tables directory...');
+                const res = await fetch('/api/tables/scan', { method: 'POST' });
+                const startData = await res.json();
+                
+                if (!startData.success) {
+                    Toast.error(startData.message || 'Failed to start scan');
+                    return;
+                }
+
+                // Poll for completion
+                const pollStatus = async () => {
+                    const statusRes = await fetch('/api/tables/scan/status');
+                    const statusData = await statusRes.json();
+
+                    if (statusData.status === 'completed' || statusData.status === 'idle') {
+                        const scanned = statusData.total_items || statusData.scanned || 0;
+                        const added = statusData.new_items || statusData.new || 0;
+                        Toast.success(`Scan complete: ${scanned} tables found, ${added} new added`);
+                        this.loadSystemStatus();
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    } else if (statusData.status === 'failed') {
+                        Toast.error('Scan failed: ' + (statusData.message || 'Unknown error'));
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    } else {
+                        // Still running, wait and poll again
+                        setTimeout(pollStatus, 1000);
+                    }
+                };
+
+                setTimeout(pollStatus, 1000);
+            } catch (e) {
+                Toast.error('Failed to initiate scan');
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         };
 
         document.getElementById('btn-sync-vps').onclick = async () => {
-            Toast.info('Syncing VPS database...');
-            const res = await fetch('/api/vps/sync', { method: 'POST' });
-            const data = await res.json();
-            data.success ? Toast.success(data.message) : Toast.error(data.message);
+            const btn = document.getElementById('btn-sync-vps');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width: 14px; height: 14px;"></div> Syncing...';
+
+            try {
+                Toast.info('Syncing VPS database...');
+                const res = await fetch('/api/vps/sync', { method: 'POST' });
+                const startData = await res.json();
+
+                if (!startData.success) {
+                    Toast.error(startData.message || 'Failed to start sync');
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                    return;
+                }
+
+                // Poll for completion
+                const pollStatus = async () => {
+                    const statusRes = await fetch('/api/vps/sync/status');
+                    const statusData = await statusRes.json();
+
+                    if (statusData.status === 'completed' || statusData.status === 'idle') {
+                        Toast.success(statusData.message || 'VPS Database sync complete');
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    } else if (statusData.status === 'failed') {
+                        Toast.error('Sync failed: ' + (statusData.message || 'Unknown error'));
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    } else {
+                        setTimeout(pollStatus, 1500);
+                    }
+                };
+
+                setTimeout(pollStatus, 1500);
+            } catch (e) {
+                Toast.error('Failed to initiate VPS sync');
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         };
 
         document.getElementById('btn-check-updates').onclick = async () => {

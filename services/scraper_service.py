@@ -169,6 +169,7 @@ async def trigger_media_download(
         return {"success": False, "error": "Table not found in database"}
 
     folder_name = Path(table_data["folder_path"]).name
+    game_stem = Path(filename).stem
 
     from services.media_manager import save_media_dual
 

@@ -32,9 +32,10 @@ import zipfile
 from pathlib import Path
 from typing import List, Optional, Union
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, HTTPException
 
 from config import config
+from services.vps_matcher import vps_matcher
 
 # Optional archive support
 try:
@@ -210,6 +211,16 @@ async def import_table(
     Import a new table with all associated files in one operation.
     Creates the folder structure and routes each file to its correct location.
     """
+    # 1. Standardize metadata from VPS if ID provided (Authoritative 100% match logic)
+    if vps_id:
+        vps_entry = vps_matcher.get_entry(vps_id)
+        if vps_entry:
+            table_name = vps_entry.get("name") or table_name
+            manufacturer = vps_entry.get("manufacturer") or manufacturer
+            year = str(vps_entry.get("year", "")) or year
+            logger.info(
+                f"VPIN-MANAGER: Using authoritative VPS metadata for ID {vps_id}: {table_name} ({manufacturer} {year})"
+            )
     import database as db
     from services.table_file_service import TableFileService
 
@@ -391,7 +402,7 @@ async def import_table(
     VPXParser.process_vpx_table(vpx_target, extract_sidecar=False, vps_id=vps_id)
 
     # Persist to database
-    display_name_to_save = meta.get("display_name") or table_name
+    display_name_to_save = table_name or meta.get("display_name")
     table_id = await db.upsert_table(
         {
             "display_name": display_name_to_save,
@@ -412,15 +423,20 @@ async def import_table(
         }
     )
 
-    # Queue background task to download media
+    # Ensure the physical folder and files are perfectly standardized to the chosen metadata
+    from services.table_file_service import TableFileService
+    await TableFileService.standardize_names(table_id)
+
+    # Queue background task to download media (using updated names after standardization)
+    table_updated = await db.get_table(table_id)
     from services.scraper_service import trigger_media_download
 
     background_tasks.add_task(
         trigger_media_download,
         table_id=table_id,
         vps_id=vps_id,
-        table_name=display_name_to_save,
-        filename=new_vpx_filename,
+        table_name=table_updated["display_name"],
+        filename=table_updated["filename"],
     )
 
     return {

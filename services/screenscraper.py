@@ -7,6 +7,7 @@ Modeled after ES-DE's ScreenScraper.cpp implementation.
 Uses the ScreenScraper v2 API to search for Visual Pinball games
 and download media assets into ES-DE's downloaded_media folder structure.
 """
+import asyncio
 import logging
 import re
 from pathlib import Path
@@ -453,6 +454,12 @@ async def download_media_for_table(
             to_download[key] = media_info
 
     if not to_download:
+        if missing_types:
+            return {
+                "success": False,
+                "error": f"No {', '.join(missing_types)} available on ScreenScraper for this table",
+                "downloaded": [],
+            }
         return {
             "success": True,
             "message": "All requested media already present",
