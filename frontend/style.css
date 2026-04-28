@@ -1721,12 +1721,14 @@ select.input-field option {
         width: 100% !important;
         left: 0 !important;
         right: 0 !important;
+        top: 40px !important; /* Move down slightly for notch/sidebar */
         padding: 0 var(--space-md);
         display: flex;
         flex-direction: column;
         align-items: center;
         z-index: 10000;
         pointer-events: none;
+        transform: none !important; /* Remove translateX from base style */
     }
 
     .toast {
@@ -1735,6 +1737,11 @@ select.input-field option {
         margin-left: 0 !important;
         margin-right: 0 !important;
         pointer-events: auto;
+    }
+
+    /* Hide Desktop-only components on Mobile */
+    #onboarding-widget, .hide-on-mobile {
+        display: none !important;
     }
 
     /* VPS Search Autocomplete Mobile Fix */

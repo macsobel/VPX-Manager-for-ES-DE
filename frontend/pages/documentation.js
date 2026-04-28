@@ -87,7 +87,7 @@ const DocumentationPage = {
                             </div>
                         </div>
 
-                        <div style="margin-top: var(--space-2xl); padding-top: var(--space-xl); border-top: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between;">
+                        <div class="hide-on-mobile" style="margin-top: var(--space-2xl); padding-top: var(--space-xl); border-top: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between;">
                             <div>
                                 <h4 style="color: var(--text-primary); margin-bottom: 4px;">Need to see the guide again?</h4>
                                 <p>You can restart the interactive setup checklist at any time.</p>
