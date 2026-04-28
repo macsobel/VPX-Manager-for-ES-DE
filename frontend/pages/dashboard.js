@@ -62,6 +62,29 @@ const DashboardPage = {
         this.loadStats();
         this.loadSystemInfo();
         this.bindActions();
+        
+        // Proactive check: if tasks are already running, start polling
+        this.checkActiveTasks();
+    },
+
+    async checkActiveTasks() {
+        try {
+            // Check scanner
+            const scanRes = await fetch('/api/tables/scan/status');
+            const scanStatus = await scanRes.json();
+            if (scanStatus.status === 'running' || scanStatus.status === 'completed') {
+                this.pollTaskStatus('scanner', 'scan-progress-container');
+            }
+
+            // Check VPS sync
+            const vpsRes = await fetch('/api/vps/sync/status');
+            const vpsStatus = await vpsRes.json();
+            if (vpsStatus.status === 'running' || vpsStatus.status === 'completed') {
+                this.pollTaskStatus('vps_sync', 'vps-progress-container');
+            }
+        } catch (e) {
+            console.warn('Failed to check active tasks on load', e);
+        }
     },
 
     async loadStats() {
@@ -178,7 +201,7 @@ const DashboardPage = {
         if (!this._intervals) this._intervals = {};
         if (this._intervals[taskId]) clearInterval(this._intervals[taskId]);
 
-        this._intervals[taskId] = setInterval(async () => {
+        const poll = async () => {
             try {
                 const endpoint = taskId === 'scanner' ? '/api/tables/scan/status' : '/api/vps/sync/status';
                 const res = await fetch(endpoint);
@@ -203,8 +226,11 @@ const DashboardPage = {
                         </div>
                     `;
                 } else if (status.status === 'completed') {
-                    clearInterval(this._intervals[taskId]);
-                    this._intervals[taskId] = null;
+                    if (this._intervals[taskId]) {
+                        clearInterval(this._intervals[taskId]);
+                        this._intervals[taskId] = null;
+                    }
+                    container.style.display = 'block';
                     container.innerHTML = `
                         <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--accent-emerald); font-size: 0.9rem; font-weight: 500;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
@@ -217,12 +243,14 @@ const DashboardPage = {
                     }, 5000);
                     
                     // Re-enable buttons and reload stats
-                    document.getElementById('btn-quick-scan').disabled = false;
-                    document.getElementById('btn-quick-vps').disabled = false;
+                    const btnScan = document.getElementById('btn-quick-scan');
+                    const btnVps = document.getElementById('btn-quick-vps');
+                    if (btnScan) btnScan.disabled = false;
+                    if (btnVps) btnVps.disabled = false;
                     this.loadStats();
                     this.loadSystemInfo();
                 } else {
-                    // Idle or unknown - stop polling and ensure buttons are enabled
+                    // Idle or failed - stop polling
                     if (this._intervals[taskId]) {
                         clearInterval(this._intervals[taskId]);
                         this._intervals[taskId] = null;
@@ -231,25 +259,16 @@ const DashboardPage = {
                     const btnVps = document.getElementById('btn-quick-vps');
                     if (btnScan) btnScan.disabled = false;
                     if (btnVps) btnVps.disabled = false;
-                    
-                    // Also hide container if it was showing
-                    if (container) container.style.display = 'none';
+                    if (container && status.status !== 'failed') container.style.display = 'none';
                 }
             } catch (e) {
                 console.error("Polling error", e);
-                // On error, stop polling after a few tries to be safe
-                if (!this._errorCount) this._errorCount = 0;
-                this._errorCount++;
-                if (this._errorCount > 5) {
-                    clearInterval(this._intervals[taskId]);
-                    this._intervals[taskId] = null;
-                    const btnScan = document.getElementById('btn-quick-scan');
-                    const btnVps = document.getElementById('btn-quick-vps');
-                    if (btnScan) btnScan.disabled = false;
-                    if (btnVps) btnVps.disabled = false;
-                }
             }
-        }, 1000);
+        };
+
+        // Run immediately then every second
+        poll();
+        this._intervals[taskId] = setInterval(poll, 1000);
     },
 
     unmount() {
