@@ -80,7 +80,7 @@ app = BUNDLE(
     info_plist={
         'CFBundleShortVersionString': VERSION,
         'CFBundleVersion': VERSION,
-        'NSHumanReadableCopyright': 'Copyright © 2026 macsobel',
+        'NSHumanReadableCopyright': 'Developed by Aaron Sobel, 2026',
         'LSUIElement': True,
     },
 )

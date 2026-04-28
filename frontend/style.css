@@ -1716,8 +1716,91 @@ select.input-field option {
         gap: var(--space-md);
     }
 
+    /* Toast Notification Positioning - centered on mobile */
+    #toast-container {
+        width: 100% !important;
+        left: 0 !important;
+        right: 0 !important;
+        padding: 0 var(--space-md);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        z-index: 10000;
+        pointer-events: none;
+    }
+
+    .toast {
+        width: 100% !important;
+        max-width: 400px;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        pointer-events: auto;
+    }
+
+    /* VPS Search Autocomplete Mobile Fix */
+    .vps-search-results {
+        width: calc(100% - 20px) !important;
+        left: 10px !important;
+        right: 10px !important;
+        max-height: 250px !important;
+    }
+
+    /* Documentation / Getting Started Fixes */
+    .documentation-content, .card {
+        padding: var(--space-md) !important;
+        overflow-x: hidden;
+        word-wrap: break-word;
+        max-width: 100%;
+    }
+
+    .card pre, .card code {
+        white-space: pre-wrap !important;
+        word-break: break-all !important;
+    }
+
+    /* Documentation Grid Override (Inline Style Override) */
+    [style*="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr))"] {
+        grid-template-columns: 1fr !important;
+        gap: var(--space-md) !important;
+    }
+
+    /* Media Grid Stacking */
+    .media-grid {
+        grid-template-columns: 1fr !important;
+        gap: var(--space-md) !important;
+    }
+
+    .media-types-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 6px !important;
+    }
+
+    .media-type-cell {
+        padding: 8px !important;
+        font-size: 0.65rem !important;
+    }
+
+    /* Stats Grid Stacking */
     .stats-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Toolbar stacking */
+    .toolbar {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    /* Media Grid Stacking - prevent overflow */
+    .media-grid {
+        grid-template-columns: 1fr !important;
+        gap: var(--space-md) !important;
+    }
+
+    .media-card {
+        padding: var(--space-md) !important;
+        width: 100% !important;
+        min-width: 0 !important;
     }
 
     .toolbar {
