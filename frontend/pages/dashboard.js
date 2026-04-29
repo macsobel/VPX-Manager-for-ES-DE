@@ -96,21 +96,21 @@ const DashboardPage = {
             const percentMedia = stats.total_tables > 0 ? Math.round(((stats.total_tables - stats.missing_media) / stats.total_tables) * 100) : 0;
 
             document.getElementById('stats-grid').innerHTML = `
-                <div class="stat-card blue">
+                <div class="stat-card blue" onclick="window.location.hash = 'tables/list'" style="cursor: pointer;">
                     <div class="stat-icon blue">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
                     </div>
                     <div class="stat-value">${stats.total_tables}</div>
                     <div class="stat-label">Visual Pinball Tables</div>
                 </div>
-                <div class="stat-card purple">
+                <div class="stat-card purple" onclick="window.location.hash = 'tables/list'" style="cursor: pointer;">
                     <div class="stat-icon purple">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
                     </div>
                     <div class="stat-value">${percentMatched}%</div>
                     <div class="stat-label">Percent Matched with VPS</div>
                 </div>
-                <div class="stat-card amber">
+                <div class="stat-card amber" onclick="window.location.hash = 'tables/media'" style="cursor: pointer;">
                     <div class="stat-icon red">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
                     </div>
