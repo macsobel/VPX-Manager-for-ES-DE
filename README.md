@@ -15,11 +15,26 @@ The primary purpose of this project is to simplify the management of Visual Pinb
 - **EmulationStation Integration**: Seamless syncing of media and updating of `gamelist.xml` files for ES-DE.
 - **Standalone Mac App UI**: Integrated macOS menubar app (built with `rumps`) providing quick access to the Web UI, EmulationStation, and server management.
 
-## How to use it
+## Installation (Pre-built Release)
+
+1. Download the latest version for your architecture from the [Releases](https://github.com/macsobel/VPX-Manager-for-ES-DE/releases) page.
+2. Unzip the file and move **VPX Manager for ES-DE.app** to your `/Applications` folder.
+
+### 🍏 macOS First Run Instructions
+
+If macOS warns that the app is "damaged and can't be opened," it is simply blocked by Apple's Gatekeeper quarantine. To fix this:
+
+1. Move the app to your **Applications** folder.
+2. Open **Terminal** and run the following command to clear the quarantine flag:
+   ```bash
+   xattr -cr "/Applications/VPX Manager for ES-DE.app"
+   ```
+
+## Development Setup (From Source)
 
 ### Prerequisites
 - macOS operating system (optimized for macOS, though backend features cross-platform capabilities).
-- Python 3.12.x installed.
+- Python 3.11+ installed.
 
 ### Setup Instructions
 1. **Clone the repository:**
