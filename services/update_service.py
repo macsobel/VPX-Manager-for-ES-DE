@@ -58,12 +58,12 @@ class UpdateService:
                         
                         if system == "darwin":
                             if "macos" in asset_name:
-                                if (is_arm and "arm" in asset_name) or (not is_arm and "intel" in asset_name):
+                                if (is_arm and ("arm" in asset_name or "silicon" in asset_name)) or (not is_arm and "intel" in asset_name):
                                     download_url = asset.get("browser_download_url")
                                     found_match = True
                                     break
                         elif system == "linux":
-                            if ".appimage" in asset_name or "linux" in asset_name:
+                            if ".zip" in asset_name and "linux" in asset_name:
                                 if (is_arm and "aarch64" in asset_name) or (not is_arm and "x86_64" in asset_name):
                                     download_url = asset.get("browser_download_url")
                                     found_match = True
@@ -76,7 +76,7 @@ class UpdateService:
                             if system == "darwin" and "macos" in asset_name:
                                 download_url = asset.get("browser_download_url")
                                 break
-                            elif system == "linux" and (".appimage" in asset_name or "linux" in asset_name):
+                            elif system == "linux" and ("linux" in asset_name):
                                 download_url = asset.get("browser_download_url")
                                 break
                         else:
