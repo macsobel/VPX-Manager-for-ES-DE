@@ -17,21 +17,23 @@ on:
 
 jobs:
   build:
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     strategy:
       matrix:
         include:
-          - os: macos-13
+          - os: macos-15-intel
             arch: x86_64
             display_name: macOS_Intel
           - os: macos-14
             arch: arm64
-            display_name: macOS_ARM
-          - os: ubuntu-latest
+            display_name: macOS_Apple_Silicon
+          - os: ubuntu-22.04
             arch: x86_64
-            display_name: Linux_Intel
-          - os: ubuntu-24.04-arm64
+            display_name: Linux_x86_64
+          - os: ubuntu-22.04-arm
             arch: aarch64
-            display_name: Linux_ARM
+            display_name: Linux_aarch64
 
     runs-on: ${{ matrix.os }}
     permissions:
@@ -50,7 +52,7 @@ jobs:
       if: startsWith(matrix.os, 'ubuntu')
       run: |
         sudo apt-get update
-        sudo apt-get install -y libfuse2 binutils
+        sudo apt-get install -y libfuse2 binutils zip
         
     - name: Install dependencies
       run: |
@@ -79,22 +81,21 @@ jobs:
       run: |
         chmod +x build_app.sh
         ./build_app.sh
+        cd dist
+        # zip the AppImage
+        zip -j "VPX_Manager_${{ matrix.display_name }}.zip" "VPX_Manager-${{ matrix.arch }}.AppImage"
         
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: VPX_Manager_${{ matrix.display_name }}
-        path: |
-          dist/*.zip
-          dist/*.AppImage
+        path: dist/VPX_Manager_${{ matrix.display_name }}.zip
         
     - name: Create or Update Release
       if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
       uses: softprops/action-gh-release@v2
       with:
-        files: |
-          dist/*.zip
-          dist/*.AppImage
+        files: dist/VPX_Manager_*.zip
         tag_name: ${{ github.ref_name }}
         name: Release ${{ github.ref_name }}
         draft: false
