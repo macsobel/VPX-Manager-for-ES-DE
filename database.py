@@ -376,6 +376,10 @@ async def get_tables(
         for r in results:
             if r.get("folder_path"):
                 r["folder_path"] = _expand_path(r["folder_path"])
+                # Add calculated full path for convenience
+                r["vpx_path"] = str(Path(r["folder_path"]) / r["filename"])
+            else:
+                r["vpx_path"] = r["filename"]
         return results
     finally:
         await db.close()
@@ -391,6 +395,9 @@ async def get_table(table_id: int) -> dict | None:
         res = dict(row)
         if res.get("folder_path"):
             res["folder_path"] = _expand_path(res["folder_path"])
+            res["vpx_path"] = str(Path(res["folder_path"]) / res["filename"])
+        else:
+            res["vpx_path"] = res["filename"]
         return res
     finally:
         await db.close()
@@ -408,6 +415,34 @@ async def get_table_by_filename(filename: str) -> dict | None:
         res = dict(row)
         if res.get("folder_path"):
             res["folder_path"] = _expand_path(res["folder_path"])
+            res["vpx_path"] = str(Path(res["folder_path"]) / res["filename"])
+        else:
+            res["vpx_path"] = res["filename"]
+        return res
+    finally:
+        await db.close()
+async def get_table_by_path(full_path: str) -> dict | None:
+    """Find a table by its full absolute path."""
+    p = Path(full_path).expanduser()
+    filename = p.name
+    # Need to relativize the folder path to match DB storage
+    folder_path = _relativize_path(str(p.parent))
+
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT * FROM tables WHERE filename = ? AND folder_path = ?",
+            (filename, folder_path),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        res = dict(row)
+        if res.get("folder_path"):
+            res["folder_path"] = _expand_path(res["folder_path"])
+            res["vpx_path"] = str(Path(res["folder_path"]) / res["filename"])
+        else:
+            res["vpx_path"] = res["filename"]
         return res
     finally:
         await db.close()

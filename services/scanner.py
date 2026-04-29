@@ -82,14 +82,10 @@ async def scan_tables_directory() -> dict:
     errors = []
     vpx_files = []
 
-    # Collect all .vpx files (flat or nested one level)
-    for item in tables_dir.iterdir():
-        if item.is_file() and item.suffix.lower() == ".vpx":
-            vpx_files.append((item, tables_dir))
-        elif item.is_dir():
-            for sub in item.iterdir():
-                if sub.is_file() and sub.suffix.lower() == ".vpx":
-                    vpx_files.append((sub, item))
+    # Collect all .vpx files recursively
+    for sub in tables_dir.rglob("*.vpx"):
+        if sub.is_file():
+            vpx_files.append((sub, sub.parent))
 
     task_registry.start_task(
         "scanner", total=len(vpx_files), message="Scanning tables..."
@@ -314,7 +310,13 @@ async def scan_tables_directory() -> dict:
         finally:
             await existing_db.close()
 
-        task_registry.complete_task("scanner", f"Scanned {len(vpx_files)} tables")
+        summary = {
+            "scanned": len(vpx_files),
+            "new": new_count,
+            "updated": updated_count,
+            "errors": errors,
+        }
+        task_registry.complete_task("scanner", f"Scanned {len(vpx_files)} tables", extra_data=summary)
 
     except Exception as e:
         import traceback
@@ -327,13 +329,9 @@ async def scan_tables_directory() -> dict:
             print(error_msg)
         task_registry.fail_task("scanner", error_msg)
         errors.append(error_msg)
+        summary = {"errors": errors}
 
-    return {
-        "scanned": len(vpx_files),
-        "new": new_count,
-        "updated": updated_count,
-        "errors": errors,
-    }
+    return summary
 
 
 async def _scan_medias_folder(table_id: int, folder_path: Path):

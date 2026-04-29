@@ -1746,10 +1746,20 @@ select.input-field option {
 
     /* VPS Search Autocomplete Mobile Fix */
     .vps-search-results {
-        width: calc(100% - 20px) !important;
-        left: 10px !important;
+        width: calc(100% - 90px) !important;
+        left: 80px !important;
         right: 10px !important;
         max-height: 250px !important;
+        overflow-x: hidden !important;
+    }
+
+    .vps-result-item {
+        padding-left: 18px !important; /* Ensure text isn't cut off */
+    }
+
+    /* Hide 'drop files' text on mobile - space is limited */
+    .file-slot-drop-hint {
+        display: none !important;
     }
 
     /* Documentation / Getting Started Fixes */

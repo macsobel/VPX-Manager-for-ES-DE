@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 import database as db
+from services.esde_sync_service import esde_sync
 
 router = APIRouter(prefix="/api/collections", tags=["collections"])
 
@@ -41,6 +42,8 @@ async def create_collection(data: CollectionCreate):
         description=data.description,
         filter_rules=data.filter_rules,
     )
+    # Background sync to ES-DE
+    await esde_sync.export_to_esde(collection_id)
     return {"id": collection_id, "name": data.name}
 
 
@@ -67,6 +70,8 @@ async def update_collection(collection_id: int, data: CollectionUpdate):
         description=data.description,
         filter_rules=data.filter_rules,
     )
+    # Background sync to ES-DE
+    await esde_sync.export_to_esde(collection_id)
     return await db.get_collection(collection_id)
 
 
@@ -76,6 +81,8 @@ async def delete_collection(collection_id: int):
     if not existing:
         raise HTTPException(status_code=404, detail="Collection not found")
     await db.delete_collection(collection_id)
+    # Remove from ES-DE
+    await esde_sync.delete_from_esde(existing["name"])
     return {"success": True, "message": f"Deleted collection '{existing['name']}'"}
 
 
@@ -90,6 +97,10 @@ async def add_tables(collection_id: int, data: TableIds):
         if await db.add_table_to_collection(collection_id, table_id):
             added += 1
 
+    # Sync changes to ES-DE
+    if added > 0:
+        await esde_sync.export_to_esde(collection_id)
+
     return {"added": added, "collection_id": collection_id}
 
 
@@ -98,4 +109,15 @@ async def remove_table(collection_id: int, table_id: int):
     result = await db.remove_table_from_collection(collection_id, table_id)
     if not result:
         raise HTTPException(status_code=404, detail="Table not in collection")
+    
+    # Sync changes to ES-DE
+    await esde_sync.export_to_esde(collection_id)
+    
     return {"success": True}
+
+
+@router.post("/sync")
+async def manual_sync():
+    """Trigger a full bi-directional sync with ES-DE."""
+    await esde_sync.sync_all()
+    return {"success": True, "message": "Bi-directional sync with ES-DE complete"}

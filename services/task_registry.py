@@ -15,6 +15,7 @@ class TaskProgress(BaseModel):
     start_time: float = 0
     end_time: float = 0
     error: Optional[str] = None
+    extra_data: Dict[str, Any] = {}
 
     @property
     def percentage(self) -> int:
@@ -61,13 +62,15 @@ class TaskRegistry:
         if message:
             task.message = message
 
-    def complete_task(self, task_id: str, message: str = "Completed"):
+    def complete_task(self, task_id: str, message: str = "Completed", extra_data: Optional[Dict[str, Any]] = None):
         import time
 
         task = self.get_task(task_id)
         task.status = "completed"
         task.message = message
         task.end_time = time.time()
+        if extra_data:
+            task.extra_data = extra_data
         logger.info(f"Task completed: {task_id}")
 
     def fail_task(self, task_id: str, error: str):
@@ -81,7 +84,15 @@ class TaskRegistry:
         logger.error(f"Task failed: {task_id} - {error}")
 
     def get_all_statuses(self) -> Dict[str, Any]:
-        return {k: v.model_dump() for k, v in self._tasks.items()}
+        results = {}
+        for k, v in self._tasks.items():
+            data = v.model_dump()
+            # Flatten extra_data for frontend compatibility if needed, 
+            # or just let the frontend access .extra_data
+            if v.extra_data:
+                data.update(v.extra_data)
+            results[k] = data
+        return results
 
 
 task_registry = TaskRegistry()

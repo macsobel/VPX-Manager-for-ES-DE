@@ -18,7 +18,7 @@ from routers import (
     upload,
     vps,
     media,
-    collections,
+    # collections,
     settings as settings_router,
     scraper,
     patches,
@@ -27,6 +27,7 @@ from routers import (
     ini_manager,
     updates,
 )
+from services.esde_sync_service import esde_sync
 import socket
 
 # ── Logging & Security ──────────────────────────────────────────────
@@ -128,6 +129,10 @@ async def lifespan(app: FastAPI):
         )
     except Exception:
         logger.info("VPX Manager for ES-DE is running locally.")
+    
+    # Baseline sync with EmulationStation collections (Disabled)
+    # import asyncio
+    # asyncio.create_task(esde_sync.sync_all())
 
     yield
 
@@ -144,7 +149,7 @@ app.include_router(tables.router)
 app.include_router(upload.router)
 app.include_router(vps.router)
 app.include_router(media.router)
-app.include_router(collections.router)
+# app.include_router(collections.router)
 app.include_router(settings_router.router)
 app.include_router(scraper.router)
 app.include_router(patches.router)
