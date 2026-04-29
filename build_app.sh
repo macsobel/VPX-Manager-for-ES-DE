@@ -69,6 +69,16 @@ else
     # For Linux builds
     echo "Creating AppImage (Linux specific)..."
 
+    # Detect Architecture
+    ARCH_RAW="$(uname -m)"
+    case "${ARCH_RAW}" in
+        x86_64)   ARCH="x86_64";;
+        aarch64)  ARCH="aarch64";;
+        arm64)    ARCH="aarch64";; # macOS ARM reporting as Linux ARM in some envs
+        *)        ARCH="x86_64";; # Fallback
+    esac
+    echo "Detected Architecture: ${ARCH}"
+
     # Setup AppDir
     APPDIR="${DIST_DIR}/VPX_Manager.AppDir"
     rm -rf "${APPDIR}"
@@ -99,18 +109,18 @@ exec "${HERE}/usr/bin/VPX_Manager" "$@"
 EOF
     chmod +x "${APPDIR}/AppRun"
 
-    # Download appimagetool if not present
-    APPIMAGETOOL="${DIST_DIR}/appimagetool-x86_64.AppImage"
+    # Download architecture-appropriate appimagetool if not present
+    APPIMAGETOOL="${DIST_DIR}/appimagetool-${ARCH}.AppImage"
     if [ ! -f "${APPIMAGETOOL}" ]; then
-        echo "Downloading appimagetool..."
-        curl -L "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" -o "${APPIMAGETOOL}"
+        echo "Downloading appimagetool for ${ARCH}..."
+        curl -L "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${ARCH}.AppImage" -o "${APPIMAGETOOL}"
         chmod +x "${APPIMAGETOOL}"
     fi
 
     # Generate AppImage
-    ARCH=x86_64 "${APPIMAGETOOL}" "${APPDIR}" "${DIST_DIR}/VPX_Manager-x86_64.AppImage"
+    ARCH="${ARCH}" "${APPIMAGETOOL}" "${APPDIR}" "${DIST_DIR}/VPX_Manager-${ARCH}.AppImage"
 
-    APPIMAGE_BUNDLE="${DIST_DIR}/VPX_Manager-x86_64.AppImage"
+    APPIMAGE_BUNDLE="${DIST_DIR}/VPX_Manager-${ARCH}.AppImage"
 
     echo ""
     echo "=== Build Complete ==="

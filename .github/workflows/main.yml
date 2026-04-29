@@ -14,14 +14,25 @@ on:
         type: boolean
         default: false
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        include:
+          - os: macos-13
+            arch: x86_64
+            display_name: macOS_Intel
+          - os: macos-14
+            arch: arm64
+            display_name: macOS_ARM
+          - os: ubuntu-latest
+            arch: x86_64
+            display_name: Linux_Intel
+          - os: ubuntu-24.04-arm64
+            arch: aarch64
+            display_name: Linux_ARM
+
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
@@ -36,7 +47,7 @@ jobs:
         cache: 'pip'
 
     - name: Install Linux Dependencies
-      if: matrix.os == 'ubuntu-latest'
+      if: startsWith(matrix.os, 'ubuntu')
       run: |
         sudo apt-get update
         sudo apt-get install -y libfuse2 binutils
@@ -56,39 +67,34 @@ jobs:
         python3 build_utils.py
         
     - name: Build macOS App
-      if: matrix.os == 'macos-latest'
+      if: startsWith(matrix.os, 'macos')
       run: |
         chmod +x build_app.sh
         ./build_app.sh
         cd dist
-        zip -r "VPX_Manager_macOS.zip" "VPX Manager for ES-DE.app"
+        zip -r "VPX_Manager_${{ matrix.display_name }}.zip" "VPX Manager for ES-DE.app"
 
     - name: Build Linux AppImage
-      if: matrix.os == 'ubuntu-latest'
+      if: startsWith(matrix.os, 'ubuntu')
       run: |
         chmod +x build_app.sh
         ./build_app.sh
-        # The script creates VPX_Manager-x86_64.AppImage in dist/
         
-    - name: Upload Artifact (macOS)
-      if: matrix.os == 'macos-latest'
+    - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: VPX_Manager_macOS
-        path: dist/VPX_Manager_macOS.zip
-        
-    - name: Upload Artifact (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      uses: actions/upload-artifact@v4
-      with:
-        name: VPX_Manager_Linux
-        path: dist/VPX_Manager-x86_64.AppImage
+        name: VPX_Manager_${{ matrix.display_name }}
+        path: |
+          dist/*.zip
+          dist/*.AppImage
         
     - name: Create or Update Release
       if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
       uses: softprops/action-gh-release@v2
       with:
-        files: dist/VPX_Manager*
+        files: |
+          dist/*.zip
+          dist/*.AppImage
         tag_name: ${{ github.ref_name }}
         name: Release ${{ github.ref_name }}
         draft: false
