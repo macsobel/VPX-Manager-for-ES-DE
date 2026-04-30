@@ -13,6 +13,7 @@ build/
 dist/
 
 # Application Specific
+app_data/
 *.pkl
 *.dat
 config.dat
