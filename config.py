@@ -186,8 +186,8 @@ class AppConfig(BaseModel):
     screenscraper_password: str = ""  # This will be encoded in the JSON
     screenscraper_devid: str = ""  # Not saved to JSON
     screenscraper_devpassword: str = ""  # Not saved to JSON
-    screenscraper_dev_user: str = ""  # Fallback (geoferret) — Not saved to JSON
-    screenscraper_dev_pass: str = ""  # Fallback password — Not saved to JSON
+    screenscraper_dev_user: str = ""  # Not saved to JSON
+    screenscraper_dev_pass: str = ""  # Not saved to JSON
 
     # Media Preferences
     media_preferences: dict = {
