@@ -62,7 +62,6 @@ jobs:
         SS_DEV_ID: ${{ secrets.SS_DEV_ID }}
         SS_DEVPASS: ${{ secrets.SS_DEVPASS }}
       run: |
-        echo "${{ github.run_number }}" > version.txt
         python3 build_utils.py
         
     - name: Build macOS App
