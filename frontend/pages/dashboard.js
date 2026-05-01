@@ -130,30 +130,59 @@ const DashboardPage = {
 
     async loadSystemInfo() {
         try {
-            const res = await fetch('/api/system/status');
-            const info = await res.json();
+            const [sysRes, tablesRes] = await Promise.all([
+                fetch('/api/system/status'),
+                fetch('/api/tables?limit=9999')
+            ]);
+            const info = await sysRes.json();
+            const tablesData = await tablesRes.json();
+            const tables = tablesData.tables || [];
+
+            const fmtSize = (mb) => mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
+
+            // Count updates using the same logic as the tables page
+            let updatesCount = 0;
+            for (const t of tables) {
+                const hasDirect = t.latest_vps_version && t.version
+                    && !versionsAreEqual(t.latest_vps_version, t.version)
+                    && !versionsAreEqual(t.latest_vps_version, t.ignored_version);
+                const hasCommunity = t.is_community_newer
+                    && t.community_vps_version && t.version
+                    && !versionsAreEqual(t.community_vps_version, t.version)
+                    && !versionsAreEqual(t.community_vps_version, t.ignored_version);
+                if (hasDirect || hasCommunity) updatesCount++;
+            }
+
+            const updatesHtml = updatesCount > 0
+                ? `<a href="#tables" style="color: var(--accent-amber); font-weight: 600; text-decoration: none;">${updatesCount} table update${updatesCount === 1 ? '' : 's'} available</a>`
+                : `<div style="color: var(--accent-emerald);">All tables up to date</div>`;
+
+            const softwareCheck = (sw) => {
+                const icon = sw.exists
+                    ? `<span style="color: var(--accent-emerald);">✓</span>`
+                    : `<span style="color: var(--accent-red);">✗</span>`;
+                const pathHint = !sw.exists
+                    ? `<div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; word-break: break-all;">${sw.path}</div>`
+                    : '';
+                return `<div>${icon} ${sw.label}${pathHint}</div>`;
+            };
 
             document.getElementById('system-info').innerHTML = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-lg);">
-                    <div>
-                        <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm);">Files on Disk</div>
-                        <div>${info.counts.vpx_files} VPX files</div>
-                        <div>${info.counts.b2s_files} Backglass files</div>
-                        <div>${info.counts.rom_files} ROM files</div>
-                    </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-lg);">
                     <div>
                         <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm);">Storage</div>
-                        <div>Tables: ${info.storage.tables_size_mb} MB</div>
+                        <div>Tables: ${fmtSize(info.storage.tables_size_mb)}</div>
+                        <div>Media: ${fmtSize(info.storage.media_size_mb)}</div>
                         <div>Disk Free: ${info.storage.disk_free_gb} GB</div>
                     </div>
                     <div>
-                        <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm);">Directories</div>
-                        <div class="dir-status ${info.directories.tables_dir.exists ? 'exists' : 'missing'}">
-                            ${info.directories.tables_dir.exists ? '✓' : '✗'} Tables
-                        </div>
-                        <div class="dir-status ${info.directories.support_dir.exists ? 'exists' : 'missing'}">
-                            ${info.directories.support_dir.exists ? '✓' : '✗'} App Support
-                        </div>
+                        <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm);">Updates</div>
+                        ${updatesHtml}
+                    </div>
+                    <div>
+                        <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm);">Software</div>
+                        ${softwareCheck(info.software.vpx)}
+                        ${softwareCheck(info.software.esde)}
                     </div>
                 </div>
             `;

@@ -155,29 +155,41 @@ async def pick_path(prompt: str = "Select a path", pick_files: bool = False):
 
 @router.get("/system/status")
 async def system_status(request: Request):
-    """System overview: table counts, disk usage, directory status."""
+    """System overview: table counts, disk usage, directory status, software checks."""
     tables_dir = config.expanded_tables_dir
 
-    # Count files
+    # Count files and track sizes separately
     vpx_count = 0
     b2s_count = 0
     rom_count = 0
     media_count = 0
-    total_size = 0
+    table_size = 0
+    media_size = 0
 
     if tables_dir.exists():
         for f in tables_dir.rglob("*"):
             if f.is_file():
-                total_size += f.stat().st_size
+                fsize = f.stat().st_size
                 ext = f.suffix.lower()
+                parent_name = f.parent.name.lower()
+
+                # Classify as media or table content
+                is_media = parent_name == "medias" or parent_name in (
+                    "covers", "screenshots", "titlescreens", "videos",
+                    "fanart", "marquees", "miximages", "backglasses",
+                )
+                if is_media:
+                    media_size += fsize
+                    media_count += 1
+                else:
+                    table_size += fsize
+
                 if ext == ".vpx":
                     vpx_count += 1
                 elif ext == ".directb2s":
                     b2s_count += 1
                 elif ext == ".zip" and "roms" in str(f.parent).lower():
                     rom_count += 1
-                elif f.parent.name == "medias":
-                    media_count += 1
 
     # Disk usage
     disk = shutil.disk_usage(
@@ -185,6 +197,10 @@ async def system_status(request: Request):
     )
 
     db_tables = await db.get_table_count()
+
+    # Software path checks
+    vpx_path = Path(os.path.expanduser(config.vpx_standalone_app_path))
+    esde_path = Path(os.path.expanduser(config.esde_app_path))
 
     return {
         "directories": {
@@ -205,15 +221,29 @@ async def system_status(request: Request):
             "db_tables": db_tables,
         },
         "storage": {
-            "tables_size_mb": round(total_size / (1024 * 1024), 1),
+            "tables_size_mb": round(table_size / (1024 * 1024), 1),
+            "media_size_mb": round(media_size / (1024 * 1024), 1),
             "disk_total_gb": round(disk.total / (1024**3), 1),
             "disk_used_gb": round(disk.used / (1024**3), 1),
             "disk_free_gb": round(disk.free / (1024**3), 1),
+        },
+        "software": {
+            "vpx": {
+                "path": str(vpx_path),
+                "exists": vpx_path.exists(),
+                "label": "Visual Pinball Standalone",
+            },
+            "esde": {
+                "path": str(esde_path),
+                "exists": esde_path.exists(),
+                "label": "Emulation Station DE",
+            },
         },
         "is_local": check_is_local(request),
         "version": VERSION,
         "platform": sys.platform,
     }
+
 
 
 @router.post("/migrate-media")

@@ -186,6 +186,33 @@ async def get_stats():
     vbs_rows = await cursor.fetchall()
     vbs_patched = sum(1 for r in vbs_rows if r["vbs_hash"] in patch_final_hashes)
 
+    # Table updates available (VPS-matched tables with newer versions)
+    updates_available = 0
+    try:
+        vps_tables = await db.get_tables(vps_matched=True, limit=9999)
+        for t in vps_tables:
+            if not t.get("vps_id"):
+                continue
+            stored_version = (t.get("vps_version") or t.get("version") or "").strip()
+            if not stored_version:
+                continue
+            entry = vps_matcher.get_entry(t["vps_id"])
+            if not entry:
+                continue
+            # Get the latest file version from VPS
+            file_entry = None
+            if t.get("vps_file_id"):
+                file_entry = vps_matcher.get_file_entry(t["vps_id"], t["vps_file_id"])
+            if not file_entry:
+                file_entry = vps_matcher._get_latest_table(entry.get("tableFiles", []))
+            if not file_entry:
+                continue
+            latest_version = (file_entry.get("version") or "").strip()
+            if latest_version and latest_version != stored_version:
+                updates_available += 1
+    except Exception:
+        pass  # Don't break stats if VPS comparison fails
+
     return {
         "total_tables": total,
         "vps_matched": matched,
@@ -193,6 +220,7 @@ async def get_stats():
         "missing_media": missing_media_count,
         "vbs_extracted": vbs_extracted,
         "vbs_patched": vbs_patched,
+        "updates_available": updates_available,
     }
 
 
