@@ -150,9 +150,11 @@ const SettingsPage = {
                             ${this._renderDirInput('setting-esde-media-dir', 'ES-DE Downloaded Media Directory', data.esde_media_dir, 'Directory for ES-DE downloaded media', false, data.is_local)}
                         </div>
 
+<!-- 
                         <div style="margin-top: var(--space-xs);">
                             <button type="button" class="btn btn-secondary btn-sm" id="btn-migrate-media">Migrate Existing Media</button>
                         </div>
+-->
                     </div>
                 </div>
 
@@ -271,6 +273,7 @@ const SettingsPage = {
                 }
             });
 
+            /* 
             const btnMigrate = document.getElementById('btn-migrate-media');
             if (btnMigrate) {
                 btnMigrate.onclick = async () => {
@@ -289,6 +292,7 @@ const SettingsPage = {
                     });
                 };
             }
+            */
 
             // Save button (explicit click handled by form onsubmit)
             // But we keep the id for styling/manual binding if needed.

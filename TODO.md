@@ -3,8 +3,8 @@
 ## 🚀 High Priority (In Progress)
 - [ ] **Media Migration Utility**: 
     - Currently implemented in `services/media_manager.py` and `routers/settings.py`.
-    - Hidden from UI (commented out in `frontend/pages/settings.js`).
-    - Needs more testing with very large libraries (10GB+) and cross-drive moves.
+    - **STATUS: UNSTABLE**. Hidden from UI again due to reported hangs/failures.
+    - Needs deep-dive into why the background task stalls for some users.
     - Needs a "Real-time Progress Bar" instead of just a spinner.
 
 ## 🛠️ Maintenance & Refinement

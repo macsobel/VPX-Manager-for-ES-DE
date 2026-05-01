@@ -564,6 +564,7 @@ async def migrate_media_strategy(target_mode: str):
                 if not filename:
                     continue
 
+                stem = Path(filename).stem
                 portable_base_root = tables_dir / "media"
                 portable_base_nested = tables_dir / Path(filename).parent / "media"
 
@@ -575,9 +576,6 @@ async def migrate_media_strategy(target_mode: str):
                     "videos",
                     "manuals",
                 ]:
-                    portable_category_dir = portable_base / media_type
-                    if not portable_category_dir.exists():
-                        continue
 
                     found_file = None
                     for ext in [".png", ".jpg", ".mp4", ".pdf"]:
