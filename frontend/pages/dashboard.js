@@ -8,7 +8,7 @@ const DashboardPage = {
         container.innerHTML = `
             <div class="page-header">
                 <h1 class="page-title">Dashboard</h1>
-                <p class="page-subtitle">Overview of your Virtual Pinball library</p>
+                <p class="page-subtitle">Overview of your Visual Pinball library</p>
             </div>
             <div class="stats-grid" id="stats-grid">
                 <div class="stat-card blue loading-skeleton" style="height: 130px;"></div>
@@ -46,7 +46,7 @@ const DashboardPage = {
                         </div>
                         <span style="font-weight: 700; color: var(--text-primary);">Add New Table</span>
                     </div>
-                    <p style="font-size: 0.82rem; color: var(--text-tertiary);">Drop .vpx, .directb2s, and ROM .zip files for smart routing</p>
+                    <p style="font-size: 0.82rem; color: var(--text-tertiary);">Drop .vpx, .directb2s, and ROM .zip files for easy guided installation</p>
                 </button>
             </div>
             <div class="card" style="margin-top: var(--space-xl);" id="system-info-card">
@@ -62,7 +62,7 @@ const DashboardPage = {
         this.loadStats();
         this.loadSystemInfo();
         this.bindActions();
-        
+
         // Proactive check: if tasks are already running, start polling
         this.checkActiveTasks();
     },
@@ -237,11 +237,11 @@ const DashboardPage = {
                             ${status.message || 'Complete'}
                         </div>
                     `;
-                    setTimeout(() => { 
-                        container.style.display = 'none'; 
+                    setTimeout(() => {
+                        container.style.display = 'none';
                         container.innerHTML = '';
                     }, 5000);
-                    
+
                     // Re-enable buttons and reload stats
                     const btnScan = document.getElementById('btn-quick-scan');
                     const btnVps = document.getElementById('btn-quick-vps');

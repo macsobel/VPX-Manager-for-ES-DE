@@ -148,9 +148,6 @@ const SettingsPage = {
 
                         <div id="esde-media-dir-container" style="${data.media_storage_mode === 'standard' ? '' : 'display: none;'}">
                             ${this._renderDirInput('setting-esde-media-dir', 'ES-DE Downloaded Media Directory', data.esde_media_dir, 'Directory for ES-DE downloaded media', false, data.is_local)}
-                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: -8px; margin-bottom: var(--space-sm);">
-                                Note: gamelist.xml will be automatically managed in the corresponding ES-DE gamelists folder.
-                            </div>
                         </div>
 
                         <div style="margin-top: var(--space-xs);">

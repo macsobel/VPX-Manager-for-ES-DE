@@ -181,10 +181,7 @@ async def trigger_media_download(
                 )
                 continue
 
-            if cfg.media_storage_mode == "portable":
-                media_base = Path(table_data["folder_path"]) / "media"
-            else:
-                media_base = esde_base
+            media_base = cfg.esde_media_base
 
             # Use a safe temporary path within the app's support directory
             temp_dir = Path(cfg.support_dir) / "temp"

@@ -256,10 +256,7 @@ async def rotate_media(table_id: int, media_type: str, angle: int) -> dict:
         game_stem = Path(table["filename"]).stem
         folder_name = Path(table["folder_path"]).name
 
-        if config.media_storage_mode == "portable":
-            media_base = Path(table["folder_path"]) / "media"
-        else:
-            media_base = config.esde_media_base
+        media_base = config.esde_media_base
 
         await save_media_dual(
             media_base=media_base,
@@ -357,10 +354,7 @@ async def save_uploaded_media(
     folder_name = Path(table["folder_path"]).name
 
     # Determine base directory
-    if config.media_storage_mode == "portable":
-        media_base = Path(table["folder_path"]) / "media"
-    else:
-        media_base = config.esde_media_base
+    media_base = config.esde_media_base
 
     target_dir = media_base / media_type
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -399,9 +393,7 @@ async def save_uploaded_media(
             if tag:
                 # Always use the nested path for the <game> entry in XML
                 if config.media_storage_mode == "portable":
-                    rel_xml_path = (
-                        f"./media/{media_type}/{folder_name}/{game_stem}{ext}"
-                    )
+                    rel_xml_path = f"./media/{media_type}/{folder_name}{ext}"
                 else:
                     rel_xml_path = str(path_game).replace("\\", "/")
 
@@ -545,9 +537,7 @@ async def migrate_media_strategy(target_mode: str):
 
                     if found_file:
                         # Move to portable
-                        portable_dir = (
-                            tables_dir / Path(filename).parent / "media" / media_type
-                        )
+                        portable_dir = tables_dir / "media" / media_type
                         portable_dir.mkdir(parents=True, exist_ok=True)
                         dest_path = portable_dir / found_file.name
 
@@ -574,7 +564,8 @@ async def migrate_media_strategy(target_mode: str):
                 if not filename:
                     continue
 
-                portable_base = tables_dir / Path(filename).parent / "media"
+                portable_base_root = tables_dir / "media"
+                portable_base_nested = tables_dir / Path(filename).parent / "media"
 
                 for media_type in [
                     "covers",
@@ -590,9 +581,16 @@ async def migrate_media_strategy(target_mode: str):
 
                     found_file = None
                     for ext in [".png", ".jpg", ".mp4", ".pdf"]:
-                        check_path = portable_category_dir / f"{stem}{ext}"
-                        if check_path.exists():
-                            found_file = check_path
+                        # Check root portable location first
+                        check_path_root = portable_base_root / media_type / f"{stem}{ext}"
+                        if check_path_root.exists():
+                            found_file = check_path_root
+                            break
+                        
+                        # Fallback to nested/buggy location
+                        check_path_nested = portable_base_nested / media_type / f"{stem}{ext}"
+                        if check_path_nested.exists():
+                            found_file = check_path_nested
                             break
 
                     if found_file:
@@ -660,11 +658,7 @@ async def migrate_media_strategy(target_mode: str):
 
                 target_filename = f"{Path(filename).stem}{ext}"
                 if target_mode == "portable":
-                    rel_path = (
-                        f"./{Path(filename).parent.name}/media/{media_type}/{target_filename}"
-                        if Path(filename).parent.name
-                        else f"./media/{media_type}/{target_filename}"
-                    )
+                    rel_path = f"./media/{media_type}/{target_filename}"
                 else:
                     global_category_dir = global_esde / media_type
                     rel_path = str(global_category_dir / target_filename).replace(
