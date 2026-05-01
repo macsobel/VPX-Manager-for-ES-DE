@@ -21,6 +21,43 @@ const MediaPreferencesPage = {
     async render() {
         const container = document.getElementById('page-container');
         container.innerHTML = `
+            <style>
+                @media (max-width: 768px) {
+                    .media-pref-header-actions {
+                        flex-direction: column;
+                        width: 100%;
+                    }
+                    .media-pref-header-actions button {
+                        width: 100%;
+                        justify-content: center;
+                    }
+                    .preference-item {
+                        flex-direction: column;
+                        align-items: stretch !important;
+                        gap: var(--space-md) !important;
+                        padding: var(--space-md) !important;
+                    }
+                    .preference-item-index {
+                        margin-bottom: -5px;
+                    }
+                    .preference-item select {
+                        width: 100% !important;
+                    }
+                    .preference-item-actions {
+                        display: flex !important;
+                        flex-direction: row !important;
+                        justify-content: center !important;
+                        gap: var(--space-md) !important;
+                        border-top: 1px solid var(--border-subtle);
+                        padding-top: var(--space-sm);
+                        margin-top: var(--space-xs);
+                    }
+                    .preference-item-actions button {
+                        width: auto !important;
+                        padding: 8px var(--space-md) !important;
+                    }
+                }
+            </style>
             <div class="page-header">
                 <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-sm);">
                     <button class="btn btn-secondary" onclick="window.location.hash = 'settings'" style="padding: 6px; border-radius: 50%;">
@@ -32,7 +69,7 @@ const MediaPreferencesPage = {
             </div>
 
             <div class="card" style="margin-bottom: var(--space-xl);">
-                <div style="display: flex; justify-content: flex-end; margin-bottom: var(--space-md); gap: var(--space-sm);">
+                <div class="media-pref-header-actions" style="display: flex; justify-content: flex-end; margin-bottom: var(--space-md); gap: var(--space-sm);">
                     <button class="btn btn-secondary" id="btn-reset-defaults">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                         Restore Defaults
@@ -125,7 +162,7 @@ const MediaPreferencesPage = {
 
         return `
             <div class="preference-item" style="display: flex; align-items: center; gap: var(--space-sm); background: var(--bg-secondary); padding: var(--space-sm) var(--space-md); border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-weight: bold; color: var(--text-secondary); width: 24px;">#${index + 1}</div>
+                <div class="preference-item-index" style="font-weight: bold; color: var(--text-secondary); width: 24px;">#${index + 1}</div>
 
                 <select class="input-field" style="width: 200px;"
                         onchange="MediaPreferencesPage.updateSource('${categoryId}', ${index}, this.value)">
@@ -138,7 +175,7 @@ const MediaPreferencesPage = {
                     ${keyOptions}
                 </select>
 
-                <div style="display: flex; gap: 4px;">
+                <div class="preference-item-actions" style="display: flex; gap: 4px;">
                     <button class="btn btn-secondary" style="padding: 4px; border: none; background: transparent;"
                             onclick="MediaPreferencesPage.movePreference('${categoryId}', ${index}, -1)"
                             ${index === 0 ? 'disabled style="opacity: 0.3; padding: 4px; border: none; background: transparent;"' : ''}>
