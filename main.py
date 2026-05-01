@@ -271,13 +271,36 @@ if __name__ == "__main__":
                     # Make it grayed out/unclickable
                     self.status_item.set_callback(None)
 
+                    self.update_item = rumps.MenuItem(
+                        "Check for Updates...", callback=self.check_for_updates
+                    )
+                    
+                    # Set icon for Check for Updates
+                    check_icon_path = os.path.join(os.path.dirname(__file__), "resources", "check_circle.png")
+                    if os.path.exists(check_icon_path):
+                        self.update_item.icon = check_icon_path
+                        self.update_item.template = True
+
+                    self.about_item = rumps.MenuItem("About VPX Manager", callback=self.about_window)
+                    # Set icon for About
+                    info_icon_path = os.path.join(os.path.dirname(__file__), "resources", "info_circle.png")
+                    if os.path.exists(info_icon_path):
+                        self.about_item.icon = info_icon_path
+                        self.about_item.template = True
+
+                    self.settings_item = rumps.MenuItem("Settings...", callback=self.open_settings)
+                    # Set icon for Settings
+                    settings_icon_path = os.path.join(os.path.dirname(__file__), "resources", "settings_gear.png")
+                    if os.path.exists(settings_icon_path):
+                        self.settings_item.icon = settings_icon_path
+                        self.settings_item.template = True
+
                     self.menu = [
                         self.status_item,
                         None,  # Separator
-                        rumps.MenuItem("About VPX Manager", callback=self.about_window),
-                        rumps.MenuItem(
-                            "Check for Updates...", callback=self.check_for_updates
-                        ),
+                        self.about_item,
+                        self.update_item,
+                        self.settings_item,
                         None,  # Separator
                         rumps.MenuItem("Open Web Interface", callback=self.open_web_ui),
                         rumps.MenuItem("Open Emulation Station", callback=self.open_es),
@@ -288,8 +311,11 @@ if __name__ == "__main__":
 
                 def open_web_ui(self, sender):
                     import webbrowser
-
                     webbrowser.open("http://localhost:8746")
+
+                def open_settings(self, sender):
+                    import webbrowser
+                    webbrowser.open("http://localhost:8746/#settings")
 
                 def about_window(self, sender):
                     rumps.alert(

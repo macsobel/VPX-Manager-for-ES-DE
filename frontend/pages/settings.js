@@ -53,7 +53,7 @@ const SettingsPage = {
                         Media Download Preferences
                     </button>
                     <button class="btn btn-secondary" id="btn-check-updates">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
                         Check for Updates
                     </button>
                 </div>
