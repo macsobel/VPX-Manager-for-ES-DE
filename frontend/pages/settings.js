@@ -8,7 +8,7 @@ const SettingsPage = {
         container.innerHTML = `
             <div class="page-header">
                 <h1 class="page-title">Settings</h1>
-                <p class="page-subtitle">Configure paths and view system status</p>
+                <p class="page-subtitle">Configure file paths and adjust system settings</p>
             </div>
 
             <div class="settings-section">
@@ -95,10 +95,10 @@ const SettingsPage = {
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
                         <div style="font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: var(--space-xs);">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-                            Visual Pinball Standalone Integration
+                            Visual Pinball Standalone Settings
                         </div>
                         <a href="https://github.com/vpinball/vpinball" target="_blank" style="font-size: 0.75rem; color: var(--accent-blue); text-decoration: none; display: flex; align-items: center; gap: 4px;">
-                            Official Repository
+                            Official GitHub Repository
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                         </a>
                     </div>
@@ -127,7 +127,7 @@ const SettingsPage = {
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
                         <div style="font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: var(--space-xs);">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
-                            EmulationStation Desktop Edition Integration
+                            Emulation Station Desktop Edition Settings
                         </div>
                         <a href="https://es-de.org/" target="_blank" style="font-size: 0.75rem; color: var(--accent-blue); text-decoration: none; display: flex; align-items: center; gap: 4px;">
                             es-de.org
@@ -135,7 +135,7 @@ const SettingsPage = {
                         </a>
                     </div>
                     <div style="display: grid; gap: var(--space-md);">
-                        ${this._renderDirInput('setting-esde-app', 'EmulationStation: DE App Path', data.esde_app_path, 'Path to the ES-DE executable or .app bundle', true, data.is_local)}
+                        ${this._renderDirInput('setting-esde-app', 'Emulation Station Desktop Edition App Path', data.esde_app_path, 'Path to the ES-DE executable or .app bundle', true, data.is_local)}
                         
                         <div style="margin-top: var(--space-sm);">
                             <label class="input-label">Media Storage Strategy</label>
@@ -160,9 +160,15 @@ const SettingsPage = {
                 </div>
 
                 <div style="grid-column: 1 / -1; margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border-subtle);">
-                    <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-md); display: flex; align-items: center; gap: var(--space-xs);">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                        ScreenScraper Account
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
+                        <div style="font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: var(--space-xs);">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            ScreenScraper Account
+                        </div>
+                        <a href="https://www.screenscraper.fr/membreinscription.php" target="_blank" style="font-size: 0.75rem; color: var(--accent-blue); text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                            Register for a New ScreenScraper Account
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        </a>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md);">
                         <div class="input-group">
@@ -202,15 +208,15 @@ const SettingsPage = {
                 const statusDiv = document.getElementById('ss-test-status');
                 statusDiv.innerHTML = '<div class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></div> Testing...';
                 statusDiv.className = '';
-                
+
                 try {
                     // Better: The user should save settings first, then test.
                     // Or let's just save them automatically on test.
-                    await this.saveSettings(false); 
-                    
+                    await this.saveSettings(false);
+
                     const res = await fetch('/api/scraper/test', { method: 'POST' });
                     const result = await res.json();
-                    
+
                     if (result.success) {
                         statusDiv.innerHTML = `<span style="color: var(--accent-green);">✓ ${result.message}</span>`;
                     } else {
@@ -267,7 +273,7 @@ const SettingsPage = {
                     mediaDirContainer.style.display = 'none';
                 }
             });
-            
+
             const btnMigrate = document.getElementById('btn-migrate-media');
             if (btnMigrate) {
                 btnMigrate.onclick = async () => {
@@ -297,7 +303,7 @@ const SettingsPage = {
     async saveSettings(showToast = true) {
         try {
             const getVal = (id) => document.getElementById(id)?.value || '';
-            
+
             const body = {
                 tables_dir: getVal('setting-tables-dir'),
                 media_storage_mode: getVal('setting-media-storage-mode'),
@@ -310,7 +316,7 @@ const SettingsPage = {
                 screenscraper_username: getVal('setting-ss-user'),
                 screenscraper_password: getVal('setting-ss-pass'),
             };
-            
+
             await fetch('/api/settings', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -376,12 +382,12 @@ const SettingsPage = {
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<div class="spinner" style="width: 14px; height: 14px;"></div> Scanning...';
-            
+
             try {
                 Toast.info('Scanning tables directory...');
                 const res = await fetch('/api/tables/scan', { method: 'POST' });
                 const startData = await res.json();
-                
+
                 if (!startData.success) {
                     Toast.error(startData.message || 'Failed to start scan');
                     return;
@@ -466,11 +472,11 @@ const SettingsPage = {
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<div class="spinner" style="width: 14px; height: 14px;"></div> Checking...';
-            
+
             try {
                 const res = await fetch('/api/updates/check');
                 const result = await res.json();
-                
+
                 if (result.update_available) {
                     Modal.confirm(
                         'Update Available',
