@@ -130,46 +130,15 @@ const DashboardPage = {
 
     async loadSystemInfo() {
         try {
-            const [sysRes, tablesRes] = await Promise.all([
+            const [sysRes, updateRes] = await Promise.all([
                 fetch('/api/system/status'),
-                fetch('/api/tables?limit=9999')
+                fetch('/api/tables/update-count')
             ]);
             const info = await sysRes.json();
-            const tablesData = await tablesRes.json();
-            const tables = tablesData.tables || [];
+            const updateData = await updateRes.json();
+            const updatesCount = updateData.updates_available || 0;
 
             const fmtSize = (mb) => mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
-
-            // Local robust version compare to ensure consistency
-            const isNewer = (vLatest, vCurrent, vIgnored) => {
-                if (!vLatest || !vCurrent) return false;
-                const norm = (v) => String(v || "").trim().toLowerCase();
-                const l = norm(vLatest);
-                const c = norm(vCurrent);
-                const i = norm(vIgnored);
-                
-                // Use global versionsAreEqual if available, else basic normalized compare
-                const isEqual = window.versionsAreEqual || ((a, b) => a === b);
-                
-                if (l === "" || c === "") return false;
-                if (isEqual(l, c)) return false;
-                if (i !== "" && isEqual(l, i)) return false;
-                return true;
-            };
-
-            let updatesCount = 0;
-            for (const t of tables) {
-                // Check direct updates
-                const hasDirect = isNewer(t.latest_vps_version, t.version, t.ignored_version);
-                
-                // Check community updates
-                const hasCommunity = t.is_community_newer && 
-                                   isNewer(t.community_vps_version, t.version, t.ignored_version);
-                
-                if (hasDirect || hasCommunity) {
-                    updatesCount++;
-                }
-            }
 
             const updatesHtml = updatesCount > 0
                 ? `<a href="#tables" style="color: var(--accent-amber); font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px;">

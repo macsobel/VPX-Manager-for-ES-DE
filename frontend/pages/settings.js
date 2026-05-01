@@ -17,9 +17,27 @@ const SettingsPage = {
                     Directory Paths
                 </div>
                 <div class="card">
-                    <form class="settings-grid" id="settings-form">
+                    <form id="settings-form" class="settings-grid">
                         <div style="text-align: center;"><div class="spinner"></div></div>
                     </form>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-section-title">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <div style="display: flex; align-items: center; gap: var(--space-xs);">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            ScreenScraper Account
+                        </div>
+                        <a href="https://www.screenscraper.fr/membreinscription.php" target="_blank" style="font-size: 0.75rem; color: var(--accent-blue); text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                            Register for a New Account
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        </a>
+                    </div>
+                </div>
+                <div class="card" id="scraper-settings-card">
+                    <div style="text-align: center;"><div class="spinner"></div></div>
                 </div>
             </div>
 
@@ -173,40 +191,37 @@ const SettingsPage = {
                     </div>
                 </div>
 
-                <div style="grid-column: 1 / -1; margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border-subtle);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
-                        <div style="font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: var(--space-xs);">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                            ScreenScraper Account
-                        </div>
-                        <a href="https://www.screenscraper.fr/membreinscription.php" target="_blank" style="font-size: 0.75rem; color: var(--accent-blue); text-decoration: none; display: flex; align-items: center; gap: 4px;">
-                            Register for a New ScreenScraper Account
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                        </a>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md);">
-                        <div class="input-group">
-                            <label class="input-label">Username</label>
-                            <input class="input-field" id="setting-ss-user" name="screenscraper_username" value="${data.screenscraper_username || ''}" placeholder="ScreenScraper ID">
-                        </div>
-                        <div class="input-group">
-                            <label class="input-label">Password</label>
-                            <input class="input-field" type="password" id="setting-ss-pass" name="screenscraper_password" value="${data.screenscraper_password || ''}" placeholder="••••••••">
-                        </div>
-                    </div>
-                    <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm); align-items: center;">
-                        <button class="btn btn-secondary" id="btn-test-ss">
-                            Test Connection
-                        </button>
-                        <div id="ss-test-status" style="font-size: 0.85rem;"></div>
-                    </div>
-                </div>
-
                 <div style="margin-top: var(--space-md);">
                     <button type="submit" class="btn btn-primary" id="btn-save-settings">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                        Save Settings
+                        Save Directory Settings
                     </button>
+                </div>
+            `;
+
+            document.getElementById('scraper-settings-card').innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md);">
+                    <div class="input-group">
+                        <label class="input-label">Username</label>
+                        <input class="input-field" id="setting-ss-user" name="screenscraper_username" value="${data.screenscraper_username || ''}" placeholder="ScreenScraper ID">
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">Password</label>
+                        <input class="input-field" type="password" id="setting-ss-pass" name="screenscraper_password" value="${data.screenscraper_password || ''}" placeholder="••••••••">
+                    </div>
+                </div>
+                <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm); align-items: center; justify-content: space-between;">
+                    <div style="display: flex; gap: var(--space-sm); align-items: center;">
+                        <button class="btn btn-secondary" id="btn-test-ss">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            Test Connection
+                        </button>
+                        <button class="btn btn-primary" id="btn-save-scraper">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            Save Account Settings
+                        </button>
+                    </div>
+                    <div id="ss-test-status" style="font-size: 0.85rem;"></div>
                 </div>
             `;
 
@@ -214,6 +229,11 @@ const SettingsPage = {
             const form = document.getElementById('settings-form');
             form.onsubmit = async (e) => {
                 e.preventDefault();
+                await this.saveSettings(true);
+            };
+
+            // Bind Scraper Save
+            document.getElementById('btn-save-scraper').onclick = async () => {
                 await this.saveSettings(true);
             };
 
@@ -359,11 +379,11 @@ const SettingsPage = {
             const swCheck = (sw) => {
                 const ok = sw.exists;
                 return `
-                    <div style="display: flex; align-items: center; gap: 8px; padding: 6px 0;">
-                        <span style="color: ${ok ? 'var(--accent-emerald)' : 'var(--accent-red)'}; font-size: 1rem;">${ok ? '✓' : '✗'}</span>
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 6px 0;">
+                        <span style="color: ${ok ? 'var(--accent-emerald)' : 'var(--accent-red)'}; font-size: 1.1rem; line-height: 1;">${ok ? '✓' : '✗'}</span>
                         <div>
-                            <div style="color: var(--text-secondary); font-weight: 500;">${sw.label}</div>
-                            ${!ok ? `<div style="font-size: 0.72rem; color: var(--text-muted); word-break: break-all; margin-top: 1px;">Not found at: ${sw.path}</div>` : ''}
+                            <div style="color: var(--text-secondary); font-weight: 500; font-size: 0.88rem;">${sw.label}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); word-break: break-all; margin-top: 1px; opacity: 0.8;">${sw.path}</div>
                         </div>
                     </div>
                 `;

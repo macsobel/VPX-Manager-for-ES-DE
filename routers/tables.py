@@ -157,6 +157,90 @@ async def get_filter_options():
     }
 
 
+@router.get("/update-count")
+async def get_update_count():
+    """Count tables with available updates using the exact same logic as the tables page."""
+    from services.vps_matcher import vps_matcher
+
+    if not vps_matcher._loaded:
+        await vps_matcher._load_cached_async()
+
+    def versions_are_equal(v1: str, v2: str) -> bool:
+        """Mirror of the frontend versionsAreEqual function."""
+        if v1 == v2:
+            return True
+        if not v1 or not v2:
+            return False
+        parts1 = str(v1).split('.')
+        parts2 = str(v2).split('.')
+        length = max(len(parts1), len(parts2))
+        for i in range(length):
+            p1 = (parts1[i] if i < len(parts1) else '0').strip()
+            p2 = (parts2[i] if i < len(parts2) else '0').strip()
+            if p1.isdigit() and p2.isdigit():
+                if int(p1) != int(p2):
+                    return False
+            else:
+                if p1.lower() != p2.lower():
+                    return False
+        return True
+
+    tables = await db.get_tables(limit=9999)
+    updates_count = 0
+
+    for t in tables:
+        t_dict = dict(t)
+        vps_id = t_dict.get("vps_id", "")
+        if not vps_id:
+            continue
+
+        current_version = (t_dict.get("version") or "").strip()
+        ignored_version = (t_dict.get("ignored_version") or "").strip()
+
+        entry = vps_matcher.get_entry(vps_id)
+        if not entry:
+            continue
+
+        # Get the specific matched file entry
+        file_entry = None
+        if t_dict.get("vps_file_id"):
+            file_entry = vps_matcher.get_file_entry(vps_id, t_dict["vps_file_id"])
+        if not file_entry:
+            file_entry = vps_matcher._get_latest_table(entry.get("tableFiles", []))
+        if not file_entry:
+            continue
+
+        latest_version = (file_entry.get("version") or "").strip()
+
+        # Get community (global latest) entry
+        community_entry = vps_matcher._get_latest_table(entry.get("tableFiles", []))
+        community_version = (community_entry.get("version") or "").strip()
+        is_community_newer = community_entry.get("id") != file_entry.get("id")
+
+        # Check for direct update: latest_vps_version != current AND != ignored
+        has_direct = (
+            latest_version
+            and current_version
+            and not versions_are_equal(latest_version, current_version)
+            and not versions_are_equal(latest_version, ignored_version)
+        )
+
+        # Check for community update: same logic but using community version
+        has_community = (
+            is_community_newer
+            and community_version
+            and current_version
+            and not versions_are_equal(community_version, current_version)
+            and not versions_are_equal(community_version, ignored_version)
+        )
+
+        if has_direct or has_community:
+            updates_count += 1
+
+    return {"updates_available": updates_count}
+
+
+
 @router.get("/stats")
 async def get_stats():
     """Dashboard statistics."""

@@ -199,9 +199,12 @@ async def system_status(request: Request):
     db_tables = await db.get_table_count()
 
     # Software path checks
-    vpx_path = Path(os.path.expanduser(config.vpx_standalone_app_path))
-    esde_path = Path(os.path.expanduser(config.esde_app_path))
-
+    vpx_raw = config.vpx_standalone_app_path.strip()
+    esde_raw = config.esde_app_path.strip()
+    
+    vpx_path = Path(os.path.expanduser(vpx_raw)) if vpx_raw else None
+    esde_path = Path(os.path.expanduser(esde_raw)) if esde_raw else None
+    
     return {
         "directories": {
             "tables_dir": {
@@ -229,13 +232,13 @@ async def system_status(request: Request):
         },
         "software": {
             "vpx": {
-                "path": str(vpx_path),
-                "exists": vpx_path.exists(),
+                "path": str(vpx_path) if vpx_path else "",
+                "exists": vpx_path.exists() if vpx_path else False,
                 "label": "Visual Pinball Standalone",
             },
             "esde": {
-                "path": str(esde_path),
-                "exists": esde_path.exists(),
+                "path": str(esde_path) if esde_path else "",
+                "exists": esde_path.exists() if esde_path else False,
                 "label": "Emulation Station DE",
             },
         },

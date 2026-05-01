@@ -12,7 +12,7 @@ const Onboarding = {
             {
                 id: 'vpx',
                 title: 'Setup Visual Pinball X',
-                desc: 'Install the latest macOS build and run it once to set up your environment.',
+                desc: 'Install the latest macOS or Linux build and run it once to set up your environment.',
                 link: 'https://github.com/vpinball/vpinball/actions',
                 external: true
             },
