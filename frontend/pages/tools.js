@@ -117,6 +117,29 @@ const ToolsPage = {
                         </div>
                     </div>
                 </div>
+
+                <!-- Backglass Companion Card -->
+                <div class="settings-section">
+                    <div class="settings-section-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                        ES-DE Backglass Companion (Beta)
+                    </div>
+                    <div class="card">
+                        <div class="card-body">
+                            <p style="color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5; font-size: 0.9rem;">
+                                A custom SDL2 companion script to show the backglass on a secondary monitor while browsing Emulation Station.
+                            </p>
+                            <button class="btn btn-primary" onclick="ToolsPage.openBackglassPanel()">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                                </svg>
+                                Configure Backglass
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- NVRAM Manager Detail Panel -->
@@ -135,6 +158,30 @@ const ToolsPage = {
                     </button>
                 </div>
                 <div class="detail-panel-body" id="nvram-manager-body"></div>
+            </div>
+
+            <!-- Backglass Configuration Panel -->
+            <div class="detail-panel" id="backglass-panel">
+                <div class="detail-panel-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                         <div style="width: 32px; height: 32px; background: rgba(251, 191, 36, 0.12); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--accent-amber);">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                            </svg>
+                         </div>
+                         <h3 class="card-title" style="margin: 0; font-size: 1.1rem;">ES-DE Backglass Companion (Beta)</h3>
+                    </div>
+                    <button class="btn-icon" onclick="ToolsPage.closeBackglassPanel()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <div class="detail-panel-body" id="backglass-panel-body">
+                    <div class="spinner-container"><div class="spinner"></div></div>
+                </div>
+                <div class="detail-panel-footer" style="padding: 1rem; border-top: 1px solid var(--glass-border); display: flex; justify-content: flex-end; gap: 0.75rem;">
+                    <button class="btn btn-secondary" onclick="ToolsPage.closeBackglassPanel()">Cancel</button>
+                    <button class="btn btn-primary" id="btn-save-backglass">Save Changes</button>
+                </div>
             </div>
         `;
         this.bindEvents();
@@ -161,6 +208,11 @@ const ToolsPage = {
                 btnEsde.disabled = false;
                 btnEsde.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> Apply Integration';
             };
+        }
+
+        const btnSaveBackglass = document.getElementById('btn-save-backglass');
+        if (btnSaveBackglass) {
+            btnSaveBackglass.onclick = () => this.saveBackglassSettings();
         }
     },
 
@@ -401,6 +453,193 @@ const ToolsPage = {
             progress.style.display = 'none';
             dropzone.style.display = 'block';
             document.getElementById('nvram-file-input').value = '';
+        }
+    },
+
+    async openBackglassPanel() {
+        const panel = document.getElementById('backglass-panel');
+        const body = document.getElementById('backglass-panel-body');
+        panel.classList.add('open');
+
+        try {
+            const res = await fetch('/api/backglass/settings');
+            const settings = await res.json();
+            this.currentBackglassSettings = settings;
+
+            body.innerHTML = `
+                <div style="padding: 1rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 12px; border: 1px solid var(--glass-border);">
+                        <div>
+                            <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">Enable Backglass Companion</div>
+                            <div style="font-size: 0.8rem; color: var(--text-tertiary);">Automatically start with Emulation Station</div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="bg-enabled" ${settings.enabled ? 'checked' : ''}>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+
+                    <div class="settings-group" style="margin-bottom: 2rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                            <label class="settings-label" style="margin: 0;">Target Display</label>
+                            <button class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.75rem; height: 28px;" onclick="ToolsPage.identifyScreens()">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                Identify Monitors
+                            </button>
+                        </div>
+                        
+                        <div id="display-selector" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0.5rem;">
+                            ${Array.from({ length: settings.display_count }, (_, i) => `
+                                <button class="display-btn ${settings.screen_index === i ? 'active' : ''}" data-index="${i}" style="padding: 1rem 0.5rem; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.03); color: var(--text-secondary); border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                    <div style="font-size: 0.6rem; opacity: 0.5; margin-bottom: 2px; letter-spacing: 0.05em;">MONITOR</div>
+                                    <div style="font-size: 1.25rem; font-weight: 800;">${i}</div>
+                                </button>
+                            `).join('')}
+                        </div>
+                        <input type="hidden" id="bg-screen-index" value="${settings.screen_index}">
+                        <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 1rem;">Click 'Identify' to see numbers on your screens, then select the one for your backglass.</p>
+                    </div>
+
+                    <div class="settings-group">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                            <label class="settings-label" style="margin: 0;">Media Priority Order</label>
+                            <button style="background: none; border: none; padding: 0; color: var(--accent-blue); font-size: 0.75rem; font-weight: 600; cursor: pointer; text-decoration: underline; opacity: 0.8;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'" onclick="ToolsPage.resetBackglassPriority()">Reset to Default</button>
+                        </div>
+                        <div id="bg-priority-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            ${settings.priority.map((p, i) => `
+                                <div class="priority-item" draggable="true" data-index="${i}" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--bg-surface); border: 1px solid var(--glass-border); border-radius: 8px; cursor: grab;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                                    <span style="font-weight: 500; text-transform: capitalize;">${p}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 1rem;">Drag items to change the fallback order when searching for backglass images.</p>
+                    </div>
+                </div>
+            `;
+
+            // Bind display buttons
+            const displayBtns = document.querySelectorAll('.display-btn');
+            const hiddenInput = document.getElementById('bg-screen-index');
+            displayBtns.forEach(btn => {
+                btn.onclick = () => {
+                    displayBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    hiddenInput.value = btn.dataset.index;
+                };
+            });
+
+            // Bind Drag & Drop for priority
+            this.bindPrioritySort();
+
+        } catch (e) {
+            body.innerHTML = `<div class="error-state">Failed to load settings: ${e.message}</div>`;
+        }
+    },
+
+    bindPrioritySort() {
+        const list = document.getElementById('bg-priority-list');
+        let draggedItem = null;
+
+        list.querySelectorAll('.priority-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                draggedItem = item;
+                e.dataTransfer.effectAllowed = 'move';
+                item.style.opacity = '0.5';
+            });
+
+            item.addEventListener('dragend', () => {
+                draggedItem = null;
+                item.style.opacity = '1';
+                list.querySelectorAll('.priority-item').forEach(it => it.classList.remove('drag-over'));
+            });
+
+            item.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+
+            item.addEventListener('dragenter', (e) => {
+                if (item !== draggedItem) item.classList.add('drag-over');
+            });
+
+            item.addEventListener('dragleave', () => {
+                item.classList.remove('drag-over');
+            });
+
+            item.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (item !== draggedItem) {
+                    const items = [...list.querySelectorAll('.priority-item')];
+                    const draggedIdx = items.indexOf(draggedItem);
+                    const targetIdx = items.indexOf(item);
+
+                    if (draggedIdx < targetIdx) {
+                        item.after(draggedItem);
+                    } else {
+                        item.before(draggedItem);
+                    }
+                }
+            });
+        });
+    },
+
+    resetBackglassPriority() {
+        const defaults = ["fanart", "covers", "logos", "marquees"];
+        const list = document.getElementById('bg-priority-list');
+        list.innerHTML = defaults.map((p, i) => `
+            <div class="priority-item" draggable="true" data-index="${i}" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--bg-surface); border: 1px solid var(--glass-border); border-radius: 8px; cursor: grab;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                <span style="font-weight: 500; text-transform: capitalize;">${p}</span>
+            </div>
+        `).join('');
+        this.bindPrioritySort();
+    },
+
+    async saveBackglassSettings() {
+        const btn = document.getElementById('btn-save-backglass');
+        btn.disabled = true;
+        btn.innerText = 'Saving...';
+
+        const priority = [...document.querySelectorAll('#bg-priority-list .priority-item span')].map(s => s.innerText.toLowerCase());
+
+        const settings = {
+            enabled: document.getElementById('bg-enabled').checked,
+            screen_index: parseInt(document.getElementById('bg-screen-index').value),
+            priority: priority
+        };
+
+        try {
+            const res = await fetch('/api/backglass/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+            const data = await res.json();
+            if (data.success) {
+                Toast.success('Backglass settings saved');
+                this.closeBackglassPanel();
+            } else {
+                Toast.error('Failed to save settings');
+            }
+        } catch (e) {
+            Toast.error('Error saving settings: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = 'Save Changes';
+        }
+    },
+
+    closeBackglassPanel() {
+        document.getElementById('backglass-panel').classList.remove('open');
+    },
+
+    async identifyScreens() {
+        try {
+            await fetch('/api/backglass/identify', { method: 'POST' });
+            Toast.info('Check your monitors for identification numbers');
+        } catch (e) {
+            Toast.error('Failed to trigger screen identification');
         }
     }
 };

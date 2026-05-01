@@ -10,6 +10,24 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
 import os
+import sys
+
+# ── Sub-process Handlers (Prevents recursive app launching in bundled builds) ──
+if len(sys.argv) > 1:
+    if "--backglass" in sys.argv:
+        from backend.services.backglass.backglass_companion import BackglassCompanion
+        s_idx = int(sys.argv[2]) if len(sys.argv) > 2 else 1
+        priority = sys.argv[3].split(',') if len(sys.argv) > 3 else ["fanart", "covers", "logos", "marquees"]
+        companion = BackglassCompanion(screen_index=s_idx)
+        companion.priority = priority
+        companion.run()
+        sys.exit(0)
+    
+    if "--identify" in sys.argv:
+        from backend.services.backglass.identify import identify_screen
+        s_idx = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+        identify_screen(s_idx)
+        sys.exit(0)
 
 import database as db
 from config import LOG_FILE, VERSION
@@ -26,6 +44,7 @@ from routers import (
     vbs_manager,
     ini_manager,
     updates,
+    backglass,
 )
 from services.esde_sync_service import esde_sync
 import socket
@@ -134,6 +153,10 @@ async def lifespan(app: FastAPI):
     # import asyncio
     # asyncio.create_task(esde_sync.sync_all())
 
+    # Start Backglass Monitor
+    from backend.services.backglass.monitor_service import backglass_monitor
+    backglass_monitor.start()
+
     yield
 
 
@@ -157,6 +180,7 @@ app.include_router(tools.router)
 app.include_router(vbs_manager.router)
 app.include_router(ini_manager.router)
 app.include_router(updates.router)
+app.include_router(backglass.router)
 
 # ── Static Frontend ─────────────────────────────────────────────────
 from config import APP_SUPPORT_DIR

@@ -48,6 +48,16 @@ const DashboardPage = {
                     </div>
                     <p style="font-size: 0.82rem; color: var(--text-tertiary);">Drop .vpx, .directb2s, and ROM .zip files for easy guided installation</p>
                 </button>
+                <button class="card" id="btn-backglass-companion" style="cursor: pointer; text-align: left; border: none; font-family: var(--font-family);">
+                    <div style="display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-sm);">
+                        <div class="stat-icon amber" id="backglass-status-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                        </div>
+                        <span style="font-weight: 700; color: var(--text-primary);">Backglass Companion</span>
+                        <div id="backglass-badge" style="margin-left: auto; font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px;">Inactive</div>
+                    </div>
+                    <p style="font-size: 0.82rem; color: var(--text-tertiary);">Sync secondary monitor backglass with ES-DE table selection</p>
+                </button>
             </div>
             <div class="card" style="margin-top: var(--space-xl);" id="system-info-card">
                 <div class="card-header">
@@ -65,6 +75,7 @@ const DashboardPage = {
 
         // Proactive check: if tasks are already running, start polling
         this.checkActiveTasks();
+        this.updateBackglassStatus();
     },
 
     async checkActiveTasks() {
@@ -222,6 +233,54 @@ const DashboardPage = {
         document.getElementById('btn-quick-upload').onclick = () => {
             window.location.hash = 'upload';
         };
+
+        document.getElementById('btn-backglass-companion').onclick = async () => {
+            const statusRes = await fetch('/api/backglass/status');
+            const status = await statusRes.json();
+            
+            if (status.running) {
+                const res = await fetch('/api/backglass/stop', { method: 'POST' });
+                if (res.ok) Toast.success('Backglass Companion stopped');
+            } else {
+                const res = await fetch('/api/backglass/start', { method: 'POST' });
+                if (res.ok) Toast.success('Backglass Companion started');
+            }
+            this.updateBackglassStatus();
+        };
+    },
+
+    async updateBackglassStatus() {
+        if (!this._intervals) this._intervals = {};
+        if (this._intervals.backglass) return;
+
+        const update = async () => {
+            const btn = document.getElementById('btn-backglass-companion');
+            const badge = document.getElementById('backglass-badge');
+            const icon = document.getElementById('backglass-status-icon');
+            if (!btn || !badge || !icon) return;
+
+            try {
+                const res = await fetch('/api/backglass/status');
+                const status = await res.json();
+
+                if (status.running) {
+                    badge.innerText = 'Active';
+                    badge.style.background = 'rgba(16, 185, 129, 0.2)';
+                    badge.style.color = '#10b981';
+                    icon.className = 'stat-icon emerald';
+                } else {
+                    badge.innerText = 'Inactive';
+                    badge.style.background = 'rgba(255, 255, 255, 0.05)';
+                    badge.style.color = 'var(--text-tertiary)';
+                    icon.className = 'stat-icon amber';
+                }
+            } catch (e) {
+                console.warn('Backglass status check failed');
+            }
+        };
+
+        update();
+        this._intervals.backglass = setInterval(update, 2000);
     },
 
     pollTaskStatus(taskId, containerId) {

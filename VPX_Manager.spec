@@ -20,7 +20,7 @@ def get_version():
 
 VERSION = get_version()
 
-datas = [('frontend', 'frontend'), ('resources', 'resources')]
+datas = [('frontend', 'frontend'), ('resources', 'resources'), ('backend', 'backend')]
 if os.path.exists('config.dat'):
     datas.append(('config.dat', '.'))
 if os.path.exists('version.txt'):
@@ -31,7 +31,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=datas,
-    hiddenimports=['uvicorn', 'fastapi', 'aiosqlite', 'pydantic', 'httpx', 'olefile', 'PIL', 'setproctitle', 'rumps'],
+    hiddenimports=['uvicorn', 'fastapi', 'aiosqlite', 'pydantic', 'httpx', 'olefile', 'PIL', 'setproctitle', 'rumps', 'pygame'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

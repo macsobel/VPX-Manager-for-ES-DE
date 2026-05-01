@@ -33,3 +33,4 @@ brain/
 _research/
 scratch/
 tests/*.vpx
+*.log
