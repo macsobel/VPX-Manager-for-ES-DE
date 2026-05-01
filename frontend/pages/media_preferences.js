@@ -47,14 +47,15 @@ const MediaPreferencesPage = {
                         display: flex !important;
                         flex-direction: row !important;
                         justify-content: center !important;
-                        gap: var(--space-md) !important;
-                        border-top: 1px solid var(--border-subtle);
+                        gap: var(--space-lg) !important;
                         padding-top: var(--space-sm);
-                        margin-top: var(--space-xs);
                     }
                     .preference-item-actions button {
                         width: auto !important;
-                        padding: 8px var(--space-md) !important;
+                        padding: 8px !important;
+                        display: flex !important;
+                        align-items: center !important;
+                        justify-content: center !important;
                     }
                 }
             </style>
