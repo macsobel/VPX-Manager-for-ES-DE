@@ -27,7 +27,7 @@ const ToolsPage = {
                     <div class="card">
                         <div class="card-body">
                             <p style="color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5; font-size: 0.9rem;">
-                                Extract, edit, and patch VBScript files for your tables. Includes a code editor and automatically identify and download patched VBS files.
+                                Extract and patch VBScript files for your tables. Includes a code editor and automatic patched file detection.
                             </p>
                             <button class="btn btn-primary" onclick="window.location.hash = 'vbs-manager'">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -55,7 +55,7 @@ const ToolsPage = {
                     <div class="card">
                         <div class="card-body">
                             <p style="color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5; font-size: 0.9rem;">
-                                Manage, generate, and edit table-specific INI files. Includes a code editor and automated quick-fixes.
+                                Manage and generate table-specific INI files. Includes a code editor and configuration quick-fixes.
                             </p>
                             <button class="btn btn-primary" onclick="window.location.hash = 'ini-manager'">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -80,8 +80,7 @@ const ToolsPage = {
                     <div class="card">
                         <div class="card-body">
                             <p style="color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5; font-size: 0.9rem;">
-                                This tool helps users import and store pre-initialized NVRAM files in a master repository.
-                                Certain Bally MPU and Gottlieb System 3 VPM tables require pre-initialized NVRAM files.
+                                Import and store pre-initialized NVRAM files in a master repository. This helps prevent "Factory Settings Restored" errors on certain tables.
                             </p>
                             <button class="btn btn-primary" onclick="ToolsPage.openNvramManager()">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -106,7 +105,7 @@ const ToolsPage = {
                     <div class="card">
                         <div class="card-body">
                             <p style="color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5; font-size: 0.9rem;">
-                                Automate the configuration of ES-DE to launch VPX tables and return focus to ES-DE after the table closes.
+                                Configure ES-DE to launch VPX tables and return focus to the frontend after the table closes.
                             </p>
                             <button class="btn btn-primary" id="btn-apply-esde">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
