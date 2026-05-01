@@ -84,13 +84,20 @@ const UploadPage = {
                     </div>
                 </div>
 
-                <!-- Import Button -->
-                <div class="form-checkbox-group" id="group-scrape-media">
-                    <input type="checkbox" id="import-scrape-media" checked>
-                    <label class="form-checkbox-label" for="import-scrape-media">
-                        Search for media automatically
-                        <span class="form-checkbox-sublabel">Downloads wheels, videos, and backglass from VPMediaDB & ScreenScraper</span>
-                    </label>
+                <!-- Import Options -->
+                <div class="file-slot" id="group-scrape-media" style="cursor: pointer;" onclick="document.getElementById('import-scrape-media').click()">
+                    <div class="file-slot-header">
+                        <div class="file-slot-icon blue">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        </div>
+                        <div class="file-slot-info">
+                            <div class="file-slot-label" style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" id="import-scrape-media" checked style="width: 16px; height: 16px; accent-color: var(--accent-blue); cursor: pointer;" onclick="event.stopPropagation()">
+                                Auto-scrape media on import
+                            </div>
+                            <div class="file-slot-desc">Fetches media files and metadata for Emulation Station DE from VPMediaDB and ScreenScraper when adding the table.</div>
+                        </div>
+                    </div>
                 </div>
                 <div style="display: flex; gap: var(--space-md); align-items: center; margin-top: var(--space-md);">
                     <button class="btn btn-primary btn-lg" id="btn-do-import" disabled>
@@ -120,15 +127,15 @@ const UploadPage = {
 
     _renderFileSlot(id, label, accept, required, color, description, iconPath, existingFiles = [], multiple = false) {
         const reqBadge = required ? `<span class="slot-badge required" id="badge-${id}">Required</span>` : `<span class="slot-badge optional" id="badge-${id}">Optional</span>`;
-        
+
         let existingHtml = '';
         if (existingFiles && existingFiles.length > 0) {
             existingHtml = `
                 <div class="existing-files-list">
                     ${existingFiles.map(file => {
-                        const relPath = this._getRelPathForSlot(id, file);
-                        const isDeleted = this._state.deletedFiles.includes(relPath);
-                        return `
+                const relPath = this._getRelPathForSlot(id, file);
+                const isDeleted = this._state.deletedFiles.includes(relPath);
+                return `
                             <div class="existing-file-tag ${isDeleted ? 'to-delete' : ''}" data-rel-path="${relPath}" data-slot="${id}">
                                 <span>${file}</span>
                                 <button class="btn-remove-existing" title="${isDeleted ? 'Undo delete' : 'Mark for deletion'}">
@@ -136,7 +143,7 @@ const UploadPage = {
                                 </button>
                             </div>
                         `;
-                    }).join('')}
+            }).join('')}
                 </div>
             `;
         }
@@ -438,9 +445,9 @@ const UploadPage = {
 
         if (fileOrList) {
             if (clearBtn) clearBtn.style.display = 'flex';
-            
+
             const isMultipleSlot = ['rom', 'nvram', 'puppack', 'music', 'altsound', 'altcolor'].includes(slotId);
-            
+
             if (isMultipleSlot) {
                 // Handle multiple files
                 const files = fileOrList instanceof FileList ? Array.from(fileOrList) : (Array.isArray(fileOrList) ? fileOrList : [fileOrList]);
@@ -480,7 +487,7 @@ const UploadPage = {
             } else {
                 this._state[stateKey] = null;
             }
-            
+
             status.textContent = 'No file selected';
             status.classList.remove('has-file');
             slot.classList.remove('has-file');
@@ -506,7 +513,7 @@ const UploadPage = {
                 body: formData
             });
             console.info('VPIN-MANAGER: VPX Parse Response:', data);
-            
+
             if (data.success) {
                 if (data.roms && data.roms.length > 0) {
                     this._updateRomGuidance(data.roms);
@@ -519,11 +526,11 @@ const UploadPage = {
                 } else if (!this._state.vpsId) {
                     this._updateAltcolorGuidance([]);
                 }
-                
+
                 if (data.nvram && data.nvram.length > 0) {
                     this._autoPopulateNvram(data.nvram);
                 }
-                
+
                 if (data.patch_info && data.patch_info.patch_url) {
                     this._showVbsAutoPatch(data.patch_info.patch_url);
                 }
@@ -538,7 +545,7 @@ const UploadPage = {
                             if (vps.altsound) this._updateAltSoundGuidance(vps.altsound);
                             if (vps.puppack) this._updatePupPackGuidance(vps.puppack);
                             if (vps.music) this._updateMusicGuidance(vps.music);
-                        }).catch(() => {});
+                        }).catch(() => { });
                 }
             }
         } catch (err) {
@@ -567,7 +574,7 @@ const UploadPage = {
     _updateRomGuidance(roms) {
         const romDesc = document.getElementById('desc-rom');
         const romBadge = document.getElementById('badge-rom');
-        
+
         if (!roms || roms.length === 0) {
             if (romBadge) {
                 romBadge.textContent = 'Optional';
@@ -591,7 +598,7 @@ const UploadPage = {
             const romHtml = roms.map(r => {
                 const ver = typeof r === 'string' ? r : r.version;
                 let url = typeof r === 'string' ? '' : (r.url || '');
-                
+
                 // Fallback to existing link if we have one for this version
                 if (!url && existingLinks[ver.toLowerCase()]) {
                     url = existingLinks[ver.toLowerCase()];
@@ -604,7 +611,7 @@ const UploadPage = {
             }).join(', ');
             romDesc.innerHTML = `Expected ROMs: <strong>${romHtml}</strong>`;
         }
-        
+
         if (romBadge) {
             romBadge.textContent = 'Required';
             romBadge.className = 'slot-badge required';
@@ -613,7 +620,7 @@ const UploadPage = {
 
     _updateAltcolorGuidance(altcolors) {
         const altDesc = document.getElementById('desc-altcolor');
-        
+
         if (!altcolors || altcolors.length === 0) {
             if (altDesc) altDesc.innerHTML = 'Serum or color files → pinmame/altcolor/';
             return;
@@ -717,7 +724,7 @@ const UploadPage = {
                     </button>`;
             }).join(' ');
             el.innerHTML = `<div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px;">${html}</div>`;
-            
+
             // Add listeners to these new buttons
             el.querySelectorAll('.btn-import-nvram-action').forEach(btn => {
                 btn.onclick = async (e) => {
@@ -767,15 +774,15 @@ const UploadPage = {
 
     _showVbsAutoPatch(url) {
         if (this._state.vbsFile) return; // Don't override user's manual VBS
-        
+
         const slotId = 'vbs';
         const status = document.getElementById(`status-${slotId}`);
         const slot = document.getElementById(`slot-${slotId}`);
         const hint = document.getElementById(`drop-hint-${slotId}`);
-        
+
         // Hide normal text, show banner
         if (hint) hint.style.display = 'none';
-        
+
         const banner = document.createElement('div');
         banner.className = 'vbs-patch-hint';
         banner.style.width = '100%';
@@ -785,11 +792,11 @@ const UploadPage = {
                 <button id="btn-auto-patch" class="btn btn-sm" style="background: var(--accent-amber); color: #000; padding: 6px 12px; font-weight: 600;">Import Patched File</button>
             </div>
         `;
-        
+
         status.innerHTML = '';
         status.appendChild(banner);
         status.classList.add('has-file');
-        
+
         const btn = document.getElementById('btn-auto-patch');
         btn.onclick = async (e) => {
             e.preventDefault();
@@ -815,7 +822,7 @@ const UploadPage = {
 
     _autoPopulateNvram(matchedFiles) {
         if (!matchedFiles || matchedFiles.length === 0) return;
-        
+
         const slotId = 'nvram';
         const fileNames = matchedFiles.join(', ');
         const status = document.getElementById(`status-${slotId}`);
@@ -824,13 +831,13 @@ const UploadPage = {
         const clearBtn = document.getElementById(`clear-${slotId}`);
 
         this._state.nvramFiles = matchedFiles;
-        
+
         status.innerHTML = `<span class="file-slot-check">✓</span> Matched from Repository: <strong>${this._esc(fileNames)}</strong>`;
         status.classList.add('has-file');
         slot.classList.add('has-file');
         if (hint) hint.style.display = 'none';
         if (clearBtn) clearBtn.style.display = 'flex';
-        
+
         this._updateImportButton();
     },
 
@@ -952,10 +959,10 @@ const UploadPage = {
             formData.append('vps_table_url', this._state.vpsTableUrl || '');
             formData.append('ipdb_id', this._state.ipdbId || '');
             formData.append('vpx_file', this._state.vpxFile);
-            
+
             const autoScrape = document.getElementById('import-scrape-media')?.checked;
             formData.append('auto_scrape', autoScrape || false);
-            
+
             if (autoScrape) {
                 progressText.textContent = 'Importing table & searching for media...';
             } else {
@@ -982,10 +989,10 @@ const UploadPage = {
                 if (Array.isArray(this._state.musicFile)) this._state.musicFile.forEach(f => formData.append('music_file', f));
                 else formData.append('music_file', this._state.musicFile);
             }
-            
+
             if (this._state.vbsFile) formData.append('vbs_file', this._state.vbsFile);
             if (this._state.iniFile) formData.append('ini_file', this._state.iniFile);
-            
+
             if (this._state.nvramFiles && this._state.nvramFiles.length > 0) {
                 const repoNames = [];
                 this._state.nvramFiles.forEach(f => {
@@ -1009,15 +1016,15 @@ const UploadPage = {
             if (data.success) {
                 const vpsNote = this._state.vpsId ? ' (VPS matched)' : '';
                 Toast.success(`Table imported: ${data.folder}${vpsNote}`);
-                
+
                 if (data.scraped && data.scraped.downloaded && data.scraped.downloaded.length > 0) {
                     Toast.success(`Successfully downloaded ${data.scraped.downloaded.length} media assets!`);
                 }
-                
+
                 progressText.textContent = 'Import complete! Updating library...';
-                
+
                 // Trigger a table scan refresh
-                fetch('/api/tables/scan', { method: 'POST' }).catch(() => {});
+                fetch('/api/tables/scan', { method: 'POST' }).catch(() => { });
                 setTimeout(() => {
                     overlay.style.display = 'none';
                     this._resetState();
@@ -1059,7 +1066,7 @@ const UploadPage = {
                 fetch(`/api/tables/${tableId}`),
                 fetch(`/api/tables/${tableId}/inventory`)
             ]);
-            
+
             const t = await tableRes.json();
             const invData = await inventoryRes.json();
             const inv = invData.inventory || {};
@@ -1177,7 +1184,7 @@ const UploadPage = {
                     </div>
                 </div>
             `;
-            
+
             document.getElementById('maintenance-content').innerHTML = html;
 
             // Re-init file state
@@ -1247,7 +1254,7 @@ const UploadPage = {
                     e.stopPropagation();
                     const tag = btn.closest('.existing-file-tag');
                     const relPath = tag.dataset.relPath;
-                    
+
                     if (this._state.deletedFiles.includes(relPath)) {
                         this._state.deletedFiles = this._state.deletedFiles.filter(p => p !== relPath);
                         tag.classList.remove('to-delete');
@@ -1324,7 +1331,7 @@ const UploadPage = {
         const btn = document.getElementById('btn-upload-files');
         if (!btn) return;
         const hasAnyStaged = this._state.b2sFile || (this._state.romFiles && this._state.romFiles.length > 0) || this._state.puppackFile ||
-                        this._state.musicFile || this._state.altsoundFile || this._state.altcolorFile || this._state.vpxFile || this._state.vbsFile || this._state.iniFile;
+            this._state.musicFile || this._state.altsoundFile || this._state.altcolorFile || this._state.vpxFile || this._state.vbsFile || this._state.iniFile;
         const hasAnyDeleted = this._state.deletedFiles && this._state.deletedFiles.length > 0;
         btn.disabled = !(hasAnyStaged || hasAnyDeleted);
     },
@@ -1383,9 +1390,9 @@ const UploadPage = {
             }
             Toast.success(`Changes applied successfully`);
             progressText.textContent = 'Done! Updating library...';
-            
+
             // Trigger a table scan refresh
-            fetch('/api/tables/scan', { method: 'POST' }).catch(() => {});
+            fetch('/api/tables/scan', { method: 'POST' }).catch(() => { });
             setTimeout(() => {
                 overlay.style.display = 'none';
                 window.location.hash = '#tables';

@@ -9,59 +9,59 @@ const Onboarding = {
         dragged: false,
         pos: { x: window.innerWidth - 320, y: 80 },
         steps: [
-            { 
-                id: 'vpx', 
-                title: 'Initialize Visual Pinball X', 
+            {
+                id: 'vpx',
+                title: 'Setup Visual Pinball X',
                 desc: 'Install the latest macOS build and run it once to set up your environment.',
                 link: 'https://github.com/vpinball/vpinball/actions',
                 external: true
             },
-            { 
-                id: 'esde', 
-                title: 'Set Up EmulationStation DE', 
-                desc: 'Download ES-DE if you want a frontend experience and run it once to initialize.',
+            {
+                id: 'esde',
+                title: 'Set Up Emulation Station: DE',
+                desc: 'Download ES-DE if you want to use the frontend experience and run it once to initialize.',
                 link: 'https://es-de.org/#Download',
                 external: true
             },
-            { 
-                id: 'settings', 
-                title: 'Configure App Paths', 
-                desc: 'Connect the manager to your VPX and ES-DE folders on the Settings page.',
+            {
+                id: 'settings',
+                title: 'Configure VPX Manager Settings',
+                desc: 'Configure this tool with your VPX and ES-DE folders on the Settings page.',
                 link: '#settings'
             },
-            { 
-                id: 'nvram', 
-                title: 'Sync Essential Assets', 
-                desc: 'Import your existing NVRAM and VBS files using the Tools page.',
+            {
+                id: 'nvram',
+                title: 'Preload Configured NVRAMs',
+                desc: 'Download and import NVRAM files using the Tools page.',
                 link: '#tools'
             },
-            { 
-                id: 'launcher', 
-                title: 'Enable ES-DE Integration', 
-                desc: 'Install the VPX Launcher script from the Tools page.',
+            {
+                id: 'launcher',
+                title: 'Enable ES-DE Integration',
+                desc: 'Install the automated VPX Launcher script from the Tools page.',
                 link: '#tools'
             },
-            { 
-                id: 'scan', 
-                title: 'Scan Table Library', 
-                desc: 'Find your .vpx files and populate the database.',
+            {
+                id: 'scan',
+                title: 'Scan Table Library',
+                desc: 'Find your existing .vpx files and populate the database.',
                 link: '#tables/list'
             },
-            { 
-                id: 'vps', 
-                title: 'Match with VPS', 
+            {
+                id: 'vps',
+                title: 'Match with VPS',
                 desc: 'Connect your tables to the VPS for automated media and metadata.',
                 link: '#tables/list'
             },
-            { 
-                id: 'media', 
-                title: 'Scrape Artwork', 
-                desc: 'Download flyers, backglass images, and wheel art.',
+            {
+                id: 'media',
+                title: 'Scrape Media Files',
+                desc: 'Download videos, backglass images, and wheel art.',
                 link: '#tables/media'
             },
-            { 
-                id: 'play', 
-                title: 'Launch & Play', 
+            {
+                id: 'play',
+                title: 'Launch & Play',
                 desc: 'You\'re all set! Launch a table and enjoy.',
                 link: '#tables/list'
             }
@@ -89,7 +89,7 @@ const Onboarding = {
             this.render();
             this.setupDraggable();
             this.ensureInBounds();
-            
+
             // Handle window resize
             window.addEventListener('resize', () => {
                 this.ensureInBounds();
@@ -160,7 +160,7 @@ const Onboarding = {
         this.render();
         this.setupDraggable();
         this.save();
-        
+
         // Show a success toast if available
         if (window.Toast) {
             Toast.show('Setup Guide restarted!', 'success');
@@ -172,7 +172,7 @@ const Onboarding = {
         if (!el) return;
         const header = el.querySelector('.onboarding-header');
         if (!header) return;
-        
+
         let isDragging = false;
         let startX, startY;
 
@@ -181,16 +181,16 @@ const Onboarding = {
             startX = e.clientX - el.offsetLeft;
             startY = e.clientY - el.offsetTop;
             header.style.cursor = 'grabbing';
-            
+
             const onMouseMove = (e) => {
                 if (!isDragging) return;
                 let x = e.clientX - startX;
                 let y = e.clientY - startY;
-                
+
                 // Constrain to window
                 x = Math.max(0, Math.min(window.innerWidth - el.offsetWidth, x));
                 y = Math.max(0, Math.min(window.innerHeight - el.offsetHeight, y));
-                
+
                 el.style.left = x + 'px';
                 el.style.top = y + 'px';
                 this.state.pos = { x, y };
@@ -227,15 +227,24 @@ const Onboarding = {
 
         el.innerHTML = `
             <div class="onboarding-header">
-                <div class="onboarding-title-group">
+                <div class="onboarding-title-group" onclick="if(Onboarding.state.minimized) Onboarding.minimize()">
                     <span class="onboarding-icon">🚀</span>
-                    <h3>Setup Mission</h3>
+                    <div class="onboarding-text-stack">
+                        <h3>First Run Setup Guide</h3>
+                        ${this.state.minimized ? `<div class="onboarding-mini-progress">${progress}% Complete</div>` : ''}
+                    </div>
                 </div>
                 <div class="onboarding-actions">
-                    <button class="onboarding-btn-min" onclick="Onboarding.minimize()">
-                        ${this.state.minimized ? '▢' : '—'}
+                    <button class="onboarding-btn-min" onclick="Onboarding.minimize()" title="${this.state.minimized ? 'Expand' : 'Minimize'}">
+                        ${this.state.minimized ? `
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                        ` : `
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+                        `}
                     </button>
-                    <button class="onboarding-btn-close" onclick="Onboarding.dismiss()">×</button>
+                    <button class="onboarding-btn-close" onclick="Onboarding.dismiss()" title="Close Guide">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
                 </div>
             </div>
             

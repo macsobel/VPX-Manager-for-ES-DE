@@ -25,7 +25,7 @@ const ManualsPage = {
             <div class="page-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <h1 class="page-title">Game Manuals</h1>
-                    <p class="page-subtitle">Review PDF manuals downloaded from media files</p>
+                    <p class="page-subtitle">Review the game manuals to better understand the deep rulesets</p>
                 </div>
                 <div>
                     <button class="btn btn-primary" id="btn-bulk-download">
@@ -174,9 +174,9 @@ const ManualsPage = {
                     <div class="table-name">${table.display_name}</div>
                 </div>
                 ${table.has_manual
-                    ? '<span class="status-badge status-success">Available</span>'
-                    : '<span class="status-badge status-error">Missing</span>'
-                }
+                ? '<span class="status-badge status-success">Available</span>'
+                : '<span class="status-badge status-error">Missing</span>'
+            }
             </div>
         `).join('');
     },
@@ -247,7 +247,7 @@ const ManualsPage = {
                     </button>
                 `;
             }
-            
+
             contentArea.innerHTML = `
                 <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--space-md);">
                     <div style="background: rgba(79, 140, 255, 0.1); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--accent-blue); margin-bottom: var(--space-md); border: 1px solid rgba(79, 140, 255, 0.2);">
@@ -268,7 +268,7 @@ const ManualsPage = {
         contentArea.innerHTML = '<div class="pdf-loading-overlay"><div class="spinner"></div><span>Loading manual...</span></div>';
 
         document.getElementById('btn-fullscreen')?.addEventListener('click', () => this.toggleFullscreen());
-        
+
         document.getElementById('pdf-zoom-in')?.addEventListener('click', () => {
             if (this.state.zoomLevel < 1.0) {
                 this.state.zoomLevel = Math.min(1.0, this.state.zoomLevel + 0.25);
@@ -290,16 +290,16 @@ const ManualsPage = {
             if (zoomControls) {
                 zoomControls.style.display = document.fullscreenElement ? 'flex' : 'none';
             }
-            
+
             // Update button label
             const fsBtn = document.getElementById('btn-fullscreen');
             if (fsBtn) {
                 const isFs = !!document.fullscreenElement;
                 fsBtn.innerHTML = `
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        ${isFs 
-                            ? '<path d="M4 14h6m0 0v6m0-6L3 21M20 10h-6m0 0V4m0 4l7-7"></path>' 
-                            : '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>'}
+                        ${isFs
+                        ? '<path d="M4 14h6m0 0v6m0-6L3 21M20 10h-6m0 0V4m0 4l7-7"></path>'
+                        : '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>'}
                     </svg>
                     ${isFs ? 'Exit Fullscreen' : 'Fullscreen'}
                 `;
@@ -328,14 +328,14 @@ const ManualsPage = {
 
     async renderAllPages() {
         const contentArea = document.getElementById('manual-content-area');
-        
+
         // Save relative scroll position to avoid jumping to top
         const scrollPercent = contentArea.scrollHeight > 0 ? contentArea.scrollTop / contentArea.scrollHeight : 0;
 
         contentArea.innerHTML = ''; // Clear container
 
         const containerWidth = contentArea.clientWidth - 40; // Spacing
-        
+
         // Update zoom percentage label and button states
         const zoomLabel = document.getElementById('zoom-percent');
         if (zoomLabel) zoomLabel.textContent = `${Math.round(this.state.zoomLevel * 100)}%`;
@@ -345,7 +345,7 @@ const ManualsPage = {
             zoomInBtn.disabled = this.state.zoomLevel >= 1.0;
             zoomInBtn.style.opacity = this.state.zoomLevel >= 1.0 ? '0.5' : '1';
         }
-        
+
         const zoomOutBtn = document.getElementById('pdf-zoom-out');
         if (zoomOutBtn) {
             zoomOutBtn.disabled = this.state.zoomLevel <= 0.25;
@@ -354,7 +354,7 @@ const ManualsPage = {
 
         for (let i = 1; i <= this.state.pdfDoc.numPages; i++) {
             const page = await this.state.pdfDoc.getPage(i);
-            
+
             // Calculate scale to fit width, then apply zoomLevel
             const unscaledViewport = page.getViewport({ scale: 1 });
             const fitScale = containerWidth / unscaledViewport.width;
@@ -484,11 +484,11 @@ const ManualsPage = {
 
             if (data.batch.running) {
                 if (progressContainer) progressContainer.style.display = 'block';
-                
+
                 const percentage = data.batch.total > 0 ? (data.batch.completed / data.batch.total) * 100 : 0;
                 if (progressBar) progressBar.style.width = `${percentage}%`;
                 if (statusLabel) {
-                    statusLabel.innerText = data.batch.total > 0 
+                    statusLabel.innerText = data.batch.total > 0
                         ? `${data.batch.current_table} (${data.batch.completed}/${data.batch.total})`
                         : data.batch.current_table;
                 }

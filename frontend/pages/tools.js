@@ -8,7 +8,7 @@ const ToolsPage = {
         container.innerHTML = `
             <div class="page-header">
                 <h1 class="page-title">Tools</h1>
-                <p class="page-subtitle">Maintenance and management tools for your VPin installation</p>
+                <p class="page-subtitle">Maintenance and tools for your Visual Pinball installation</p>
             </div>
 
             <div class="settings-grid">
@@ -27,7 +27,7 @@ const ToolsPage = {
                     <div class="card">
                         <div class="card-body">
                             <p style="color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5; font-size: 0.9rem;">
-                                Extract, edit, and patch VBScript files for your tables. Includes a code editor and automated quick-fixes.
+                                Extract, edit, and patch VBScript files for your tables. Includes a code editor and automatically identify and download patched VBS files.
                             </p>
                             <button class="btn btn-primary" onclick="window.location.hash = 'vbs-manager'">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -81,7 +81,7 @@ const ToolsPage = {
                         <div class="card-body">
                             <p style="color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5; font-size: 0.9rem;">
                                 This tool helps users import and store pre-initialized NVRAM files in a master repository.
-                                By using these files during table import, you can prevent "Factory Settings Restored" errors on first boot.
+                                Certain Bally MPU and Gottlieb System 3 VPM tables require pre-initialized NVRAM files.
                             </p>
                             <button class="btn btn-primary" onclick="ToolsPage.openNvramManager()">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -106,7 +106,7 @@ const ToolsPage = {
                     <div class="card">
                         <div class="card-body">
                             <p style="color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5; font-size: 0.9rem;">
-                                Automates the creation of a focus-aware launcher script and configures ES-DE to return focus to the menu after a table closes.
+                                Automate the configuration of ES-DE to launch VPX tables and return focus to ES-DE after the table closes.
                             </p>
                             <button class="btn btn-primary" id="btn-apply-esde">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -279,11 +279,11 @@ const ToolsPage = {
         const list = document.getElementById('nvram-file-list');
         const count = document.getElementById('nvram-count');
         const btnInstall = document.getElementById('btn-install-nvrams');
-        
+
         if (!list) return;
 
         count.textContent = `${this.nvramFiles.length} file${this.nvramFiles.length === 1 ? '' : 's'}`;
-        
+
         if (btnInstall) {
             btnInstall.disabled = this.nvramFiles.length === 0;
             // Optionally change style if disabled
@@ -337,7 +337,7 @@ const ToolsPage = {
         const originalContent = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<div class="spinner" style="width: 16px; height: 16px; margin-bottom: 0.25rem;"></div> Installing...';
-        
+
         try {
             const res = await fetch('/api/tools/nvram/install', { method: 'POST' });
             const data = await res.json();
