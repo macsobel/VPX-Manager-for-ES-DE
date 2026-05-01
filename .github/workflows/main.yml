@@ -1,0 +1,106 @@
+name: Build macOS App
+
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish a new release?'
+        required: true
+        type: boolean
+        default: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-15-intel
+            arch: x86_64
+            display_name: macOS_Intel
+          - os: macos-14
+            arch: arm64
+            display_name: macOS_Apple_Silicon
+          - os: ubuntu-22.04
+            arch: x86_64
+            display_name: Linux_x86_64
+          - os: ubuntu-22.04-arm
+            arch: aarch64
+            display_name: Linux_aarch64
+
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install Linux Dependencies
+      if: startsWith(matrix.os, 'ubuntu')
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libfuse2 binutils zip
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        
+    - name: Generate Obfuscated Config and Version
+      env:
+        SS_DEV_ID: ${{ secrets.SS_DEV_ID }}
+        SS_DEVPASS: ${{ secrets.SS_DEVPASS }}
+      run: |
+        python3 scripts/build/build_utils.py
+        
+    - name: Build macOS App
+      if: startsWith(matrix.os, 'macos')
+      run: |
+        chmod +x scripts/build/build_app.sh
+        ./scripts/build/build_app.sh
+        cd dist
+        zip -r "VPX_Manager_${{ matrix.display_name }}.zip" "VPX Manager for ES-DE.app"
+
+    - name: Build Linux AppImage
+      if: startsWith(matrix.os, 'ubuntu')
+      run: |
+        chmod +x scripts/build/build_app.sh
+        ./scripts/build/build_app.sh
+        cd dist
+        # zip the AppImage
+        zip -j "VPX_Manager_${{ matrix.display_name }}.zip" "VPX_Manager-${{ matrix.arch }}.AppImage"
+        
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VPX_Manager_${{ matrix.display_name }}
+        path: dist/VPX_Manager_${{ matrix.display_name }}.zip
+        
+    - name: Get version
+      id: get_version
+      run: |
+        VERSION=$(cat backend/core/version.txt | xargs)
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Create or Update Release
+      if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/VPX_Manager_*.zip
+        tag_name: v${{ steps.get_version.outputs.version }}
+        name: v${{ steps.get_version.outputs.version }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

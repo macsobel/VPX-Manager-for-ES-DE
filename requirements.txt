@@ -1,0 +1,19 @@
+fastapi
+uvicorn[standard]
+python-multipart
+httpx
+pydantic
+pydantic-settings
+aiosqlite
+Pillow
+olefile
+setproctitle
+py7zr
+rarfile
+patool
+rumps; sys_platform == "darwin"
+pystray; sys_platform == "linux"
+imageio-ffmpeg
+pygame
+jaraco.text
+platformdirs
