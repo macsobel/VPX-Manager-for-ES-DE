@@ -23,6 +23,25 @@ const SettingsPage = {
                 </div>
             </div>
 
+            <div class="settings-section">
+                <div class="settings-section-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    Media Download Preferences
+                </div>
+                <div class="card" style="cursor: pointer;" onclick="window.location.hash = 'media-preferences'">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: var(--space-lg);">
+                        <div style="flex: 1;">
+                            <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.6; margin: 0;">
+                                Choose which media types to download when scraping table artwork. You can enable or disable individual types like wheel images, backglasses, table videos, and more.
+                            </p>
+                        </div>
+                        <button class="btn btn-primary" onclick="event.stopPropagation(); window.location.hash = 'media-preferences'" style="flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                            Configure Media Types
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             <div class="settings-section">
                 <div class="settings-section-title">
@@ -47,10 +66,6 @@ const SettingsPage = {
                     <button class="btn btn-secondary" id="btn-sync-vps">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
                         Sync VPS Database
-                    </button>
-                    <button class="btn btn-secondary" id="btn-media-preferences" onclick="window.location.hash = 'media-preferences'">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                        Media Download Preferences
                     </button>
                     <button class="btn btn-secondary" id="btn-check-updates">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
@@ -336,44 +351,72 @@ const SettingsPage = {
             const res = await fetch('/api/system/status');
             const info = await res.json();
 
+            const fmtSize = (mb) => mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
+
+            const diskUsedPct = Math.round((info.storage.disk_used_gb / info.storage.disk_total_gb) * 100);
+            const barColor = diskUsedPct > 90 ? 'var(--accent-red)' : diskUsedPct > 75 ? 'var(--accent-amber)' : 'var(--accent-blue)';
+
+            const swCheck = (sw) => {
+                const ok = sw.exists;
+                return `
+                    <div style="display: flex; align-items: center; gap: 8px; padding: 6px 0;">
+                        <span style="color: ${ok ? 'var(--accent-emerald)' : 'var(--accent-red)'}; font-size: 1rem;">${ok ? '✓' : '✗'}</span>
+                        <div>
+                            <div style="color: var(--text-secondary); font-weight: 500;">${sw.label}</div>
+                            ${!ok ? `<div style="font-size: 0.72rem; color: var(--text-muted); word-break: break-all; margin-top: 1px;">Not found at: ${sw.path}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            };
+
             document.getElementById('system-status-card').innerHTML = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-xl);">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-xl);">
                     <div>
-                        <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm); font-size: 0.85rem;">Files on Disk</div>
-                        <div style="display: grid; gap: var(--space-xs); font-size: 0.85rem; color: var(--text-tertiary);">
-                            <div><span style="font-weight: 600; color: var(--text-primary); font-size: 1.1rem;">${info.counts.vpx_files}</span> VPX tables</div>
-                            <div><span style="font-weight: 600; color: var(--text-primary); font-size: 1.1rem;">${info.counts.b2s_files}</span> Backglass files</div>
-                            <div><span style="font-weight: 600; color: var(--text-primary); font-size: 1.1rem;">${info.counts.rom_files}</span> ROM files</div>
-                            <div><span style="font-weight: 600; color: var(--text-primary); font-size: 1.1rem;">${info.counts.media_files}</span> Media files</div>
-                            <div><span style="font-weight: 600; color: var(--text-primary); font-size: 1.1rem;">${info.counts.db_tables}</span> in database</div>
+                        <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-md); font-size: 0.85rem;">Storage</div>
+                        <div style="display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 0.85rem; align-items: baseline;">
+                            <span style="color: var(--text-muted);">Tables</span>
+                            <span style="color: var(--text-primary); font-weight: 600;">${fmtSize(info.storage.tables_size_mb)}</span>
+                            <span style="color: var(--text-muted);">Media</span>
+                            <span style="color: var(--text-primary); font-weight: 600;">${fmtSize(info.storage.media_size_mb)}</span>
+                        </div>
+                        <div style="margin-top: var(--space-md);">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">
+                                <span>Disk Usage</span>
+                                <span>${info.storage.disk_used_gb} / ${info.storage.disk_total_gb} GB (${diskUsedPct}%)</span>
+                            </div>
+                            <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden;">
+                                <div style="width: ${diskUsedPct}%; height: 100%; background: ${barColor}; border-radius: 3px; transition: width 0.4s ease;"></div>
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">${info.storage.disk_free_gb} GB free</div>
                         </div>
                     </div>
                     <div>
-                        <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm); font-size: 0.85rem;">Storage</div>
-                        <div style="display: grid; gap: var(--space-xs); font-size: 0.85rem; color: var(--text-tertiary);">
-                            <div>Tables: <strong style="color: var(--text-primary);">${info.storage.tables_size_mb} MB</strong></div>
-                            <div>Disk Total: <strong style="color: var(--text-primary);">${info.storage.disk_total_gb} GB</strong></div>
-                            <div>Disk Free: <strong style="color: var(--text-primary);">${info.storage.disk_free_gb} GB</strong></div>
+                        <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-md); font-size: 0.85rem;">Software</div>
+                        <div style="display: grid; gap: 2px;">
+                            ${swCheck(info.software.vpx)}
+                            ${swCheck(info.software.esde)}
                         </div>
                     </div>
                     <div>
-                        <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm); font-size: 0.85rem;">Directories</div>
-                        <div style="display: grid; gap: var(--space-xs); font-size: 0.85rem;">
-                            <div class="dir-status ${info.directories.tables_dir.exists ? 'exists' : 'missing'}">
-                                ${info.directories.tables_dir.exists ? '✓' : '✗'} Tables
-                            </div>
-                            <div class="dir-status ${info.directories.support_dir.exists ? 'exists' : 'missing'}">
-                                ${info.directories.support_dir.exists ? '✓' : '✗'} Internal Data
-                            </div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: var(--space-sm);">
-                                Version: <strong style="color: var(--text-secondary);">${info.version || '2.0.0'}</strong>
-                            </div>
+                        <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-md); font-size: 0.85rem;">Library</div>
+                        <div style="display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 0.85rem; align-items: baseline;">
+                            <span style="color: var(--text-primary); font-weight: 700; font-size: 1.05rem;">${info.counts.vpx_files}</span>
+                            <span style="color: var(--text-muted);">VPX tables</span>
+                            <span style="color: var(--text-primary); font-weight: 700; font-size: 1.05rem;">${info.counts.b2s_files}</span>
+                            <span style="color: var(--text-muted);">Backglass files</span>
+                            <span style="color: var(--text-primary); font-weight: 700; font-size: 1.05rem;">${info.counts.rom_files}</span>
+                            <span style="color: var(--text-muted);">ROM files</span>
+                            <span style="color: var(--text-primary); font-weight: 700; font-size: 1.05rem;">${info.counts.media_files}</span>
+                            <span style="color: var(--text-muted);">Media files</span>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: var(--space-md); padding-top: var(--space-sm); border-top: 1px solid var(--border-subtle);">
+                            Version <strong style="color: var(--text-secondary);">${info.version || '—'}</strong> · ${info.platform === 'darwin' ? 'macOS' : info.platform}
                         </div>
                     </div>
                 </div>
             `;
         } catch (e) {
-            document.getElementById('system-status-card').innerHTML = `<span style="color: var(--accent-red);">Failed to load</span>`;
+            document.getElementById('system-status-card').innerHTML = `<span style="color: var(--accent-red);">Failed to load system status</span>`;
         }
     },
 
