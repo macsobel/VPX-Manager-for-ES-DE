@@ -140,22 +140,46 @@ const DashboardPage = {
 
             const fmtSize = (mb) => mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
 
-            // Count updates using the same logic as the tables page
+            // Local robust version compare to ensure consistency
+            const isNewer = (vLatest, vCurrent, vIgnored) => {
+                if (!vLatest || !vCurrent) return false;
+                const norm = (v) => String(v || "").trim().toLowerCase();
+                const l = norm(vLatest);
+                const c = norm(vCurrent);
+                const i = norm(vIgnored);
+                
+                // Use global versionsAreEqual if available, else basic normalized compare
+                const isEqual = window.versionsAreEqual || ((a, b) => a === b);
+                
+                if (l === "" || c === "") return false;
+                if (isEqual(l, c)) return false;
+                if (i !== "" && isEqual(l, i)) return false;
+                return true;
+            };
+
             let updatesCount = 0;
             for (const t of tables) {
-                const hasDirect = t.latest_vps_version && t.version
-                    && !versionsAreEqual(t.latest_vps_version, t.version)
-                    && !versionsAreEqual(t.latest_vps_version, t.ignored_version);
-                const hasCommunity = t.is_community_newer
-                    && t.community_vps_version && t.version
-                    && !versionsAreEqual(t.community_vps_version, t.version)
-                    && !versionsAreEqual(t.community_vps_version, t.ignored_version);
-                if (hasDirect || hasCommunity) updatesCount++;
+                // Check direct updates
+                const hasDirect = isNewer(t.latest_vps_version, t.version, t.ignored_version);
+                
+                // Check community updates
+                const hasCommunity = t.is_community_newer && 
+                                   isNewer(t.community_vps_version, t.version, t.ignored_version);
+                
+                if (hasDirect || hasCommunity) {
+                    updatesCount++;
+                }
             }
 
             const updatesHtml = updatesCount > 0
-                ? `<a href="#tables" style="color: var(--accent-amber); font-weight: 600; text-decoration: none;">${updatesCount} table update${updatesCount === 1 ? '' : 's'} available</a>`
-                : `<div style="color: var(--accent-emerald);">All tables up to date</div>`;
+                ? `<a href="#tables" style="color: var(--accent-amber); font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    ${updatesCount} table update${updatesCount === 1 ? '' : 's'} available
+                   </a>`
+                : `<div style="color: var(--accent-emerald); display: flex; align-items: center; gap: 6px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                    All tables up to date
+                   </div>`;
 
             const softwareCheck = (sw) => {
                 const icon = sw.exists
@@ -171,23 +195,31 @@ const DashboardPage = {
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-lg);">
                     <div>
                         <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm);">Storage</div>
-                        <div>Tables: ${fmtSize(info.storage.tables_size_mb)}</div>
-                        <div>Media: ${fmtSize(info.storage.media_size_mb)}</div>
-                        <div>Disk Free: ${info.storage.disk_free_gb} GB</div>
+                        <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; font-size: 0.9rem;">
+                            <span style="color: var(--text-tertiary);">Tables:</span>
+                            <span style="color: var(--text-secondary); font-weight: 500;">${fmtSize(info.storage.tables_size_mb)}</span>
+                            <span style="color: var(--text-tertiary);">Media:</span>
+                            <span style="color: var(--text-secondary); font-weight: 500;">${fmtSize(info.storage.media_size_mb)}</span>
+                            <span style="color: var(--text-tertiary);">Disk Free:</span>
+                            <span style="color: var(--text-secondary); font-weight: 500;">${info.storage.disk_free_gb} GB</span>
+                        </div>
                     </div>
                     <div>
                         <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm);">Updates</div>
-                        ${updatesHtml}
+                        <div style="font-size: 0.9rem;">${updatesHtml}</div>
                     </div>
                     <div>
                         <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm);">Software</div>
-                        ${softwareCheck(info.software.vpx)}
-                        ${softwareCheck(info.software.esde)}
+                        <div style="font-size: 0.9rem; display: grid; gap: 8px;">
+                            ${softwareCheck(info.software.vpx)}
+                            ${softwareCheck(info.software.esde)}
+                        </div>
                     </div>
                 </div>
             `;
         } catch (e) {
             document.getElementById('system-info').innerHTML = `<span style="color: var(--accent-red);">Could not load system info</span>`;
+            console.error('Dashboard load error:', e);
         }
     },
 

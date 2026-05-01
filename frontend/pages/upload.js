@@ -25,7 +25,7 @@ const UploadPage = {
         container.innerHTML = `
             <div class="page-header">
                 <h1 class="page-title">Add New Table</h1>
-                <p class="page-subtitle">Add a new table with all its associated files — each slot guides files to the correct folder</p>
+                <p class="page-subtitle">Add a new table with all its associated files. Each slot guides files to the correct folder</p>
             </div>
 
             <div class="import-form">
