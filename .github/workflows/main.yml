@@ -55,6 +55,8 @@ jobs:
       env:
         SS_DEV_ID: ${{ secrets.SS_DEV_ID }}
         SS_DEVPASS: ${{ secrets.SS_DEVPASS }}
+        SS_USER: ${{ secrets.SS_USER }}
+        SS_PASS: ${{ secrets.SS_PASS }}
       run: |
         python3 scripts/build/build_utils.py
         
@@ -63,6 +65,8 @@ jobs:
       env:
         SS_DEV_ID: ${{ secrets.SS_DEV_ID }}
         SS_DEVPASS: ${{ secrets.SS_DEVPASS }}
+        SS_USER: ${{ secrets.SS_USER }}
+        SS_PASS: ${{ secrets.SS_PASS }}
       run: |
         chmod +x scripts/build/build_app.sh
         ./scripts/build/build_app.sh

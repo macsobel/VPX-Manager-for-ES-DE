@@ -311,11 +311,8 @@ def load_config() -> AppConfig:
 
     # 2. Check for obfuscated baked-in credentials
     if getattr(sys, "frozen", False):
-        # 1. Try next to executable (Standard for COLLECT/BUNDLE)
-        dat_path = Path(sys.executable).parent / "config.dat"
-        # 2. Try Resources folder (macOS standard)
-        if not dat_path.exists():
-            dat_path = Path(sys.executable).parent.parent / "Resources" / "config.dat"
+        # PyInstaller bundles files in sys._MEIPASS
+        dat_path = Path(sys._MEIPASS) / "config.dat"
     else:
         # Running from source - project root
         dat_path = Path(__file__).resolve().parent.parent.parent / "config.dat"
