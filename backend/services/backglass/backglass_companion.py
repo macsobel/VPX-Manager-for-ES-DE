@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+"""
+Backglass Companion — displays backglass art on a secondary monitor.
+
+Uses native macOS Cocoa (PyObjC) instead of Pygame/SDL2 to completely avoid
+IOHIDManager corruption that causes ES-DE to segfault on relaunch.
+Falls back to Pygame on Linux.
+"""
 import os
 import sys
 import time
@@ -6,10 +13,8 @@ import queue
 import tempfile
 import threading
 import platform
-import subprocess
 from pathlib import Path
 
-import pygame
 import logging
 
 # Configure logging
@@ -25,7 +30,6 @@ logger = logging.getLogger("backglass_companion")
 
 if platform.system() == "Linux":
     ESDE_DIR = Path(os.path.expanduser("~/.emulationstation"))
-    # Check if ~/ROMs/vpinball exists, otherwise fallback to ~/.emulationstation/roms/vpinball
     TABLES_DIR = Path(os.path.expanduser("~/ROMs/vpinball"))
     if not TABLES_DIR.exists():
         TABLES_DIR = ESDE_DIR / "roms" / "vpinball"
@@ -37,9 +41,7 @@ MEDIA_DIR      = ESDE_DIR / "downloaded_media" / "vpinball"
 COVERS_DIR     = MEDIA_DIR / "covers"
 FANART_DIR     = MEDIA_DIR / "fanart"
 CACHE_DIR      = Path(tempfile.gettempdir()) / "vpx_backglass_companion"
-FADE_DURATION  = 0.25   # seconds for crossfade
 BG_COLOR       = (0, 0, 0)
-POLL_INTERVAL  = 0.05   # 50ms for turbo-polling
 
 DEFAULT_BG     = Path(__file__).parent / "default_bg.png"
 
@@ -47,12 +49,11 @@ DEFAULT_BG     = Path(__file__).parent / "default_bg.png"
 # Backglass resolver — finds the best image for a detected game name
 # ─────────────────────────────────────────────────────────────────────────────
 
-def find_backglass(game_name: str, priority_list: list[str]) -> Path:
+def find_backglass(game_name: str, priority_list: list) -> Path:
     """
     Search priority based on user settings.
     Default order is usually: fanart, covers, logos, marquees
     """
-    # Map friendly names to directory objects
     dir_map = {
         "covers": COVERS_DIR,
         "fanart": FANART_DIR,
@@ -69,11 +70,10 @@ def find_backglass(game_name: str, priority_list: list[str]) -> Path:
             if f.exists():
                 return f
 
-    # Final Default fallback
     return DEFAULT_BG
 
 # ─────────────────────────────────────────────────────────────────────────────
-# High-Speed lsof Sniffer
+# Native Cocoa Display (macOS) — zero SDL2 involvement
 # ─────────────────────────────────────────────────────────────────────────────
 
 class BackglassCompanion:
@@ -85,7 +85,6 @@ class BackglassCompanion:
 
     def stdin_reader(self):
         """Read game names from standard input sent by the monitor service."""
-        import sys
         logger.info("📡 Companion stdin listener started.")
         while True:
             try:
@@ -110,83 +109,159 @@ class BackglassCompanion:
                 time.sleep(1)
 
     def run(self):
-        # 1. Run display on main thread (required for SDL2/macOS)
         try:
-            self.run_display()
+            if platform.system() == "Darwin":
+                self.run_display_cocoa()
+            else:
+                self.run_display_pygame()
         except KeyboardInterrupt:
             pass
         finally:
             print("\n👋  Shutting down...")
 
-    def run_display(self):
+    def run_display_cocoa(self):
+        """Native macOS Cocoa display — no SDL2, no HID corruption."""
         try:
-            logger.info("Initializing Pygame...")
-            # Completely disable SDL's HID/joystick layer BEFORE any init.
-            # Without this, SDL2 registers IOHIDManager callbacks that corrupt
-            # shared HID state, causing ES-DE to segfault on its next launch.
-            os.environ["SDL_JOYSTICK_DISABLED"] = "1"
-            os.environ["SDL_HINT_JOYSTICK_HIDAPI"] = "0"
-            os.environ["SDL_HINT_NO_SIGNAL_HANDLERS"] = "1"
+            from AppKit import (
+                NSApplication, NSWindow, NSImageView, NSImage, NSScreen,
+                NSBorderlessWindowMask, NSBackingStoreBuffered,
+                NSApplicationActivationPolicyProhibited,
+                NSImageScaleProportionallyUpOrDown, NSCompositingOperationCopy,
+                NSColor, NSApp
+            )
+            from Foundation import NSMakeRect, NSTimer, NSRunLoop, NSDefaultRunLoopMode
+            from PIL import Image
+            import io
+        except ImportError as e:
+            logger.error(f"PyObjC not available: {e}. Falling back to pygame.")
+            self.run_display_pygame()
+            return
+
+        logger.info("Initializing Cocoa display...")
+
+        # Initialize the NSApplication
+        app = NSApplication.sharedApplication()
+        app.setActivationPolicy_(NSApplicationActivationPolicyProhibited)
+
+        # Get the target screen
+        screens = NSScreen.screens()
+        idx = self.screen_index if self.screen_index < len(screens) else 0
+        target_screen = screens[idx]
+        frame = target_screen.frame()
+        W = int(frame.size.width)
+        H = int(frame.size.height)
+        
+        logger.info(f"Target display {idx}: {W}x{H} at ({int(frame.origin.x)},{int(frame.origin.y)})")
+
+        # Create borderless fullscreen window on the target screen
+        window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_screen_(
+            frame,
+            NSBorderlessWindowMask,
+            NSBackingStoreBuffered,
+            False,
+            target_screen
+        )
+        window.setLevel_(0)  # Normal level - below ES-DE
+        window.setBackgroundColor_(NSColor.blackColor())
+        window.setCollectionBehavior_(1 << 0)  # NSWindowCollectionBehaviorCanJoinAllSpaces
+
+        # Create image view
+        image_view = NSImageView.alloc().initWithFrame_(NSMakeRect(0, 0, W, H))
+        image_view.setImageScaling_(NSImageScaleProportionallyUpOrDown)
+        window.contentView().addSubview_(image_view)
+
+        window.orderFront_(None)
+        window.makeKeyAndOrderFront_(None)
+        
+        logger.info(f"✅ Backglass display active on screen {idx} ({W}×{H}) using Cocoa")
+
+        # Helper: load image and display it
+        def load_and_display(path):
+            try:
+                # Use Pillow to load and scale the image, then convert to NSImage
+                img = Image.open(str(path))
+                iw, ih = img.size
+                scale = min(W / iw, H / ih)
+                nw, nh = int(iw * scale), int(ih * scale)
+                img = img.resize((nw, nh), Image.LANCZOS)
+
+                # Create black background
+                bg = Image.new('RGB', (W, H), (0, 0, 0))
+                bg.paste(img, ((W - nw) // 2, (H - nh) // 2))
+
+                # Convert PIL image to TIFF data then NSImage
+                buf = io.BytesIO()
+                bg.save(buf, format='TIFF')
+                tiff_data = buf.getvalue()
+                
+                from Foundation import NSData
+                ns_data = NSData.dataWithBytes_length_(tiff_data, len(tiff_data))
+                ns_image = NSImage.alloc().initWithData_(ns_data)
+                
+                if ns_image:
+                    image_view.setImage_(ns_image)
+                    
+            except Exception as e:
+                logger.error(f"Failed to load image {path}: {e}")
+
+        # Start stdin listener
+        reader_thread = threading.Thread(target=self.stdin_reader, daemon=True)
+        reader_thread.start()
+
+        # Timer to check the queue (runs on the main run loop)
+        def check_queue():
+            try:
+                img_path = self.display_queue.get_nowait()
+                load_and_display(img_path)
+            except queue.Empty:
+                pass
+            except Exception as e:
+                logger.error(f"Queue error: {e}")
+
+        class QueueChecker:
+            @staticmethod
+            def fire_(timer):
+                check_queue()
+
+        # Create a repeating timer on the main run loop
+        timer = NSTimer.timerWithTimeInterval_target_selector_userInfo_repeats_(
+            0.05,  # 50ms
+            QueueChecker,
+            'fire:',
+            None,
+            True
+        )
+        NSRunLoop.currentRunLoop().addTimer_forMode_(timer, NSDefaultRunLoopMode)
+
+        # Run the application event loop
+        try:
+            app.run()
+        except Exception as e:
+            logger.error(f"Cocoa run loop error: {e}")
+
+    def run_display_pygame(self):
+        """Fallback for Linux — uses Pygame/SDL2."""
+        try:
+            import pygame
             
-            # Only init the subsystems we actually need (display + font)
+            logger.info("Initializing Pygame (Linux fallback)...")
             pygame.display.init()
             pygame.font.init()
-            logger.info("Pygame initialized (display + font only, HID disabled).")
-            
-            # On macOS, native fullscreen (0,0) can segfault on secondary monitors.
-            # We try to get explicit dimensions first.
+
             try:
                 desktop_sizes = pygame.display.get_desktop_sizes()
                 num_displays = len(desktop_sizes)
                 idx = self.screen_index if self.screen_index < num_displays else 0
                 W, H = desktop_sizes[idx]
-                logger.info(f"Target display {idx} resolution: {W}x{H}")
-            except Exception as e:
-                logger.warning(f"Could not get desktop sizes: {e}")
+            except Exception:
                 idx = 0
                 W, H = 800, 600
 
-            # Try multiple flag combinations for stability
-            attempt_modes = [
-                # 1. Borderless Window (Most stable on macOS secondaries)
-                (W, H, pygame.NOFRAME),
-                # 2. Standard Window fallback
-                (W, H, 0),
-                # 3. Fullscreen Scaled
-                (W, H, pygame.FULLSCREEN | pygame.SCALED),
-            ]
-            
-            screen = None
-            for w, h, flags in attempt_modes:
-                try:
-                    mode_name = "FULLSCREEN" if flags & pygame.FULLSCREEN else "WINDOWED"
-                    if flags & pygame.NOFRAME: mode_name = "BORDERLESS"
-                    if flags & pygame.SCALED: mode_name += " | SCALED"
-                    
-                    logger.info(f"Attempting {mode_name} at {w}x{h} on display {idx}...")
-                    screen = pygame.display.set_mode((w, h), flags, display=idx)
-                    
-                    if screen:
-                        W, H = screen.get_size()
-                        logger.info(f"✅ Backglass display active on screen {idx} ({W}×{H}) using {mode_name}")
-                        break
-                except Exception as e:
-                    logger.warning(f"Mode {mode_name} failed: {e}")
-
-            if not screen:
-                logger.error("Failed to initialize any display mode.")
-                return
-
-            # Mouse visibility changes on macOS secondary monitors can cause segfaults in SDL2.
-            # We skip hiding the mouse cursor to ensure stability.
-    
+            screen = pygame.display.set_mode((W, H), pygame.NOFRAME, display=idx)
             clock = pygame.time.Clock()
             current_surf = pygame.Surface((W, H))
             current_surf.fill(BG_COLOR)
-            next_surf = None
-            fade_step = 0
-            fade_steps = max(1, int(FADE_DURATION * 60))
-    
+
             def load_img(path):
                 try:
                     raw = pygame.image.load(str(path))
@@ -201,8 +276,7 @@ class BackglassCompanion:
                 except Exception as e:
                     logger.error(f"Failed to load image {path}: {e}")
                     return current_surf
-    
-            # Start stdin listener
+
             reader_thread = threading.Thread(target=self.stdin_reader, daemon=True)
             reader_thread.start()
 
@@ -211,40 +285,23 @@ class BackglassCompanion:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                         running = False
-    
+
                 try:
                     img_path = self.display_queue.get_nowait()
-                    next_surf = load_img(img_path)
-                    fade_step = 0
+                    current_surf = load_img(img_path)
                 except queue.Empty:
                     pass
-                except Exception as e:
-                    logger.error(f"Queue error: {e}")
-    
-                if next_surf:
-                    fade_step += 1
-                    alpha = int((fade_step / fade_steps) * 255)
-                    next_surf.set_alpha(min(alpha, 255))
-                    screen.blit(current_surf, (0, 0))
-                    screen.blit(next_surf, (0, 0))
-                    if fade_step >= fade_steps:
-                        current_surf = next_surf.copy()
-                        current_surf.set_alpha(255)
-                        next_surf = None
-                else:
-                    screen.blit(current_surf, (0, 0))
-    
+
+                screen.blit(current_surf, (0, 0))
                 pygame.display.flip()
-                clock.tick(60)
+                clock.tick(30)
             pygame.quit()
         except Exception as e:
-            logger.error(f"Fatal error in display thread: {e}")
-            pygame.quit()
+            logger.error(f"Pygame display error: {e}")
 
 
 if __name__ == "__main__":
     s_idx = int(sys.argv[1]) if len(sys.argv) > 1 else 1
-    # Priority passed as comma-separated list: fanart,covers,logos,marquees
     priority = sys.argv[2].split(',') if len(sys.argv) > 2 else ["fanart", "covers", "logos", "marquees"]
     
     companion = BackglassCompanion(screen_index=s_idx)
