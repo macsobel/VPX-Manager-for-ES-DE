@@ -14,34 +14,38 @@ class BackglassSettings(BaseModel):
     priority: list[str]
     display_count: int = 1
 
+def get_display_count():
+    """Safely get the number of connected displays without crashing the main thread on macOS."""
+    import sys
+    if sys.platform == "darwin":
+        try:
+            import subprocess
+            # Query system_profiler for the number of resolutions detected (one per active display)
+            output = subprocess.check_output(["system_profiler", "SPDisplaysDataType"], timeout=2).decode()
+            count = output.count("Resolution:")
+            return max(1, count)
+        except:
+            return 1
+    else:
+        try:
+            import pygame
+            if not pygame.display.get_init():
+                pygame.display.init()
+            count = pygame.display.get_num_displays()
+            pygame.display.quit()
+            return count
+        except:
+            return 1
+
 @router.get("/settings", response_model=BackglassSettings)
 async def get_settings():
-    try:
-        import pygame
-        # Use only display init to avoid broken font module and thread issues on macOS
-        if not pygame.display.get_init():
-            pygame.display.init()
-        
-        count = pygame.display.get_num_displays()
-        # On some macOS setups, keeping display initialized in a background thread 
-        # can cause issues, so we quit it immediately after getting the count.
-        pygame.display.quit()
-        
-        return BackglassSettings(
-            enabled=config.backglass_enabled,
-            screen_index=config.backglass_screen_index,
-            priority=config.backglass_priority,
-            display_count=count
-        )
-    except Exception as e:
-        # Fallback if pygame display init fails (e.g. headless or permission issues)
-        print(f"Display detection failed: {e}")
-        return BackglassSettings(
-            enabled=config.backglass_enabled,
-            screen_index=config.backglass_screen_index,
-            priority=config.backglass_priority,
-            display_count=1
-        )
+    # Never import or use pygame here on macOS as it crashes the Uvicorn thread
+    return BackglassSettings(
+        enabled=config.backglass_enabled,
+        screen_index=config.backglass_screen_index,
+        priority=config.backglass_priority,
+        display_count=get_display_count()
+    )
 
 @router.post("/settings")
 async def update_settings(settings: BackglassSettings):
