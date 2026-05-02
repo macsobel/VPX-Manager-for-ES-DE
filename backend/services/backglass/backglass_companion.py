@@ -223,11 +223,8 @@ class BackglassCompanion:
                 logger.error("Failed to initialize any display mode.")
                 return
 
-            # Hide mouse cursor
-            try:
-                pygame.mouse.set_visible(False)
-            except Exception as e:
-                logger.warning(f"Could not hide cursor: {e}")
+            # Mouse visibility changes on macOS secondary monitors can cause segfaults in SDL2.
+            # We skip hiding the mouse cursor to ensure stability.
     
             clock = pygame.time.Clock()
             current_surf = pygame.Surface((W, H))
