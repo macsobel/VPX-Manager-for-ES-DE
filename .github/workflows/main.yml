@@ -25,6 +25,12 @@ jobs:
           - os: macos-14
             arch: arm64
             display_name: macOS_Apple_Silicon
+          - os: ubuntu-22.04
+            arch: x86_64
+            display_name: Linux_x86_64
+          - os: ubuntu-22.04-arm
+            arch: aarch64
+            display_name: Linux_aarch64
 
     runs-on: ${{ matrix.os }}
     permissions:
