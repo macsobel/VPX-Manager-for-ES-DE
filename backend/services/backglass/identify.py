@@ -1,6 +1,37 @@
 import pygame
 import sys
 import time
+import platform
+import ctypes
+import ctypes.util
+
+def hide_dock_icon_macos():
+    """Hide the app icon from the macOS Dock at runtime."""
+    if platform.system() != "Darwin":
+        return
+    try:
+        # Load AppKit
+        appkit_path = ctypes.util.find_library('AppKit')
+        if not appkit_path: return
+        appkit = ctypes.cdll.LoadLibrary(appkit_path)
+        
+        # Get NSApp
+        # [NSApplication sharedApplication]
+        ns_app = appkit.NSApplication.sharedApplication()
+        
+        # NSApplicationActivationPolicyProhibited = 2 (No Dock, No Menu)
+        # NSApplicationActivationPolicyAccessory = 1 (No Menu, shows in Command-Tab)
+        # We use 2 to be completely invisible
+        appkit.objc_msgSend.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_long]
+        appkit.objc_msgSend.restype = ctypes.c_void_p
+        
+        # sel_registerName("setActivationPolicy:")
+        set_policy_sel = appkit.sel_registerName(b"setActivationPolicy:")
+        
+        appkit.objc_msgSend(ns_app, set_policy_sel, 2)
+    except Exception as e:
+        # Fallback if something goes wrong with ctypes
+        pass
 
 def draw_tapered_segment(screen, p1, p2, thickness, color):
     # Draws a segment with tapered ends for that "LCD" look
@@ -53,6 +84,15 @@ def draw_elite_digit(screen, digit, x, y, size, color):
         draw_tapered_segment(screen, pts[i][0], pts[i][1], t, color)
 
 def identify_screen(display_index):
+    # Hide from Dock on macOS immediately
+    hide_dock_icon_macos()
+    
+    # Disable SDL's HID/joystick layer to prevent IOHIDManager corruption
+    import os
+    os.environ["SDL_JOYSTICK_DISABLED"] = "1"
+    os.environ["SDL_HINT_JOYSTICK_HIDAPI"] = "0"
+    os.environ["SDL_HINT_NO_SIGNAL_HANDLERS"] = "1"
+    
     # Attempt to wake up display driver
     pygame.display.init()
     for _ in range(3):

@@ -86,8 +86,9 @@ async def identify_screens():
 
     try:
         import asyncio
-        # Launch a separate process for each possible display (0-8)
-        for i in range(9):
+        count = get_display_count()
+        # Launch a separate process for each actual display
+        for i in range(count):
             cmd = [python]
             if not getattr(sys, "frozen", False):
                 # When running from source, we need to specify the main.py script
@@ -98,7 +99,7 @@ async def identify_screens():
             subprocess.Popen(cmd, start_new_session=True)
             
             # Moderate non-blocking delay to prevent display collisions on macOS
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.3)
             
         return {"success": True}
     except Exception as e:

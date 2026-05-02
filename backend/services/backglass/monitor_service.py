@@ -69,6 +69,7 @@ class BackglassMonitor:
 
             self._companion_process = subprocess.Popen(
                 cmd,
+                stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
@@ -127,11 +128,14 @@ class BackglassMonitor:
 
     def _monitor_loop(self):
         logger.info("Backglass Auto-Monitor started.")
+        last_game = None
+        
         while not self._stop_event.is_set():
             # Check if companion has died on its own
             if self._companion_process and self._companion_process.poll() is not None:
                 logger.info("Backglass Companion process ended.")
                 self._companion_process = None
+                last_game = None
 
             # Only do something if the feature is enabled in settings
             if config.backglass_enabled:
@@ -140,15 +144,55 @@ class BackglassMonitor:
                 if esde_pid and not self._companion_process:
                     # ES-DE started!
                     self.start_companion()
+                    last_game = None
                 elif not esde_pid and self._companion_process:
                     # ES-DE stopped!
                     self.stop_companion()
+                    last_game = None
+                    
+                # If running, do the lsof check here (safe from macOS AppKit fork crashes)
+                if esde_pid and self._companion_process and self._companion_process.stdin:
+                    try:
+                        cmd = ["lsof", "-p", str(esde_pid), "-Fn"]
+                        output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode()
+                        media_files = [line[1:] for line in output.split('\n') 
+                                       if line.startswith('n') and 'downloaded_media/vpinball' in line]
+                        
+                        if media_files:
+                            # Prioritize based on config
+                            selection = None
+                            for trigger in config.backglass_priority:
+                                for f in media_files:
+                                    if trigger in f:
+                                        selection = f
+                                        break
+                                if selection: break
+                            
+                            if not selection:
+                                selection = media_files[0]
+                                
+                            game_name = Path(selection).stem
+                            if game_name != last_game:
+                                last_game = game_name
+                                # Send game name to companion via stdin
+                                try:
+                                    self._companion_process.stdin.write(f"GAME:{game_name}\n")
+                                    self._companion_process.stdin.flush()
+                                except:
+                                    pass
+                    except subprocess.CalledProcessError:
+                        pass
+                    
+                    time.sleep(0.05) # 50ms turbo polling
+                else:
+                    time.sleep(2) # Slow poll when ES-DE is not running
             else:
                 # If disabled in settings but process is running, stop it
                 if self._companion_process:
                     self.stop_companion()
-            
-            time.sleep(2) # Check every 2 seconds
+                    last_game = None
+                time.sleep(2)
+
 
     def start(self):
         if self._is_monitoring:
