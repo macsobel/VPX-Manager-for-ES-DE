@@ -388,6 +388,16 @@ def load_config() -> AppConfig:
         except Exception as e:
             print(f"Warning: Could not load user config: {e}")
 
+    # 4. Environment Overrides (Convenience for local development)
+    if not cfg_data.get("screenscraper_devid"):
+        cfg_data["screenscraper_devid"] = os.environ.get("SS_DEV_ID", "")
+    if not cfg_data.get("screenscraper_devpassword"):
+        cfg_data["screenscraper_devpassword"] = os.environ.get("SS_DEVPASS", "")
+    if not cfg_data.get("screenscraper_dev_user"):
+        cfg_data["screenscraper_dev_user"] = os.environ.get("SS_USER", "")
+    if not cfg_data.get("screenscraper_dev_pass"):
+        cfg_data["screenscraper_dev_pass"] = os.environ.get("SS_PASS", "")
+
     return AppConfig(**cfg_data) if cfg_data else AppConfig()
 
 

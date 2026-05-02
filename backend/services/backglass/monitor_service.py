@@ -43,13 +43,13 @@ class BackglassMonitor:
         import sys
         if getattr(sys, "frozen", False):
             base_dir = Path(sys._MEIPASS)
-            script = base_dir / "backend" / "services" / "backglass" / "backglass_companion.py"
+            script = "" # In frozen builds, the executable itself handles flags
             python = sys.executable
         else:
             base_dir = Path(__file__).resolve().parent.parent.parent.parent
-            script = base_dir / "backend" / "services" / "backglass" / "backglass_companion.py"
+            script = base_dir / "main.py"
             venv = base_dir / ".venv" / "bin" / "python"
-            python = str(venv) if venv.exists() else "python3"
+            python = str(venv) if venv.exists() else sys.executable
         return python, script
 
     def start_companion(self):
@@ -62,14 +62,32 @@ class BackglassMonitor:
         
         logger.info(f"Starting Backglass Companion on screen {screen} with priority {priority}...")
         try:
-            # We call ourselves with the --backglass flag
-            # This is the correct way to launch sub-processes in bundled apps
+            cmd = [python]
+            if script:
+                cmd.append(str(script))
+            cmd.extend(["--backglass", screen, priority])
+
             self._companion_process = subprocess.Popen(
-                [python, "--backglass", screen, priority],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+                text=True,
+                bufsize=1 # Line buffered
             )
+            
+            def log_companion(proc):
+                try:
+                    while proc.poll() is None:
+                        line = proc.stdout.readline()
+                        if line:
+                            logger.info(f"[Companion] {line.strip()}")
+                        else:
+                            time.sleep(0.1)
+                except Exception:
+                    pass
+            
+            threading.Thread(target=log_companion, args=(self._companion_process,), daemon=True).start()
             
             # macOS/Linux: Return focus to ES-DE after a brief delay to allow the window to open
             def return_focus():

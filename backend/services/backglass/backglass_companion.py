@@ -10,6 +10,14 @@ import subprocess
 from pathlib import Path
 
 import pygame
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger("backglass_companion")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Configuration
@@ -157,11 +165,7 @@ class BackglassCompanion:
             time.sleep(POLL_INTERVAL)
 
     def run(self):
-        # 1. Start sniffer in a background thread
-        snif = threading.Thread(target=self.sniffer_thread, daemon=True)
-        snif.start()
-
-        # 2. Run display on main thread (required for SDL2/macOS)
+        # 1. Run display on main thread (required for SDL2/macOS)
         try:
             self.run_display()
         except KeyboardInterrupt:
@@ -171,22 +175,59 @@ class BackglassCompanion:
 
     def run_display(self):
         try:
+            logger.info("Initializing Pygame...")
             pygame.init()
-            num_displays = pygame.display.get_num_displays()
-            idx = self.screen_index if self.screen_index < num_displays else 0
+            logger.info("Pygame initialized.")
             
-            # Use safe flags for display initialization
-            flags = pygame.NOFRAME | pygame.FULLSCREEN
+            # On macOS, native fullscreen (0,0) can segfault on secondary monitors.
+            # We try to get explicit dimensions first.
             try:
-                screen = pygame.display.set_mode((0, 0), flags, display=idx)
+                desktop_sizes = pygame.display.get_desktop_sizes()
+                num_displays = len(desktop_sizes)
+                idx = self.screen_index if self.screen_index < num_displays else 0
+                W, H = desktop_sizes[idx]
+                logger.info(f"Target display {idx} resolution: {W}x{H}")
             except Exception as e:
-                logger.error(f"Failed to set fullscreen mode on screen {idx}: {e}")
-                # Fallback to windowed mode if fullscreen fails
-                screen = pygame.display.set_mode((800, 600), pygame.NOFRAME, display=0)
+                logger.warning(f"Could not get desktop sizes: {e}")
                 idx = 0
-                
-            W, H = screen.get_size()
-            logger.info(f"✅ Backglass display active on screen {idx} ({W}×{H})")
+                W, H = 800, 600
+
+            # Try multiple flag combinations for stability
+            attempt_modes = [
+                # 1. Borderless Window (Most stable on macOS secondaries)
+                (W, H, pygame.NOFRAME),
+                # 2. Standard Window fallback
+                (W, H, 0),
+                # 3. Fullscreen Scaled
+                (W, H, pygame.FULLSCREEN | pygame.SCALED),
+            ]
+            
+            screen = None
+            for w, h, flags in attempt_modes:
+                try:
+                    mode_name = "FULLSCREEN" if flags & pygame.FULLSCREEN else "WINDOWED"
+                    if flags & pygame.NOFRAME: mode_name = "BORDERLESS"
+                    if flags & pygame.SCALED: mode_name += " | SCALED"
+                    
+                    logger.info(f"Attempting {mode_name} at {w}x{h} on display {idx}...")
+                    screen = pygame.display.set_mode((w, h), flags, display=idx)
+                    
+                    if screen:
+                        W, H = screen.get_size()
+                        logger.info(f"✅ Backglass display active on screen {idx} ({W}×{H}) using {mode_name}")
+                        break
+                except Exception as e:
+                    logger.warning(f"Mode {mode_name} failed: {e}")
+
+            if not screen:
+                logger.error("Failed to initialize any display mode.")
+                return
+
+            # Hide mouse cursor
+            try:
+                pygame.mouse.set_visible(False)
+            except Exception as e:
+                logger.warning(f"Could not hide cursor: {e}")
     
             clock = pygame.time.Clock()
             current_surf = pygame.Surface((W, H))
@@ -210,6 +251,10 @@ class BackglassCompanion:
                     logger.error(f"Failed to load image {path}: {e}")
                     return current_surf
     
+            # Start sniffer AFTER display is active to avoid thread contention during SDL init
+            snif = threading.Thread(target=self.sniffer_thread, daemon=True)
+            snif.start()
+
             running = True
             while running:
                 for event in pygame.event.get():
