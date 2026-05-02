@@ -170,62 +170,80 @@ class BackglassCompanion:
             print("\n👋  Shutting down...")
 
     def run_display(self):
-        pygame.init()
-        num_displays = pygame.display.get_num_displays()
-        idx = self.screen_index if self.screen_index < num_displays else 0
-        
-        flags = pygame.NOFRAME | pygame.FULLSCREEN
-        screen = pygame.display.set_mode((0, 0), flags, display=idx)
-        W, H = screen.get_size()
-        print(f"✅ Window on screen {idx} ({W}×{H})")
-
-        clock = pygame.time.Clock()
-        current_surf = pygame.Surface((W, H))
-        current_surf.fill(BG_COLOR)
-        next_surf = None
-        fade_step = 0
-        fade_steps = max(1, int(FADE_DURATION * 60))
-
-        def load_img(path):
-            raw = pygame.image.load(str(path))
-            iw, ih = raw.get_size()
-            scale = min(W/iw, H/ih)
-            nw, nh = int(iw*scale), int(ih*scale)
-            scaled = pygame.transform.smoothscale(raw, (nw, nh))
-            surf = pygame.Surface((W, H))
-            surf.fill(BG_COLOR)
-            surf.blit(scaled, ((W-nw)//2, (H-nh)//2))
-            return surf
-
-        running = True
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-                    running = False
-
+        try:
+            pygame.init()
+            num_displays = pygame.display.get_num_displays()
+            idx = self.screen_index if self.screen_index < num_displays else 0
+            
+            # Use safe flags for display initialization
+            flags = pygame.NOFRAME | pygame.FULLSCREEN
             try:
-                img_path = self.display_queue.get_nowait()
-                next_surf = load_img(img_path)
-                fade_step = 0
-            except queue.Empty:
-                pass
-
-            if next_surf:
-                fade_step += 1
-                alpha = int((fade_step / fade_steps) * 255)
-                next_surf.set_alpha(min(alpha, 255))
-                screen.blit(current_surf, (0, 0))
-                screen.blit(next_surf, (0, 0))
-                if fade_step >= fade_steps:
-                    current_surf = next_surf.copy()
-                    current_surf.set_alpha(255)
-                    next_surf = None
-            else:
-                screen.blit(current_surf, (0, 0))
-
-            pygame.display.flip()
-            clock.tick(60)
-        pygame.quit()
+                screen = pygame.display.set_mode((0, 0), flags, display=idx)
+            except Exception as e:
+                logger.error(f"Failed to set fullscreen mode on screen {idx}: {e}")
+                # Fallback to windowed mode if fullscreen fails
+                screen = pygame.display.set_mode((800, 600), pygame.NOFRAME, display=0)
+                idx = 0
+                
+            W, H = screen.get_size()
+            logger.info(f"✅ Backglass display active on screen {idx} ({W}×{H})")
+    
+            clock = pygame.time.Clock()
+            current_surf = pygame.Surface((W, H))
+            current_surf.fill(BG_COLOR)
+            next_surf = None
+            fade_step = 0
+            fade_steps = max(1, int(FADE_DURATION * 60))
+    
+            def load_img(path):
+                try:
+                    raw = pygame.image.load(str(path))
+                    iw, ih = raw.get_size()
+                    scale = min(W/iw, H/ih)
+                    nw, nh = int(iw*scale), int(ih*scale)
+                    scaled = pygame.transform.smoothscale(raw, (nw, nh))
+                    surf = pygame.Surface((W, H))
+                    surf.fill(BG_COLOR)
+                    surf.blit(scaled, ((W-nw)//2, (H-nh)//2))
+                    return surf
+                except Exception as e:
+                    logger.error(f"Failed to load image {path}: {e}")
+                    return current_surf
+    
+            running = True
+            while running:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                        running = False
+    
+                try:
+                    img_path = self.display_queue.get_nowait()
+                    next_surf = load_img(img_path)
+                    fade_step = 0
+                except queue.Empty:
+                    pass
+                except Exception as e:
+                    logger.error(f"Queue error: {e}")
+    
+                if next_surf:
+                    fade_step += 1
+                    alpha = int((fade_step / fade_steps) * 255)
+                    next_surf.set_alpha(min(alpha, 255))
+                    screen.blit(current_surf, (0, 0))
+                    screen.blit(next_surf, (0, 0))
+                    if fade_step >= fade_steps:
+                        current_surf = next_surf.copy()
+                        current_surf.set_alpha(255)
+                        next_surf = None
+                else:
+                    screen.blit(current_surf, (0, 0))
+    
+                pygame.display.flip()
+                clock.tick(60)
+            pygame.quit()
+        except Exception as e:
+            logger.error(f"Fatal error in display thread: {e}")
+            pygame.quit()
 
 if __name__ == "__main__":
     s_idx = int(sys.argv[1]) if len(sys.argv) > 1 else 1

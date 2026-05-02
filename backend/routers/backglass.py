@@ -74,11 +74,21 @@ async def identify_screens():
         python = str(venv) if venv.exists() else "python3"
 
     try:
-        # Launch a separate process for each possible display (0-5)
-        # The scripts will automatically exit if the display doesn't exist.
-        # This is the most reliable way to show multiple windows on macOS.
-        for i in range(6):
-            subprocess.Popen([python, "--identify", str(i)], start_new_session=True)
+        import asyncio
+        # Launch a separate process for each possible display (0-8)
+        for i in range(9):
+            cmd = [python]
+            if not getattr(sys, "frozen", False):
+                # When running from source, we need to specify the main.py script
+                main_script = Path(__file__).resolve().parent.parent.parent / "main.py"
+                cmd.append(str(main_script))
+            
+            cmd.extend(["--identify", str(i)])
+            subprocess.Popen(cmd, start_new_session=True)
+            
+            # Moderate non-blocking delay to prevent display collisions on macOS
+            await asyncio.sleep(0.5)
+            
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to launch identify: {str(e)}")
