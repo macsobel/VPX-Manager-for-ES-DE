@@ -60,6 +60,9 @@ jobs:
         
     - name: Build macOS App
       if: startsWith(matrix.os, 'macos')
+      env:
+        SS_DEV_ID: ${{ secrets.SS_DEV_ID }}
+        SS_DEVPASS: ${{ secrets.SS_DEVPASS }}
       run: |
         chmod +x scripts/build/build_app.sh
         ./scripts/build/build_app.sh
