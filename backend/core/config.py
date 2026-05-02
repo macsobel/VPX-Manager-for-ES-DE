@@ -310,9 +310,15 @@ def load_config() -> AppConfig:
     # 1. Start with defaults
 
     # 2. Check for obfuscated baked-in credentials
-    dat_path = Path(getattr(sys, "_MEIPASS", ".")) / "config.dat"
-    if not dat_path.exists() and getattr(sys, "frozen", False):
-        dat_path = Path(sys.executable).parent.parent / "Resources" / "config.dat"
+    if getattr(sys, "frozen", False):
+        # 1. Try next to executable (Standard for COLLECT/BUNDLE)
+        dat_path = Path(sys.executable).parent / "config.dat"
+        # 2. Try Resources folder (macOS standard)
+        if not dat_path.exists():
+            dat_path = Path(sys.executable).parent.parent / "Resources" / "config.dat"
+    else:
+        # Running from source - project root
+        dat_path = Path(__file__).resolve().parent.parent.parent / "config.dat"
 
     if dat_path.exists():
         try:

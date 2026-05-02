@@ -16,16 +16,25 @@ class BackglassSettings(BaseModel):
 
 @router.get("/settings", response_model=BackglassSettings)
 async def get_settings():
-    import pygame
-    if not pygame.get_init():
-        pygame.init()
-    
-    return BackglassSettings(
-        enabled=config.backglass_enabled,
-        screen_index=config.backglass_screen_index,
-        priority=config.backglass_priority,
-        display_count=pygame.display.get_num_displays()
-    )
+    try:
+        import pygame
+        if not pygame.get_init():
+            pygame.init()
+        
+        return BackglassSettings(
+            enabled=config.backglass_enabled,
+            screen_index=config.backglass_screen_index,
+            priority=config.backglass_priority,
+            display_count=pygame.display.get_num_displays()
+        )
+    except Exception as e:
+        # Fallback if pygame display init fails (e.g. headless or permission issues)
+        return BackglassSettings(
+            enabled=config.backglass_enabled,
+            screen_index=config.backglass_screen_index,
+            priority=config.backglass_priority,
+            display_count=1
+        )
 
 @router.post("/settings")
 async def update_settings(settings: BackglassSettings):
