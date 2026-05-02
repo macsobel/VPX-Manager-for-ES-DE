@@ -98,6 +98,10 @@ class VPSMatcher:
                 "vps_sync", f"Synced {len(self.vps_data)} entries."
             )
 
+            # NEW: Auto-match unmatched tables after sync
+            import asyncio
+            asyncio.create_task(self.auto_match_all())
+
             return {
                 "success": True,
                 "count": len(self.vps_data),
@@ -406,6 +410,76 @@ class VPSMatcher:
             if str(f.get("id", "")) == str(file_id):
                 return f
         return None
+
+    async def auto_match_all(self) -> dict:
+        """
+        Find all unmatched tables in the DB and attempt to match them with VPS entries.
+        Requires a 100% name match (after cleaning).
+        """
+        import backend.core.database as db
+        from backend.services.table_file_service import TableFileService
+
+        self.ensure_loaded()
+        if not self.vps_data:
+            return {"matched": 0}
+
+        unmatched = await db.get_tables(vps_matched=False, limit=5000)
+        matched_count = 0
+
+        # Build a mapping of clean VPS names to entries
+        # We only auto-match if a name is unique in the VPS for VPX format
+        clean_vps_map = {}
+        for name_lower, entry in self._search_index:
+            if name_lower not in clean_vps_map:
+                clean_vps_map[name_lower] = entry
+            else:
+                # If name is not unique, we don't auto-match to avoid ambiguity
+                clean_vps_map[name_lower] = None
+
+        for table in unmatched:
+            # Clean the table display name
+            table_name = table["display_name"].lower()
+            # Remove common suffixes/version info
+            for remove in ["vpx", "vr", "v2", "v3", "v4", "mod", "4k", "desktop", "fs"]:
+                table_name = table_name.replace(remove, "")
+            table_name = table_name.strip(" _-.()")
+
+            entry = clean_vps_map.get(table_name)
+            if entry and entry != None:
+                # 100% Match found!
+                vps_id = entry.get("id")
+                # Get the best VPX file for this entry
+                file_entry = self._get_latest_table(entry.get("tableFiles", []))
+                
+                update_data = {
+                    "id": table["id"],
+                    "filename": table["filename"],
+                    "vps_id": vps_id,
+                    "vps_file_id": file_entry.get("id", ""),
+                    "manufacturer": entry.get("manufacturer", ""),
+                    "year": str(entry.get("year", "")),
+                    "theme": " • ".join(str(t) for t in (entry.get("theme") or []) if t),
+                    "table_type": entry.get("type", ""),
+                    "ipdb_id": self._extract_ipdb_id(entry),
+                    "players": str(entry.get("players", "1"))
+                }
+                
+                # Check if specific display name should be updated (if current is generic)
+                if len(table["display_name"]) < 5 or table["display_name"] == table["filename"]:
+                     update_data["display_name"] = entry.get("name", "")
+
+                await db.upsert_table(update_data)
+                
+                # Conduct follow-up standardization
+                try:
+                    await TableFileService.standardize_names(table["id"])
+                except Exception as e:
+                    print(f"Auto-match standardization failed for {table['id']}: {e}")
+                
+                matched_count += 1
+                print(f"AUTO-MATCH: Linked '{table['display_name']}' to VPS ID {vps_id}")
+
+        return {"matched": matched_count}
 
     def _get_latest_table(self, table_files: list[dict]) -> dict:
         """Find the table file entry with the highest version/newest date."""

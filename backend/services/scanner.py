@@ -316,6 +316,10 @@ async def scan_tables_directory() -> dict:
             "updated": updated_count,
             "errors": errors,
         }
+        # NEW: Auto-match unmatched tables after scan
+        from backend.services.vps_matcher import vps_matcher
+        asyncio.create_task(vps_matcher.auto_match_all())
+
         task_registry.complete_task("scanner", f"Scanned {len(vpx_files)} tables", extra_data=summary)
 
     except Exception as e:
