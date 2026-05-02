@@ -24,19 +24,31 @@ def get_version():
 
 VERSION = get_version()
 
-# PyInstaller is invoked from the project ROOT, so paths are relative to ROOT
-datas = [('frontend', 'frontend'), ('resources', 'resources'), ('backend', 'backend')]
+# Define absolute path to project root relative to this spec file
+spec_dir = os.path.dirname(os.path.abspath(SPEC))
+root_dir = os.path.abspath(os.path.join(spec_dir, '../..'))
+
+# PyInstaller is invoked from the project ROOT, but we use absolute paths for robustness
+datas = [
+    (os.path.join(root_dir, 'frontend'), 'frontend'),
+    (os.path.join(root_dir, 'resources'), 'resources'),
+    (os.path.join(root_dir, 'backend'), 'backend'),
+]
+
 # config.dat is generated at the project root by build_utils.py
-if os.path.exists('config.dat'):
-    print(f"[SPEC] Found config.dat at project root — bundling credentials.")
-    datas.append(('config.dat', '.'))
+config_dat = os.path.join(root_dir, 'config.dat')
+if os.path.exists(config_dat):
+    print(f"[SPEC] Found config.dat at {config_dat} — bundling credentials.")
+    datas.append((config_dat, '.'))
 else:
-    print(f"[SPEC] WARNING: config.dat not found — dev credentials will NOT be bundled!")
-if os.path.exists('backend/core/version.txt'):
-    datas.append(('backend/core/version.txt', 'backend/core'))
+    print(f"[SPEC] WARNING: config.dat not found at {config_dat} — dev credentials will NOT be bundled!")
+
+version_txt = os.path.join(root_dir, 'backend/core/version.txt')
+if os.path.exists(version_txt):
+    datas.append((version_txt, 'backend/core'))
 
 a = Analysis(
-    ['main.py'],
+    [os.path.join(root_dir, 'main.py')],
     pathex=[],
     binaries=[],
     datas=datas,
@@ -68,7 +80,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='resources/icon.png' if sys.platform != 'darwin' else None,
+    icon=os.path.join(root_dir, 'resources/icon.png') if sys.platform != 'darwin' else None,
 )
 
 coll = COLLECT(
@@ -85,7 +97,7 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='VPX Manager for ES-DE.app',
-    icon='resources/icon.icns' if sys.platform == 'darwin' else 'resources/icon.png',
+    icon=os.path.join(root_dir, 'resources/icon.icns') if sys.platform == 'darwin' else os.path.join(root_dir, 'resources/icon.png'),
     bundle_identifier='com.macsobel.vpxmanager',
     info_plist={
         'CFBundleShortVersionString': VERSION,
