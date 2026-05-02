@@ -33,7 +33,7 @@ It automates scraping metadata and media from sources like [ScreenScraper](https
 - Packages tables for Visual Pinball on [iOS](https://apps.apple.com/us/app/visual-pinball/id6547859926) and Android, including AirSync via Safari.
 - Provides an integrated game manual reader for reading the rules and reference material for each table in your collection.
 
-### EmulationStation DE Integration
+### Emulation Station DE Integration
 
 - Automates the process of enabling Visual Pinball as a system in ES-DE and keeps your table list current.
 - Provides a custom backglass art screen on a secondary monitor that syncs with whichever table you have selected in ES-DE.
