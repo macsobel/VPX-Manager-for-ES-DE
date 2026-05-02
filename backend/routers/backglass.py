@@ -18,17 +18,24 @@ class BackglassSettings(BaseModel):
 async def get_settings():
     try:
         import pygame
-        if not pygame.get_init():
-            pygame.init()
+        # Use only display init to avoid broken font module and thread issues on macOS
+        if not pygame.display.get_init():
+            pygame.display.init()
+        
+        count = pygame.display.get_num_displays()
+        # On some macOS setups, keeping display initialized in a background thread 
+        # can cause issues, so we quit it immediately after getting the count.
+        pygame.display.quit()
         
         return BackglassSettings(
             enabled=config.backglass_enabled,
             screen_index=config.backglass_screen_index,
             priority=config.backglass_priority,
-            display_count=pygame.display.get_num_displays()
+            display_count=count
         )
     except Exception as e:
         # Fallback if pygame display init fails (e.g. headless or permission issues)
+        print(f"Display detection failed: {e}")
         return BackglassSettings(
             enabled=config.backglass_enabled,
             screen_index=config.backglass_screen_index,
