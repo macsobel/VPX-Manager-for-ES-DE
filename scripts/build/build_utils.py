@@ -27,10 +27,11 @@ def generate_config_dat(dev_id, dev_password, dev_user, dev_pass, output_path="c
         "screenscraper_dev_pass": double_scramble(dev_pass)
     }
     
-    with open(output_path, "wb") as f:
-        marshal.dump(data, f)
+    import json
+    with open(output_path, "w") as f:
+        json.dump(data, f)
     
-    print(f"Successfully generated scrambled {output_path}")
+    print(f"Successfully generated scrambled JSON {output_path} (ID len: {len(dev_id)})")
 
 if __name__ == "__main__":
     # If environment variables are present (e.g. in GitHub Actions), use them

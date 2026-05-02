@@ -319,18 +319,31 @@ def load_config() -> AppConfig:
 
     if dat_path.exists():
         try:
-            with open(dat_path, "rb") as f:
-                baked_in = marshal.load(f)
+            with open(dat_path, "r") as f:
+                baked_in = json.load(f)
                 if isinstance(baked_in, dict):
-                    # Descramble dev secrets from binary dat (Double XOR stack)
+                    # Descramble dev secrets from JSON dat (Double XOR stack)
                     for k, v in baked_in.items():
                         if isinstance(v, str):
                             # Reverse order: dev_vpx_scrambler_99 THEN vpx_secret_key_2026
                             descrambled = _scramble(_scramble_dev(v))
                             baked_in[k] = descrambled
+                    
+                    devid = baked_in.get("screenscraper_devid", "")
+                    print(f"Loaded baked-in config from {dat_path} (DevID length: {len(devid)})")
                     cfg_data.update(baked_in)
         except Exception as e:
-            print(f"Warning: Could not load obfuscated config: {e}")
+            # Try marshal as fallback for legacy builds
+            try:
+                with open(dat_path, "rb") as f:
+                    baked_in = marshal.load(f)
+                    if isinstance(baked_in, dict):
+                        for k, v in baked_in.items():
+                            if isinstance(v, str):
+                                baked_in[k] = _scramble(_scramble_dev(v))
+                        cfg_data.update(baked_in)
+            except:
+                print(f"Warning: Could not load obfuscated config: {e}")
 
     # 3. Load user-specific config
     if CONFIG_FILE.exists():
