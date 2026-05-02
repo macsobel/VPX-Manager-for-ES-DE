@@ -24,15 +24,19 @@ def get_version():
 
 VERSION = get_version()
 
-datas = [('../../frontend', 'frontend'), ('../../resources', 'resources'), ('../../backend', 'backend')]
-# These will be found relative to the project root where pyinstaller is executed
-if os.path.exists('../../config.dat'):
-    datas.append(('../../config.dat', '.'))
-if os.path.exists('../../backend/core/version.txt'):
-    datas.append(('../../backend/core/version.txt', 'backend/core'))
+# PyInstaller is invoked from the project ROOT, so paths are relative to ROOT
+datas = [('frontend', 'frontend'), ('resources', 'resources'), ('backend', 'backend')]
+# config.dat is generated at the project root by build_utils.py
+if os.path.exists('config.dat'):
+    print(f"[SPEC] Found config.dat at project root — bundling credentials.")
+    datas.append(('config.dat', '.'))
+else:
+    print(f"[SPEC] WARNING: config.dat not found — dev credentials will NOT be bundled!")
+if os.path.exists('backend/core/version.txt'):
+    datas.append(('backend/core/version.txt', 'backend/core'))
 
 a = Analysis(
-    ['../../main.py'],
+    ['main.py'],
     pathex=[],
     binaries=[],
     datas=datas,
@@ -64,7 +68,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='../../resources/icon.png' if sys.platform != 'darwin' else None,
+    icon='resources/icon.png' if sys.platform != 'darwin' else None,
 )
 
 coll = COLLECT(
@@ -81,7 +85,7 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='VPX Manager for ES-DE.app',
-    icon='../../resources/icon.icns' if sys.platform == 'darwin' else '../../resources/icon.png',
+    icon='resources/icon.icns' if sys.platform == 'darwin' else 'resources/icon.png',
     bundle_identifier='com.macsobel.vpxmanager',
     info_plist={
         'CFBundleShortVersionString': VERSION,
