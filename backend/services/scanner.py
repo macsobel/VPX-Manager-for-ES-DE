@@ -300,9 +300,8 @@ async def scan_tables_directory() -> dict:
 
                     try:
                         gm = GamelistManager(str(config.get_gamelist_xml_path()))
-                        gm.remove_game(
-                            f"./{row['filename']}"
-                        )  # simple relative fallback
+                        rel_path = f"./{Path(row['folder_path']).name}/{row['filename']}"
+                        gm.remove_game(rel_path)
                     except Exception:
                         pass
                     await delete_all_media_for_table(row["filename"])

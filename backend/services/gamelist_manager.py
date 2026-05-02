@@ -74,7 +74,11 @@ class GamelistManager:
             logger.info(f"Creating new <game> entry for {rom_path}")
             game_elem = ET.SubElement(root, "game")
             path_elem = ET.SubElement(game_elem, "path")
-            # Preserve the original case for writing to the path tag
+        else:
+            path_elem = game_elem.find("path")
+
+        if path_elem is not None:
+            # Always update path to match current disk casing to prevent ES-DE duplicates
             path_elem.text = (
                 rom_path if rom_path.startswith("./") else f"./{rom_path.lstrip('./')}"
             )
