@@ -128,10 +128,9 @@ class BackglassCompanion:
             os.environ["SDL_HINT_JOYSTICK_HIDAPI"] = "0"
             os.environ["SDL_HINT_NO_SIGNAL_HANDLERS"] = "1"
             
-            # Only init the subsystems we actually need (display + font)
+            # Only init the subsystems we actually need (display)
             pygame.display.init()
-            pygame.font.init()
-            logger.info("Pygame initialized (display + font only, HID disabled).")
+            logger.info("Pygame initialized (display only, HID disabled).")
             
             # On macOS, native fullscreen (0,0) can segfault on secondary monitors.
             # We try to get explicit dimensions first.
