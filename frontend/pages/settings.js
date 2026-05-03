@@ -538,7 +538,7 @@ const SettingsPage = {
             btn.innerHTML = '<div class="spinner" style="width: 14px; height: 14px;"></div> Checking...';
 
             try {
-                const res = await fetch('/api/updates/check');
+                const res = await fetch('/api/updates/check?force=true');
                 const result = await res.json();
 
                 if (result.update_available) {

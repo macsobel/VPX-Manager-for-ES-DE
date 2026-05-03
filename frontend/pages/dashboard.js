@@ -128,12 +128,12 @@ const DashboardPage = {
         }
     },
 
-    async loadSystemInfo() {
+    async loadSystemInfo(force = false) {
         try {
             const [sysRes, updateCountRes, softUpdateRes] = await Promise.all([
                 fetch('/api/system/status'),
                 fetch('/api/tables/update-count'),
-                fetch('/api/updates/check')
+                fetch(`/api/updates/check${force ? '?force=true' : ''}`)
             ]);
             const info = await sysRes.json();
             const updateCountData = await updateCountRes.json();
@@ -171,9 +171,14 @@ const DashboardPage = {
                 softUpdateHtml = `<div style="color: var(--accent-red); font-size: 0.75rem; margin-top: 8px; opacity: 0.7;">Update check failed: ${softUpdate.error}</div>`;
             } else {
                 softUpdateHtml = `
-                    <div style="margin-top: 8px; font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                        VPX Manager is up to date (v${softUpdate.current_version})
+                    <div style="margin-top: 8px;">
+                        <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                            VPX Manager is up to date (v${softUpdate.current_version})
+                        </div>
+                        <div style="margin-top: 4px; padding-left: 18px;">
+                            <button id="btn-dashboard-check-now" class="btn-link" style="font-size: 0.7rem; color: var(--accent-blue); background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline;">Check now</button>
+                        </div>
                     </div>
                 `;
             }
@@ -217,6 +222,16 @@ const DashboardPage = {
                     </div>
                 </div>
             `;
+
+            // Bind Dashboard Check Now
+            const btnCheckNow = document.getElementById('btn-dashboard-check-now');
+            if (btnCheckNow) {
+                btnCheckNow.onclick = async () => {
+                    btnCheckNow.disabled = true;
+                    btnCheckNow.innerHTML = 'Checking...';
+                    await this.loadSystemInfo(true);
+                };
+            }
         } catch (e) {
             document.getElementById('system-info').innerHTML = `<span style="color: var(--accent-red);">Could not load system info</span>`;
             console.error('Dashboard load error:', e);
