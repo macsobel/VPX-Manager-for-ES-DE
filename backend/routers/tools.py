@@ -188,6 +188,29 @@ async def apply_esde_integration():
         esde_scripts_dir.mkdir(parents=True, exist_ok=True)
         script_path = esde_scripts_dir / "launch_vpinball.sh"
 
+        # Create game-selected script for backglass companion
+        game_select_dir = esde_scripts_dir / "game-selected"
+        game_select_dir.mkdir(parents=True, exist_ok=True)
+        bg_script_path = game_select_dir / "vpx_backglass.sh"
+
+        bg_script_content = """#!/bin/bash
+# VPX Backglass Companion - Event Trigger
+# This script is called by ES-DE when a user selects a game.
+# Parameters: $1=ROM path, $2=game name, $3=system name, $4=system full name
+
+if [ "$3" = "vpinball" ]; then
+    rom_filename=$(basename "$1")
+    echo "${rom_filename%.*}" > /tmp/vpx_backglass_current_game.txt
+else
+    rm -f /tmp/vpx_backglass_current_game.txt
+fi
+"""
+        with open(bg_script_path, "w") as f:
+            f.write(bg_script_content)
+
+        st = os.stat(bg_script_path)
+        os.chmod(bg_script_path, st.st_mode | stat.S_IEXEC)
+
         vpx_path = config.vpx_standalone_app_path
 
         # We need the binary path to call it directly so bash waits for it to exit
@@ -390,17 +413,37 @@ echo "Script completed successfully."
                     s_tree = ET.parse(settings_path, parser=parser)
                     s_root = s_tree.getroot()
 
-                    found = False
+                    found_emu = False
                     for string_elem in s_root.findall("string"):
                         if string_elem.get("name") == "AlternativeEmulator_vpinball":
                             string_elem.set("value", "Visual Pinball X (Script)")
-                            found = True
+                            found_emu = True
                             break
 
-                    if not found:
+                    if not found_emu:
                         new_string = ET.SubElement(s_root, "string")
                         new_string.set("name", "AlternativeEmulator_vpinball")
                         new_string.set("value", "Visual Pinball X (Script)")
+
+                    # Enable Custom Event Scripts
+                    found_scripts = False
+                    found_scripts_browsing = False
+                    for bool_elem in s_root.findall("bool"):
+                        if bool_elem.get("name") == "CustomEventScripts":
+                            bool_elem.set("value", "true")
+                            found_scripts = True
+                        elif bool_elem.get("name") == "CustomEventScriptsBrowsing":
+                            bool_elem.set("value", "true")
+                            found_scripts_browsing = True
+
+                    if not found_scripts:
+                        new_bool = ET.SubElement(s_root, "bool")
+                        new_bool.set("name", "CustomEventScripts")
+                        new_bool.set("value", "true")
+                    if not found_scripts_browsing:
+                        new_bool = ET.SubElement(s_root, "bool")
+                        new_bool.set("name", "CustomEventScriptsBrowsing")
+                        new_bool.set("value", "true")
 
                     s_tree.write(settings_path, encoding="utf-8", xml_declaration=True)
                 except Exception as e:
