@@ -149,39 +149,62 @@ class BackglassMonitor:
                     # ES-DE stopped!
                     self.stop_companion()
                     last_game = None
-                    
-                # If running, do the lsof check here (safe from macOS AppKit fork crashes)
-                if esde_pid and self._companion_process and self._companion_process.stdin:
+                    # Clean up the trigger file so it doesn't show a stale game on next launch
                     try:
-                        cmd = ["lsof", "-p", str(esde_pid), "-Fn"]
-                        output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode()
-                        media_files = [line[1:] for line in output.split('\n') 
-                                       if line.startswith('n') and 'downloaded_media/vpinball' in line]
-                        
-                        if media_files:
-                            # Prioritize based on config
-                            selection = None
-                            for trigger in config.backglass_priority:
-                                for f in media_files:
-                                    if trigger in f:
-                                        selection = f
-                                        break
-                                if selection: break
-                            
-                            if not selection:
-                                selection = media_files[0]
-                                
-                            game_name = Path(selection).stem
-                            if game_name != last_game:
-                                last_game = game_name
-                                # Send game name to companion via stdin
-                                try:
-                                    self._companion_process.stdin.write(f"GAME:{game_name}\n")
-                                    self._companion_process.stdin.flush()
-                                except:
-                                    pass
-                    except subprocess.CalledProcessError:
+                        Path("/tmp/vpx_backglass_current_game.txt").unlink(missing_ok=True)
+                    except:
                         pass
+                    
+                # If running, do the check here
+                if esde_pid and self._companion_process and self._companion_process.stdin:
+                    # 1. Try reading from the ES-DE custom event trigger file
+                    game_name = None
+                    trigger_file = Path("/tmp/vpx_backglass_current_game.txt")
+                    if trigger_file.exists():
+                        try:
+                            # We only care about the first line
+                            with open(trigger_file, "r") as f:
+                                content = f.read().strip()
+                                if content:
+                                    game_name = content
+                        except Exception:
+                            pass
+
+                    # 2. Fallback to lsof logic if the event file is missing or empty
+                    # (this happens if they haven't re-run the ES-DE integration tool to install the script)
+                    if not game_name:
+                        try:
+                            cmd = ["lsof", "-p", str(esde_pid), "-Fn"]
+                            output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode()
+                            media_files = [line[1:] for line in output.split('\n')
+                                           if line.startswith('n') and 'downloaded_media/vpinball' in line]
+                            
+                            if media_files:
+                                # Prioritize based on config
+                                selection = None
+                                for trigger in config.backglass_priority:
+                                    for f in media_files:
+                                        if trigger in f:
+                                            selection = f
+                                            break
+                                    if selection: break
+                                
+                                if not selection:
+                                    selection = media_files[0]
+
+                                game_name = Path(selection).stem
+                        except subprocess.CalledProcessError:
+                            pass
+
+                    # 3. Update companion if game changed
+                    if game_name and game_name != last_game:
+                        last_game = game_name
+                        # Send game name to companion via stdin
+                        try:
+                            self._companion_process.stdin.write(f"GAME:{game_name}\n")
+                            self._companion_process.stdin.flush()
+                        except:
+                            pass
                     
                     time.sleep(0.05) # 50ms turbo polling
                 else:
