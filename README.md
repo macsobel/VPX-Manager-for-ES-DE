@@ -45,6 +45,7 @@ It automates scraping metadata and media from sources like [ScreenScraper](https
 - Automatically installs NVRAM files for Bally MPU 6803 and Gottlieb System 3 tables so they boot correctly.
 - Built-in settings editor for VPX config files (VBS, INI).
 - Runs natively on macOS (available now) and Linux (coming soon).
+- Interface optimized for desktop and mobile
 
 ---
 
