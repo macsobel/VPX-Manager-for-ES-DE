@@ -500,20 +500,6 @@ const ToolsPage = {
                         <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 1rem;">Click 'Identify' to see numbers on your screens, then select the one for your backglass.</p>
                     </div>
 
-                    <div class="settings-group">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-                            <label class="settings-label" style="margin: 0;">Media Priority Order</label>
-                            <button style="background: none; border: none; padding: 0; color: var(--accent-blue); font-size: 0.75rem; font-weight: 600; cursor: pointer; text-decoration: underline; opacity: 0.8;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'" onclick="ToolsPage.resetBackglassPriority()">Reset to Default</button>
-                        </div>
-                        <div id="bg-priority-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
-                            ${settings.priority.map((p, i) => `
-                                <div class="priority-item" draggable="true" data-index="${i}" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--bg-surface); border: 1px solid var(--glass-border); border-radius: 8px; cursor: grab;">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                                    <span style="font-weight: 500; text-transform: capitalize;">${p}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                        <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 1rem;">Drag items to change the fallback order when searching for backglass images.</p>
                     </div>
                 </div>
             `;
@@ -529,84 +515,21 @@ const ToolsPage = {
                 };
             });
 
-            // Bind Drag & Drop for priority
-            this.bindPrioritySort();
 
         } catch (e) {
             body.innerHTML = `<div class="error-state">Failed to load settings: ${e.message}</div>`;
         }
     },
 
-    bindPrioritySort() {
-        const list = document.getElementById('bg-priority-list');
-        let draggedItem = null;
-
-        list.querySelectorAll('.priority-item').forEach(item => {
-            item.addEventListener('dragstart', (e) => {
-                draggedItem = item;
-                e.dataTransfer.effectAllowed = 'move';
-                item.style.opacity = '0.5';
-            });
-
-            item.addEventListener('dragend', () => {
-                draggedItem = null;
-                item.style.opacity = '1';
-                list.querySelectorAll('.priority-item').forEach(it => it.classList.remove('drag-over'));
-            });
-
-            item.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-            });
-
-            item.addEventListener('dragenter', (e) => {
-                if (item !== draggedItem) item.classList.add('drag-over');
-            });
-
-            item.addEventListener('dragleave', () => {
-                item.classList.remove('drag-over');
-            });
-
-            item.addEventListener('drop', (e) => {
-                e.preventDefault();
-                if (item !== draggedItem) {
-                    const items = [...list.querySelectorAll('.priority-item')];
-                    const draggedIdx = items.indexOf(draggedItem);
-                    const targetIdx = items.indexOf(item);
-
-                    if (draggedIdx < targetIdx) {
-                        item.after(draggedItem);
-                    } else {
-                        item.before(draggedItem);
-                    }
-                }
-            });
-        });
-    },
-
-    resetBackglassPriority() {
-        const defaults = ["fanart", "covers", "logos", "marquees"];
-        const list = document.getElementById('bg-priority-list');
-        list.innerHTML = defaults.map((p, i) => `
-            <div class="priority-item" draggable="true" data-index="${i}" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--bg-surface); border: 1px solid var(--glass-border); border-radius: 8px; cursor: grab;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                <span style="font-weight: 500; text-transform: capitalize;">${p}</span>
-            </div>
-        `).join('');
-        this.bindPrioritySort();
-    },
 
     async saveBackglassSettings() {
         const btn = document.getElementById('btn-save-backglass');
         btn.disabled = true;
         btn.innerText = 'Saving...';
 
-        const priority = [...document.querySelectorAll('#bg-priority-list .priority-item span')].map(s => s.innerText.toLowerCase());
-
         const settings = {
             enabled: document.getElementById('bg-enabled').checked,
-            screen_index: parseInt(document.getElementById('bg-screen-index').value),
-            priority: priority
+            screen_index: parseInt(document.getElementById('bg-screen-index').value)
         };
 
         try {

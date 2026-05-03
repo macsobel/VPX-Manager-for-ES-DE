@@ -130,25 +130,53 @@ const DashboardPage = {
 
     async loadSystemInfo() {
         try {
-            const [sysRes, updateRes] = await Promise.all([
+            const [sysRes, updateCountRes, softUpdateRes] = await Promise.all([
                 fetch('/api/system/status'),
-                fetch('/api/tables/update-count')
+                fetch('/api/tables/update-count'),
+                fetch('/api/updates/check')
             ]);
             const info = await sysRes.json();
-            const updateData = await updateRes.json();
-            const updatesCount = updateData.updates_available || 0;
+            const updateCountData = await updateCountRes.json();
+            const softUpdate = await softUpdateRes.json();
+            
+            const updatesCount = updateCountData.updates_available || 0;
 
             const fmtSize = (mb) => mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
 
             const updatesHtml = updatesCount > 0
-                ? `<a href="#tables" style="color: var(--accent-amber); font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+                ? `<a href="#tables" style="color: var(--accent-amber); font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                     ${updatesCount} table update${updatesCount === 1 ? '' : 's'} available
                    </a>`
-                : `<div style="color: var(--accent-emerald); display: flex; align-items: center; gap: 6px;">
+                : `<div style="color: var(--accent-emerald); display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
                     All tables up to date
                    </div>`;
+
+            let softUpdateHtml = '';
+            if (softUpdate.update_available) {
+                softUpdateHtml = `
+                    <div style="margin-top: 12px; padding: 12px; background: rgba(79, 140, 255, 0.1); border: 1px solid rgba(79, 140, 255, 0.2); border-radius: 8px;">
+                        <div style="font-weight: 700; color: var(--text-primary); font-size: 0.85rem; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Software Update v${softUpdate.latest_version}
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-bottom: 10px;">A new version of VPX Manager is available.</div>
+                        <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem; width: 100%; justify-content: center;" onclick="window.open('${softUpdate.download_url}', '_blank')">
+                            Download Now
+                        </button>
+                    </div>
+                `;
+            } else if (softUpdate.error) {
+                softUpdateHtml = `<div style="color: var(--accent-red); font-size: 0.75rem; margin-top: 8px; opacity: 0.7;">Update check failed: ${softUpdate.error}</div>`;
+            } else {
+                softUpdateHtml = `
+                    <div style="margin-top: 8px; font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        VPX Manager is up to date (v${softUpdate.current_version})
+                    </div>
+                `;
+            }
 
             const softwareCheck = (sw) => {
                 const icon = sw.exists
@@ -175,7 +203,10 @@ const DashboardPage = {
                     </div>
                     <div>
                         <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm);">Updates</div>
-                        <div style="font-size: 0.9rem;">${updatesHtml}</div>
+                        <div style="font-size: 0.9rem;">
+                            ${updatesHtml}
+                            ${softUpdateHtml}
+                        </div>
                     </div>
                     <div>
                         <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm);">Software</div>

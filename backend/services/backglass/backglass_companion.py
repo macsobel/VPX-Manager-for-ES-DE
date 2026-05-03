@@ -68,25 +68,14 @@ def get_random_backglass() -> Path:
 # Backglass resolver — finds the best image for a detected game name
 # ─────────────────────────────────────────────────────────────────────────────
 
-def find_backglass(game_name: str, priority_list: list[str]) -> Path:
+def find_backglass(game_name: str) -> Path:
     """
-    Search priority based on user settings.
-    Default order is usually: fanart, covers, logos, marquees
+    Search for fanart (backglass) for the given game name.
+    Falls back to a random generic backglass if not found.
     """
-    # Map friendly names to directory objects
-    dir_map = {
-        "covers": COVERS_DIR,
-        "fanart": FANART_DIR,
-        "logos": MEDIA_DIR / "logos",
-        "marquees": MEDIA_DIR / "marquees"
-    }
-
-    for trigger in priority_list:
-        target_dir = dir_map.get(trigger)
-        if not target_dir: continue
-        
+    if FANART_DIR.exists():
         for ext in (".png", ".jpg", ".jpeg", ".webp", ".tiff"):
-            f = target_dir / f"{game_name}{ext}"
+            f = FANART_DIR / f"{game_name}{ext}"
             if f.exists():
                 return f
 
@@ -119,7 +108,7 @@ class BackglassCompanion:
                     game_name = line[5:]
                     if game_name != self.last_game:
                         logger.info(f"🎯 New Selection: {game_name}")
-                        bg_path = find_backglass(game_name, self.priority)
+                        bg_path = find_backglass(game_name)
                         self.display_queue.put(bg_path)
                         self.last_game = game_name
                 elif line == "DISCONNECT":
@@ -258,9 +247,5 @@ class BackglassCompanion:
 
 if __name__ == "__main__":
     s_idx = int(sys.argv[1]) if len(sys.argv) > 1 else 1
-    # Priority passed as comma-separated list: fanart,covers,logos,marquees
-    priority = sys.argv[2].split(',') if len(sys.argv) > 2 else ["fanart", "covers", "logos", "marquees"]
-    
     companion = BackglassCompanion(screen_index=s_idx)
-    companion.priority = priority
     companion.run()

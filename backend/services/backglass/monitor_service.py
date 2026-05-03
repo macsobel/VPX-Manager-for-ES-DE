@@ -58,14 +58,13 @@ class BackglassMonitor:
 
         python, script = self._get_paths()
         screen = str(config.backglass_screen_index)
-        priority = ",".join(config.backglass_priority)
         
-        logger.info(f"Starting Backglass Companion on screen {screen} with priority {priority}...")
+        logger.info(f"Starting Backglass Companion on screen {screen}...")
         try:
             cmd = [python]
             if script:
                 cmd.append(str(script))
-            cmd.extend(["--backglass", screen, priority])
+            cmd.extend(["--backglass", screen])
 
             self._companion_process = subprocess.Popen(
                 cmd,
@@ -170,28 +169,15 @@ class BackglassMonitor:
                         except Exception:
                             pass
 
-                    # 2. Fallback to lsof logic if the event file is missing or empty
-                    # (this happens if they haven't re-run the ES-DE integration tool to install the script)
                     if not game_name:
                         try:
                             cmd = ["lsof", "-p", str(esde_pid), "-Fn"]
                             output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode()
                             media_files = [line[1:] for line in output.split('\n')
-                                           if line.startswith('n') and 'downloaded_media/vpinball' in line]
+                                           if line.startswith('n') and 'downloaded_media/vpinball/fanart' in line]
                             
                             if media_files:
-                                # Prioritize based on config
-                                selection = None
-                                for trigger in config.backglass_priority:
-                                    for f in media_files:
-                                        if trigger in f:
-                                            selection = f
-                                            break
-                                    if selection: break
-                                
-                                if not selection:
-                                    selection = media_files[0]
-
+                                selection = media_files[0]
                                 game_name = Path(selection).stem
                         except subprocess.CalledProcessError:
                             pass

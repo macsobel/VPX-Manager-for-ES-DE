@@ -1,4 +1,6 @@
 import logging
+import time
+from datetime import datetime, timedelta
 
 import httpx
 
@@ -11,12 +13,23 @@ GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
 
 class UpdateService:
-    @staticmethod
-    async def check_for_updates():
+    def __init__(self):
+        self._cached_result = None
+        self._last_check_time = None
+        self._cache_duration = timedelta(hours=12)
+
+    async def check_for_updates(self, force: bool = False):
         """
         Check GitHub for the latest release and compare with local version.
         Returns a dict with update status and details.
+        Uses a 12-hour cache by default.
         """
+        now = datetime.now()
+        if not force and self._cached_result and self._last_check_time:
+            if now - self._last_check_time < self._cache_duration:
+                logger.info("Returning cached update check result")
+                return self._cached_result
+
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(GITHUB_API_URL)
@@ -83,7 +96,7 @@ class UpdateService:
                             # Final fallback: just use the first asset
                             download_url = assets[0].get("browser_download_url")
 
-                return {
+                result = {
                     "update_available": is_newer,
                     "latest_version": latest_tag,
                     "current_version": VERSION,
@@ -92,6 +105,11 @@ class UpdateService:
                     "published_at": release_data.get("published_at"),
                     "body": release_data.get("body", ""),
                 }
+                
+                self._cached_result = result
+                self._last_check_time = now
+                return result
+
         except httpx.HTTPStatusError as e:
             logger.error(f"GitHub API error: {e}")
             return {

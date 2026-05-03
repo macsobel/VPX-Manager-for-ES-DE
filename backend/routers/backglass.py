@@ -11,7 +11,6 @@ router = APIRouter(prefix="/api/backglass", tags=["backglass"])
 class BackglassSettings(BaseModel):
     enabled: bool
     screen_index: int
-    priority: list[str]
     display_count: int = 1
 
 def get_display_count():
@@ -43,7 +42,6 @@ async def get_settings():
     return BackglassSettings(
         enabled=config.backglass_enabled,
         screen_index=config.backglass_screen_index,
-        priority=config.backglass_priority,
         display_count=get_display_count()
     )
 
@@ -51,7 +49,6 @@ async def get_settings():
 async def update_settings(settings: BackglassSettings):
     config.backglass_enabled = settings.enabled
     config.backglass_screen_index = settings.screen_index
-    config.backglass_priority = settings.priority
     save_config(config)
     
     # If we just enabled it, the monitor service will pick it up on its next loop

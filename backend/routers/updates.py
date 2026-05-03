@@ -6,6 +6,6 @@ router = APIRouter(prefix="/api/updates", tags=["updates"])
 
 
 @router.get("/check")
-async def check_updates():
+async def check_updates(force: bool = False):
     """Manually check for updates from GitHub."""
-    return await update_service.check_for_updates()
+    return await update_service.check_for_updates(force=force)
