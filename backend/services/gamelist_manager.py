@@ -234,6 +234,58 @@ class GamelistManager:
                 logger.error(f"Failed to write gamelist.xml after rename: {e}")
         return found
 
+    def clean_dead_entries(self, tables_dir: str):
+        tree, root = self._load_tree()
+        found = False
+        tables_path = Path(tables_dir)
+
+        seen_paths = set()
+        elements_to_remove = []
+
+        for elem in root:
+            if elem.tag not in ("game", "folder"):
+                continue
+
+            path_elem = elem.find("path")
+            if path_elem is None or not path_elem.text:
+                elements_to_remove.append(elem)
+                continue
+
+            # Standardize path
+            norm_path = self._normalize_path(path_elem.text)
+
+            # Check for duplicates
+            if norm_path in seen_paths:
+                elements_to_remove.append(elem)
+                continue
+            seen_paths.add(norm_path)
+
+            # Check if file/folder exists on disk
+            rel_str = path_elem.text.replace("./", "", 1).replace("\\", "/")
+            full_path = tables_path / rel_str
+            # Handle case where XML paths redundantly include the Tables folder name
+            if not full_path.exists() and rel_str.startswith(f"{tables_path.name}/"):
+                alt_path = tables_path / rel_str[len(tables_path.name)+1:]
+                if alt_path.exists():
+                    full_path = alt_path
+
+            if not full_path.exists():
+                elements_to_remove.append(elem)
+
+        for elem in elements_to_remove:
+            root.remove(elem)
+            found = True
+
+        if found:
+            _indent(root)
+            try:
+                self.xml_path.parent.mkdir(parents=True, exist_ok=True)
+                tree.write(self.xml_path, encoding="utf-8", xml_declaration=True)
+                logger.info(f"Cleaned dead/duplicate entries from {self.xml_path}")
+            except Exception as e:
+                logger.error(f"Failed to update gamelist.xml after cleaning: {e}")
+        return found
+
     def remove_game(self, rom_path: str) -> bool:
         tree, root = self._load_tree()
         norm_path = self._normalize_path(rom_path)

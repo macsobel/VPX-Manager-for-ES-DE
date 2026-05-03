@@ -129,17 +129,23 @@ class TableFileService:
             logger.error(f"Failed to update gamelist.xml: {e}")
 
         # 6. Update global media assets (ES-DE folders)
-        # We rename any files in /images, /videos, /manuals that start with the old stem
         try:
-            from backend.services.media_manager import ESDE_EXTENSIONS
+            from backend.services.media_manager import ESDE_STATUS_TYPES, ESDE_EXTENSIONS
 
-            esde_base = config.expanded_tables_dir
-            categories = ["images", "videos", "manuals"]
+            esde_base = config.esde_media_base
 
-            for cat in categories:
+            for cat in ESDE_STATUS_TYPES:
                 cat_dir = esde_base / cat
                 if not cat_dir.exists():
                     continue
+
+                # Map ESDE_STATUS_TYPES to extensions key
+                if cat == "videos":
+                    exts = ESDE_EXTENSIONS["videos"]
+                elif cat == "manuals":
+                    exts = ESDE_EXTENSIONS["manuals"]
+                else:
+                    exts = ESDE_EXTENSIONS["images"]
 
                 # Suffixes often used in ES-DE (plus plain)
                 possible_suffixes = [
@@ -152,7 +158,7 @@ class TableFileService:
                 ]
 
                 for suf in possible_suffixes:
-                    for ext in ESDE_EXTENSIONS.get(cat, []):
+                    for ext in exts:
                         old_media = cat_dir / f"{old_stem}{suf}{ext}"
                         if old_media.exists():
                             new_media = cat_dir / f"{standard_base}{suf}{ext}"
