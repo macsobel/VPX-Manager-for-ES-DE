@@ -49,8 +49,17 @@ FADE_DURATION  = 0.25   # seconds for crossfade
 BG_COLOR       = (0, 0, 0)
 POLL_INTERVAL  = 0.05   # 50ms for turbo-polling
 
-DEFAULT_BG      = Path(__file__).parent / "default_bg.png"
-GENERIC_BGS_DIR = Path(__file__).parent.parent.parent.parent / "resources" / "backglass_images"
+if getattr(sys, "frozen", False):
+    # PyInstaller bundles files in sys._MEIPASS
+    BASE_DIR = Path(sys._MEIPASS)
+    DEFAULT_BG = BASE_DIR / "backend" / "services" / "backglass" / "default_bg.png"
+    GENERIC_BGS_DIR = BASE_DIR / "resources" / "backglass_images"
+    ESDE_BG = BASE_DIR / "resources" / "esde_bg.png"
+else:
+    BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+    DEFAULT_BG = Path(__file__).parent / "default_bg.png"
+    GENERIC_BGS_DIR = BASE_DIR / "resources" / "backglass_images"
+    ESDE_BG = BASE_DIR / "resources" / "esde_bg.png"
 
 def get_random_backglass() -> Path:
     """Returns a random PNG from the generic backglass directory."""
@@ -75,9 +84,18 @@ def find_backglass(game_name: str) -> Path:
     """
     if FANART_DIR.exists():
         for ext in (".png", ".jpg", ".jpeg", ".webp", ".tiff"):
+            # 1. Check root level (standard)
             f = FANART_DIR / f"{game_name}{ext}"
+            logger.info(f"Checking fanart path: {f}")
             if f.exists():
                 return f
+            # 2. Check subfolder (some ES-DE setups)
+            f_sub = FANART_DIR / game_name / f"{game_name}{ext}"
+            logger.info(f"Checking fanart path: {f_sub}")
+            if f_sub.exists():
+                return f_sub
+    
+    logger.info(f"No fanart found for {game_name}, falling back to generic.")
 
     # Final Default fallback
     return get_random_backglass()
@@ -114,7 +132,7 @@ class BackglassCompanion:
                 elif line == "DISCONNECT":
                     logger.info("📴 ES-DE disconnected.")
                     self.last_game = None
-                    self.display_queue.put(Path(__file__).parent.parent.parent.parent / "resources" / "esde_bg.png")
+                    self.display_queue.put(ESDE_BG)
             except Exception as e:
                 logger.error(f"Stdin read error: {e}")
                 time.sleep(1)
