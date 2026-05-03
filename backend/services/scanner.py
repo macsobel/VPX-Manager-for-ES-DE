@@ -95,12 +95,12 @@ async def scan_tables_directory() -> dict:
         existing_db = await db.get_db()
         try:
             cursor = await existing_db.execute(
-                "SELECT id, filename, mtime, vps_id FROM tables"
+                "SELECT id, filename, mtime, vps_id, folder_path, vbs_hash FROM tables"
             )
             rows = await cursor.fetchall()
-            # Store existing info: {filename_lower: (id, mtime_in_db, vps_id)}
+            # Store existing info: {filename_lower: (id, mtime_in_db, vps_id, folder_path, original_filename)}
             existing_meta = {
-                row["filename"].lower(): (row["id"], row["mtime"], row["vps_id"])
+                row["filename"].lower(): (row["id"], row["mtime"], row["vps_id"], row["folder_path"], row["filename"], row["vbs_hash"])
                 for row in rows
             }
         finally:
@@ -224,6 +224,20 @@ async def scan_tables_directory() -> dict:
 
                     table_id = existing_info[0] if existing_info else None
                     vps_id = existing_info[2] if existing_info else None
+
+                    # If not found by exact filename, check if another entry exists with the exact same folder path
+                    # where the old file no longer exists (indicating an external rename).
+                    if not table_id:
+                        for ef_lower, ef_info in existing_meta.items():
+                            e_id, e_mtime, e_vps_id, e_folder_path, e_original_filename, e_vbs_hash = ef_info
+                            if e_folder_path == str(folder_path) and e_vbs_hash and e_vbs_hash == vbs_hash:
+                                # Ensure the old file doesn't actually exist
+                                old_file_path = Path(e_folder_path) / e_original_filename
+                                if not old_file_path.exists():
+                                    table_id = e_id
+                                    vps_id = e_vps_id
+                                    break
+
                     table_data = {
                         "filename": vpx_path.name,
                         "version": meta["version"],
@@ -294,18 +308,18 @@ async def scan_tables_directory() -> dict:
             for row in all_existing:
                 if row["filename"].lower() not in found_filenames:
                     # Need to delete this table!
-                    from backend.services.gamelist_manager import GamelistManager
-                    from backend.services.media_manager import \
-                        delete_all_media_for_table
-
-                    try:
-                        gm = GamelistManager(str(config.get_gamelist_xml_path()))
-                        rel_path = f"./{Path(row['folder_path']).name}/{row['filename']}"
-                        gm.remove_game(rel_path)
-                    except Exception:
-                        pass
+                    from backend.services.media_manager import delete_all_media_for_table
                     await delete_all_media_for_table(row["filename"])
                     await db.delete_table(row["id"])
+
+            # Clean up gamelist.xml once
+            from backend.services.gamelist_manager import GamelistManager
+            try:
+                gm = GamelistManager(str(config.get_gamelist_xml_path()))
+                gm.clean_dead_entries(str(config.expanded_tables_dir))
+            except Exception as e:
+                logger.error(f"Failed to clean gamelist.xml: {e}")
+
         finally:
             await existing_db.close()
 

@@ -109,6 +109,32 @@ async def match_table(table_id: int, match: MatchRequest):
     await TableFileService.standardize_names(table_id)
 
     updated = await db.get_table(table_id)
+
+    # Sync with gamelist.xml
+    try:
+        from backend.services.gamelist_manager import GamelistManager
+        from backend.core.config import config
+        from pathlib import Path
+
+        folder_name = Path(updated["folder_path"]).name
+        rom_path = f"./{folder_name}/{updated['filename']}"
+        gm = GamelistManager(str(config.get_gamelist_xml_path()))
+
+        xml_meta = {}
+        if match.name:
+            xml_meta["display_name"] = match.name
+        if match.manufacturer:
+            xml_meta["manufacturer"] = match.manufacturer
+            xml_meta["publisher"] = match.manufacturer
+            xml_meta["genre"] = match.manufacturer
+        if match.year:
+            xml_meta["year"] = str(match.year)
+
+        if xml_meta:
+            gm.update_game(rom_path, xml_meta)
+    except Exception as e:
+        print(f"Failed to sync gamelist.xml after match for {table_id}: {e}")
+
     return {"success": True, "table": updated}
 
 
