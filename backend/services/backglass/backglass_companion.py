@@ -88,11 +88,13 @@ def find_backglass(game_name: str) -> Path:
             f = FANART_DIR / f"{game_name}{ext}"
             logger.info(f"Checking fanart path: {f}")
             if f.exists():
+                logger.info(f"✅ Found backglass: {f.name}")
                 return f
             # 2. Check subfolder (some ES-DE setups)
             f_sub = FANART_DIR / game_name / f"{game_name}{ext}"
             logger.info(f"Checking fanart path: {f_sub}")
             if f_sub.exists():
+                logger.info(f"✅ Found backglass: {f_sub.name}")
                 return f_sub
     
     logger.info(f"No fanart found for {game_name}, falling back to generic.")
@@ -184,8 +186,12 @@ class BackglassCompanion:
                     if flags & pygame.NOFRAME: mode_name = "BORDERLESS"
                     if flags & pygame.SCALED: mode_name += " | SCALED"
                     
-                    logger.info(f"Attempting {mode_name} at {w}x{h} on display {idx}...")
-                    screen = pygame.display.set_mode((w, h), flags, display=idx)
+                    # macOS: Use NOFRAME + Always on Top (0x00008000 is the SDL flag for ALWAYS_ON_TOP)
+                    # We also add SHOWN to be explicit.
+                    full_flags = flags | 0x00008000 | pygame.SHOWN
+                    
+                    logger.info(f"Attempting {mode_name} at {w}x{h} on display {idx} with flags {hex(full_flags)}...")
+                    screen = pygame.display.set_mode((w, h), full_flags, display=idx)
                     
                     if screen:
                         W, H = screen.get_size()
@@ -210,6 +216,7 @@ class BackglassCompanion:
     
             def load_img(path):
                 try:
+                    logger.info(f"Loading image for display: {path}")
                     raw = pygame.image.load(str(path))
                     iw, ih = raw.get_size()
                     scale = min(W/iw, H/ih)

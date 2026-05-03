@@ -188,8 +188,8 @@ async def apply_esde_integration():
         esde_scripts_dir.mkdir(parents=True, exist_ok=True)
         script_path = esde_scripts_dir / "launch_vpinball.sh"
 
-        # Create game-selected script for backglass companion
-        game_select_dir = esde_scripts_dir / "game-selected"
+        # Create game-select script for backglass companion
+        game_select_dir = esde_scripts_dir / "game-select"
         game_select_dir.mkdir(parents=True, exist_ok=True)
         bg_script_path = game_select_dir / "vpx_backglass.sh"
 

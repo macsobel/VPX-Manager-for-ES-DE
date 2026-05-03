@@ -18,25 +18,41 @@ class BackglassMonitor:
         self._is_monitoring = False
 
     def get_esde_pid(self):
-        """Find the REAL ES-DE process, ignoring our own manager."""
-        try:
-            output = subprocess.check_output(["pgrep", "-f", "ES-DE"]).decode().strip()
-            if not output:
-                return None
-            
-            pids = output.split('\n')
-            for p in pids:
-                try:
-                    # Filter out our own manager app and scripts
-                    cmd_line = subprocess.check_output(["ps", "-p", p, "-o", "command="]).decode().strip()
-                    if "VPX Manager" in cmd_line or "backglass_companion" in cmd_line:
-                        continue
-                    if "ES-DE" in cmd_line:
-                        return p
-                except:
+        """Find the REAL ES-DE process, checking multiple possible names."""
+        my_pid = os.getpid()
+        # Common macOS process names for ES-DE
+        patterns = ["ES-DE", "es-de", "EmulationStation"]
+        
+        for pattern in patterns:
+            try:
+                output = subprocess.check_output(["pgrep", "-f", pattern]).decode().strip()
+                if not output:
                     continue
-        except:
-            pass
+                
+                pids = output.split('\n')
+                for p in pids:
+                    try:
+                        pid_int = int(p)
+                        if pid_int == my_pid:
+                            continue
+                            
+                        # Get command line to verify it's not our own manager or script
+                        cmd_line = subprocess.check_output(["ps", "-p", p, "-o", "command="]).decode().strip()
+                        
+                        # EXCLUSION FILTER: Must not contain our manager's signature
+                        if any(sig in cmd_line for sig in ["VPX Manager", "backglass_companion", "antigravity"]):
+                            continue
+                            
+                        # INCLUSION FILTER: If it contains ES-DE or EmulationStation and isn't us, it's likely ES-DE
+                        if any(sig in cmd_line for sig in ["ES-DE", "es-de", "EmulationStation"]):
+                            return p
+                    except:
+                        continue
+            except:
+                pass
+        
+        # If we got here, we didn't find anything
+        logger.debug("ES-DE process not found in any common pattern.")
         return None
 
     def _get_paths(self):
@@ -173,13 +189,42 @@ class BackglassMonitor:
                         try:
                             cmd = ["lsof", "-p", str(esde_pid), "-Fn"]
                             output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode()
-                            media_files = [line[1:] for line in output.split('\n')
-                                           if line.startswith('n') and 'downloaded_media/vpinball/fanart' in line]
+                            # Look for any media file in the vpinball downloaded_media directory
+                            # We search for "downloaded_media" or the user's media dir
+                            media_root = "downloaded_media"
+                            lines = output.split('\n')
                             
-                            if media_files:
-                                selection = media_files[0]
+                            found_media = []
+                            for line in lines:
+                                if line.startswith('n') and media_root in line and 'vpinball' in line:
+                                    # Filter for common image AND video extensions
+                                    # We include videos because ES-DE keeps them open while they play,
+                                    # making them a much more reliable trigger than images on fast Macs.
+                                    if any(ext in line.lower() for ext in ['.png', '.jpg', '.jpeg', '.webp', '.mp4', '.mkv', '.avi', '.mov']):
+                                        found_media.append(line[1:])
+                            
+                            if found_media:
+                                # Priority: 
+                                # 1. Videos (very reliable)
+                                # 2. Covers/Wheels (Instant signal when scrolling)
+                                # 3. Fanart
+                                videos = [f for f in found_media if any(v in f.lower() for v in ['.mp4', '.mkv', '.avi', '.mov'])]
+                                covers = [f for f in found_media if '/covers/' in f or '/wheel/' in f or '/marquees/' in f]
+                                fanart = [f for f in found_media if '/fanart/' in f]
+                                
+                                if videos:
+                                    selection = videos[0]
+                                elif covers:
+                                    # If we found a cover, it's likely an instant scroll event
+                                    selection = covers[0]
+                                elif fanart:
+                                    selection = fanart[0]
+                                else:
+                                    selection = found_media[0]
+                                    
                                 game_name = Path(selection).stem
-                        except subprocess.CalledProcessError:
+                                logger.debug(f"Sniffer detected game: {game_name}")
+                        except Exception:
                             pass
 
                     # 3. Update companion if game changed
@@ -192,7 +237,7 @@ class BackglassMonitor:
                         except:
                             pass
                     
-                    time.sleep(0.05) # 50ms turbo polling
+                    time.sleep(0.01) # 10ms ultra-turbo polling for instant detection
                 else:
                     time.sleep(2) # Slow poll when ES-DE is not running
             else:
