@@ -233,14 +233,17 @@ class BackglassCompanion:
                     if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                         running = False
     
-                try:
-                    img_path = self.display_queue.get_nowait()
-                    next_surf = load_img(img_path)
-                    fade_step = 0
-                except queue.Empty:
-                    pass
-                except Exception as e:
-                    logger.error(f"Queue error: {e}")
+                # Optimization: If there are multiple images in the queue, skip to the latest one
+                new_image_path = None
+                while not self.display_queue.empty():
+                    try:
+                        new_image_path = self.display_queue.get_nowait()
+                    except queue.Empty:
+                        break
+                
+                if new_image_path:
+                    next_surf = load_img(new_image_path)
+                    fade_step = 0 # Reset fade when a new image arrives
     
                 if next_surf:
                     fade_step += 1
