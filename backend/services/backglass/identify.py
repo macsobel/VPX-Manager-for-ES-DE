@@ -1,9 +1,17 @@
-import pygame
+import os
 import sys
 import time
 import platform
 import ctypes
 import ctypes.util
+
+# Disable SDL's HID/joystick layer to prevent IOHIDManager corruption
+# This must happen before pygame is imported!
+os.environ["SDL_JOYSTICK_DISABLED"] = "1"
+os.environ["SDL_HINT_JOYSTICK_HIDAPI"] = "0"
+os.environ["SDL_HINT_NO_SIGNAL_HANDLERS"] = "1"
+
+import pygame
 
 def hide_dock_icon_macos():
     """Hide the app icon from the macOS Dock at runtime."""
@@ -86,12 +94,6 @@ def draw_elite_digit(screen, digit, x, y, size, color):
 def identify_screen(display_index):
     # Hide from Dock on macOS immediately
     hide_dock_icon_macos()
-    
-    # Disable SDL's HID/joystick layer to prevent IOHIDManager corruption
-    import os
-    os.environ["SDL_JOYSTICK_DISABLED"] = "1"
-    os.environ["SDL_HINT_JOYSTICK_HIDAPI"] = "0"
-    os.environ["SDL_HINT_NO_SIGNAL_HANDLERS"] = "1"
     
     # Attempt to wake up display driver
     pygame.display.init()
