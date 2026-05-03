@@ -28,15 +28,15 @@ def hide_dock_icon_macos():
         ns_app = appkit.NSApplication.sharedApplication()
         
         # NSApplicationActivationPolicyProhibited = 2 (No Dock, No Menu)
-        # NSApplicationActivationPolicyAccessory = 1 (No Menu, shows in Command-Tab)
-        # We use 2 to be completely invisible
+        # NSApplicationActivationPolicyAccessory = 1 (No Menu, hides from Dock, shows in Cmd-Tab)
+        # We use 1 (Accessory) to allow the window to take focus while staying out of the Dock
         appkit.objc_msgSend.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_long]
         appkit.objc_msgSend.restype = ctypes.c_void_p
         
         # sel_registerName("setActivationPolicy:")
         set_policy_sel = appkit.sel_registerName(b"setActivationPolicy:")
         
-        appkit.objc_msgSend(ns_app, set_policy_sel, 2)
+        appkit.objc_msgSend(ns_app, set_policy_sel, 1)
     except Exception as e:
         # Fallback if something goes wrong with ctypes
         pass
@@ -126,9 +126,11 @@ def identify_screen(display_index):
         # Force foreground on macOS
         if sys.platform == "darwin":
             try:
-                # Tell macOS to bring the Python windows to the front
+                # Use a more robust AppleScript that targets the current process
                 import subprocess
-                subprocess.Popen(["osascript", "-e", 'tell application "Python" to activate'])
+                curr_pid = os.getpid()
+                script = f'tell application "System Events" to set frontmost of every process whose unix id is {curr_pid} to true'
+                subprocess.Popen(["osascript", "-e", script])
             except:
                 pass
                 
