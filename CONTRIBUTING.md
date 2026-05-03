@@ -74,7 +74,7 @@ Launch the application in development mode:
 python3 main.py
 ```
 - **Web UI**: Access at `http://localhost:8746`
-- **Logs**: View real-time logs in the terminal or in `~/Library/Application Support/VPX Manager for ES-DE/vpx_manager.log`.
+- **Logs**: View real-time logs in the terminal. The `vpx_manager.log` file (in the Application Support directory) is only generated when running in development mode.
 
 ---
 

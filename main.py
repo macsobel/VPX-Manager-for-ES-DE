@@ -86,13 +86,17 @@ class RedactingFilter(logging.Filter):
 
 
 # Configure standard logging
+is_dev = not getattr(sys, "frozen", False)
+handlers = [logging.StreamHandler()]
+
+if is_dev:
+    # Only generate log files in development environment
+    handlers.append(RotatingFileHandler(LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3))
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        RotatingFileHandler(LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3),
-        logging.StreamHandler(),
-    ],
+    handlers=handlers,
 )
 
 # Apply filter to ALL handlers in the root logger
