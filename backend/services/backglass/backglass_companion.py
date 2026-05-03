@@ -2,6 +2,7 @@
 import os
 import sys
 import time
+import random
 import queue
 import tempfile
 import threading
@@ -48,7 +49,20 @@ FADE_DURATION  = 0.25   # seconds for crossfade
 BG_COLOR       = (0, 0, 0)
 POLL_INTERVAL  = 0.05   # 50ms for turbo-polling
 
-DEFAULT_BG     = Path(__file__).parent / "default_bg.png"
+DEFAULT_BG      = Path(__file__).parent / "default_bg.png"
+GENERIC_BGS_DIR = Path(__file__).parent.parent.parent.parent / "resources" / "backglass_images"
+
+def get_random_backglass() -> Path:
+    """Returns a random PNG from the generic backglass directory."""
+    try:
+        if GENERIC_BGS_DIR.exists():
+            images = list(GENERIC_BGS_DIR.glob("*.png"))
+            if images:
+                return random.choice(images)
+    except Exception as e:
+        logger.error(f"Error picking random backglass: {e}")
+    
+    return DEFAULT_BG
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Backglass resolver — finds the best image for a detected game name
@@ -77,7 +91,7 @@ def find_backglass(game_name: str, priority_list: list[str]) -> Path:
                 return f
 
     # Final Default fallback
-    return DEFAULT_BG
+    return get_random_backglass()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # High-Speed lsof Sniffer
