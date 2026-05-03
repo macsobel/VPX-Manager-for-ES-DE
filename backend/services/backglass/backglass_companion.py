@@ -9,6 +9,13 @@ import platform
 import subprocess
 from pathlib import Path
 
+# Completely disable SDL's HID/joystick layer BEFORE importing pygame.
+# Without this, importing pygame loads SDL2, which registers IOHIDManager
+# callbacks that corrupt shared HID state, causing ES-DE to segfault on its next launch.
+os.environ["SDL_JOYSTICK_DISABLED"] = "1"
+os.environ["SDL_HINT_JOYSTICK_HIDAPI"] = "0"
+os.environ["SDL_HINT_NO_SIGNAL_HANDLERS"] = "1"
+
 import pygame
 import logging
 
@@ -121,12 +128,6 @@ class BackglassCompanion:
     def run_display(self):
         try:
             logger.info("Initializing Pygame...")
-            # Completely disable SDL's HID/joystick layer BEFORE any init.
-            # Without this, SDL2 registers IOHIDManager callbacks that corrupt
-            # shared HID state, causing ES-DE to segfault on its next launch.
-            os.environ["SDL_JOYSTICK_DISABLED"] = "1"
-            os.environ["SDL_HINT_JOYSTICK_HIDAPI"] = "0"
-            os.environ["SDL_HINT_NO_SIGNAL_HANDLERS"] = "1"
             
             # Only init the subsystems we actually need (display)
             pygame.display.init()
