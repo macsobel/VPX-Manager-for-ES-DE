@@ -65,20 +65,35 @@ class TableFileService:
                 # This matches our primary file or a sidecar (e.g. .directb2s)
                 new_file = file.parent / f"{standard_base}{file.suffix}"
                 if file != new_file:
+                    skip = False
                     if new_file.exists():
-                        logger.warning(f"Skipping rename, target exists: {new_file}")
-                        continue
-                    file.rename(new_file)
-                    results["renames"].append({"old": file.name, "new": new_file.name})
+                        try:
+                            if not file.samefile(new_file):
+                                logger.warning(f"Skipping rename, target exists and is a different file: {new_file}")
+                                skip = True
+                        except Exception:
+                            logger.warning(f"Skipping rename, target exists: {new_file}")
+                            skip = True
+                    if not skip:
+                        file.rename(new_file)
+                        results["renames"].append({"old": file.name, "new": new_file.name})
 
         # 3. Rename the FOLDER itself if necessary
         # Special case: if we are inside the folder we are renaming, this might fail on some OS.
         if old_folder_path.name != new_folder_name:
+            skip_folder = False
             if new_folder_path.exists():
-                logger.error(
-                    f"Cannot rename folder, target already exists: {new_folder_path}"
-                )
-                # We still update the DB for the files we successfully renamed inside though
+                try:
+                    if not old_folder_path.samefile(new_folder_path):
+                        logger.error(f"Cannot rename folder, target already exists: {new_folder_path}")
+                        skip_folder = True
+                except Exception as e:
+                    logger.error(f"Cannot rename folder, target exists check failed: {e}")
+                    skip_folder = True
+
+            if skip_folder:
+                # Stay with old path if rename skipped due to collision
+                new_folder_path = old_folder_path
             else:
                 try:
                     old_folder_path.rename(new_folder_path)
@@ -141,14 +156,22 @@ class TableFileService:
                         old_media = cat_dir / f"{old_stem}{suf}{ext}"
                         if old_media.exists():
                             new_media = cat_dir / f"{standard_base}{suf}{ext}"
-                            if not new_media.exists():
-                                old_media.rename(new_media)
-                                results["renames"].append(
-                                    {
-                                        "old": f"{cat}/{old_media.name}",
-                                        "new": new_media.name,
-                                    }
-                                )
+                            if old_media != new_media:
+                                skip_media = False
+                                if new_media.exists():
+                                    try:
+                                        if not old_media.samefile(new_media):
+                                            skip_media = True
+                                    except Exception:
+                                        skip_media = True
+                                if not skip_media:
+                                    old_media.rename(new_media)
+                                    results["renames"].append(
+                                        {
+                                            "old": f"{cat}/{old_media.name}",
+                                            "new": new_media.name,
+                                        }
+                                    )
         except Exception as e:
             logger.error(f"Failed to rename global media assets: {e}")
 

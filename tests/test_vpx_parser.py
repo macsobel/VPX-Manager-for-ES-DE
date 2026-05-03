@@ -18,7 +18,7 @@ def reset_mock():
     mock_olefile.OleFileIO.return_value.__enter__.return_value = mock_ole
     yield
 
-@patch('services.vpx_parser.olefile.isOleFile')
+@patch('backend.services.vpx_parser.olefile.isOleFile')
 def test_get_metadata_not_ole_file(mock_is_ole_file):
     """Test get_metadata safely handles non-OLE files by returning default metadata."""
     mock_is_ole_file.return_value = False

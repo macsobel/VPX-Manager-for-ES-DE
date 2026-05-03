@@ -61,14 +61,20 @@ class GamelistManager:
 
         # 1. Update/Create <game>
         game_elem = None
+        duplicates_to_remove = []
         for game in root.findall("game"):
             path_elem = game.find("path")
             if (
                 path_elem is not None
                 and self._normalize_path(path_elem.text) == norm_rom_path
             ):
-                game_elem = game
-                break
+                if game_elem is None:
+                    game_elem = game
+                else:
+                    duplicates_to_remove.append(game)
+
+        for dup in duplicates_to_remove:
+            root.remove(dup)
 
         if game_elem is None:
             logger.info(f"Creating new <game> entry for {rom_path}")
@@ -141,22 +147,48 @@ class GamelistManager:
     def rename_game(self, old_rom_path: str, new_rom_path: str):
         tree, root = self._load_tree()
         norm_old = self._normalize_path(old_rom_path)
+        norm_new = self._normalize_path(new_rom_path)
         found = False
 
         # 1. Rename <game> entries
+        game_matches = []
         for game in root.findall("game"):
             path_elem = game.find("path")
-            if (
-                path_elem is not None
-                and self._normalize_path(path_elem.text) == norm_old
-            ):
-                path_elem.text = (
-                    new_rom_path
-                    if new_rom_path.startswith("./")
-                    else f"./{new_rom_path.lstrip('./')}"
-                )
-                found = True
-                # Don't break, rename all matches if any (redundant but safe)
+            if path_elem is not None:
+                p_norm = self._normalize_path(path_elem.text)
+                if p_norm == norm_old or p_norm == norm_new:
+                    game_matches.append(game)
+
+        if game_matches:
+            # Keep the first match, update it, remove any others to prevent duplicates
+            first_game = game_matches[0]
+            path_elem = first_game.find("path")
+            path_elem.text = (
+                new_rom_path
+                if new_rom_path.startswith("./")
+                else f"./{new_rom_path.lstrip('./')}"
+            )
+            found = True
+
+            # Update media tags to match new stem
+            old_stem = Path(old_rom_path).stem
+            new_stem = Path(new_rom_path).stem
+            if old_stem != new_stem:
+                for tag in ["image", "video", "marquee", "fanart", "thumbnail", "manual"]:
+                    elem = first_game.find(tag)
+                    if elem is not None and elem.text:
+                        p = Path(elem.text.replace("\\", "/"))
+                        if p.name.startswith(old_stem):
+                            new_name = p.name.replace(old_stem, new_stem, 1)
+                            new_text = str(p.parent / new_name).replace("\\", "/")
+                            if elem.text.startswith("./") and not new_text.startswith("./"):
+                                new_text = f"./{new_text}"
+                            elif not elem.text.startswith("./") and new_text.startswith("./"):
+                                new_text = new_text[2:]
+                            elem.text = new_text
+
+            for dup in game_matches[1:]:
+                root.remove(dup)
 
         # 2. Rename <folder> entries if nested
         old_rel = old_rom_path.replace("./", "").replace("\\", "/")
@@ -167,19 +199,28 @@ class GamelistManager:
             new_folder = str(Path(new_rel).parent).replace("\\", "/")
 
             norm_old_folder = self._normalize_path(old_folder)
+            norm_new_folder = self._normalize_path(new_folder)
 
+            folder_matches = []
             for fol in root.findall("folder"):
                 fpath_elem = fol.find("path")
-                if (
-                    fpath_elem is not None
-                    and self._normalize_path(fpath_elem.text) == norm_old_folder
-                ):
-                    fpath_elem.text = (
-                        new_folder
-                        if new_folder.startswith("./")
-                        else f"./{new_folder.lstrip('./')}"
-                    )
-                    found = True
+                if fpath_elem is not None:
+                    p_norm = self._normalize_path(fpath_elem.text)
+                    if p_norm == norm_old_folder or p_norm == norm_new_folder:
+                        folder_matches.append(fol)
+
+            if folder_matches:
+                first_fol = folder_matches[0]
+                fpath_elem = first_fol.find("path")
+                fpath_elem.text = (
+                    new_folder
+                    if new_folder.startswith("./")
+                    else f"./{new_folder.lstrip('./')}"
+                )
+                found = True
+
+                for dup in folder_matches[1:]:
+                    root.remove(dup)
 
         if found:
             _indent(root)

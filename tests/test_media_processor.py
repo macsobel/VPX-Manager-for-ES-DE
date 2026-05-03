@@ -4,9 +4,9 @@ import subprocess
 from unittest.mock import patch, MagicMock
 from backend.services.media_processor import normalize_video
 
-@patch("services.media_processor.subprocess.check_call")
-@patch("services.media_processor.subprocess.run")
-@patch("services.media_processor.os.replace")
+@patch("backend.services.media_processor.subprocess.check_call")
+@patch("backend.services.media_processor.subprocess.run")
+@patch("backend.services.media_processor.os.replace")
 def test_normalize_video_command_injection(mock_replace, mock_subprocess_run, mock_check_call):
     # Mock ffmpeg -i output to trigger ffmpeg transcode call
     mock_subprocess_run.return_value = MagicMock(stderr="Stream #0:0(eng): Video: h264 (Main), yuv444p, 1920x1080")
