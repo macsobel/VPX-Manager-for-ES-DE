@@ -172,6 +172,8 @@ Thanks to the community members who make this hobby possible:
 2.  Install dependencies: `pip install -r requirements.txt`
 3.  Launch: `python main.py`
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development setup and credential configuration instructions.
+
 ## Troubleshooting
 *   **Gatekeeper (macOS)**: Right-click the app and select **Open** to bypass the developer verification warning.
 *   **Port Conflicts**: The application server requires port **8746**.
