@@ -44,7 +44,7 @@ It automates scraping metadata and media from sources like [ScreenScraper](https
 - Patches table scripts automatically using jsm174's [standalone script repository](https://github.com/jsm174/vpx-standalone-scripts) so older tables work on macOS and Linux.
 - Automatically installs NVRAM files for Bally MPU 6803 and Gottlieb System 3 tables so they boot correctly.
 - Built-in settings editor for VPX config files (VBS, INI).
-- Runs natively on macOS and Linux.
+- Runs natively on macOS (available now) and Linux (coming soon).
 
 ---
 
