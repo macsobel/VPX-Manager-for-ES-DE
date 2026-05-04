@@ -409,43 +409,33 @@ echo "Script completed successfully."
         ]:
             if settings_path.exists():
                 try:
-                    parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
-                    s_tree = ET.parse(settings_path, parser=parser)
-                    s_root = s_tree.getroot()
-
-                    found_emu = False
-                    for string_elem in s_root.findall("string"):
-                        if string_elem.get("name") == "AlternativeEmulator_vpinball":
-                            string_elem.set("value", "Visual Pinball X (Script)")
-                            found_emu = True
-                            break
-
-                    if not found_emu:
-                        new_string = ET.SubElement(s_root, "string")
-                        new_string.set("name", "AlternativeEmulator_vpinball")
-                        new_string.set("value", "Visual Pinball X (Script)")
-
-                    # Enable Custom Event Scripts
+                    lines = []
                     found_scripts = False
-                    found_scripts_browsing = False
-                    for bool_elem in s_root.findall("bool"):
-                        if bool_elem.get("name") == "CustomEventScripts":
-                            bool_elem.set("value", "true")
-                            found_scripts = True
-                        elif bool_elem.get("name") == "CustomEventScriptsBrowsing":
-                            bool_elem.set("value", "true")
-                            found_scripts_browsing = True
+                    found_browsing = False
+                    found_emu = False
+
+                    with open(settings_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if 'name="CustomEventScripts"' in line:
+                                line = '<bool name="CustomEventScripts" value="true" />\n'
+                                found_scripts = True
+                            elif 'name="CustomEventScriptsBrowsing"' in line:
+                                line = '<bool name="CustomEventScriptsBrowsing" value="true" />\n'
+                                found_browsing = True
+                            elif 'name="AlternativeEmulator_vpinball"' in line:
+                                line = '<string name="AlternativeEmulator_vpinball" value="Visual Pinball X (Script)" />\n'
+                                found_emu = True
+                            lines.append(line)
 
                     if not found_scripts:
-                        new_bool = ET.SubElement(s_root, "bool")
-                        new_bool.set("name", "CustomEventScripts")
-                        new_bool.set("value", "true")
-                    if not found_scripts_browsing:
-                        new_bool = ET.SubElement(s_root, "bool")
-                        new_bool.set("name", "CustomEventScriptsBrowsing")
-                        new_bool.set("value", "true")
+                        lines.append('<bool name="CustomEventScripts" value="true" />\n')
+                    if not found_browsing:
+                        lines.append('<bool name="CustomEventScriptsBrowsing" value="true" />\n')
+                    if not found_emu:
+                        lines.append('<string name="AlternativeEmulator_vpinball" value="Visual Pinball X (Script)" />\n')
 
-                    s_tree.write(settings_path, encoding="utf-8", xml_declaration=True)
+                    with open(settings_path, "w", encoding="utf-8") as f:
+                        f.writelines(lines)
                 except Exception as e:
                     logger.warning(f"Could not update {settings_path}: {e}")
 
