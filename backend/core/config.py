@@ -191,6 +191,7 @@ class AppConfig(BaseModel):
     # Backglass Companion Settings
     backglass_enabled: bool = False
     backglass_screen_index: int = 1
+    backglass_screen_name: str = ""
 
     # Media Preferences
     media_preferences: dict = {

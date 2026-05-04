@@ -73,9 +73,27 @@ class BackglassMonitor:
             return
 
         python, script = self._get_paths()
-        screen = str(config.backglass_screen_index)
         
-        logger.info(f"Starting Backglass Companion on screen {screen}...")
+        # Determine correct screen index based on saved name
+        screen_index = config.backglass_screen_index
+        saved_name = config.backglass_screen_name
+
+        if saved_name:
+            try:
+                # Lazy import to avoid circular dependencies
+                from backend.routers.backglass import get_displays
+                displays = get_displays()
+                for d in displays:
+                    if d["name"] == saved_name:
+                        screen_index = d["index"]
+                        logger.info(f"Matched display name '{saved_name}' to index {screen_index}")
+                        break
+            except Exception as e:
+                logger.warning(f"Failed to match display name '{saved_name}': {e}")
+
+        screen = str(screen_index)
+
+        logger.info(f"Starting Backglass Companion on screen {screen} (saved as {saved_name or screen_index})...")
         try:
             cmd = [python]
             if script:
