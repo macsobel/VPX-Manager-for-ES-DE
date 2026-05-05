@@ -35,6 +35,7 @@ from typing import List, Optional, Union
 from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, HTTPException
 
 from backend.core.config import config
+from backend.core.display_utils import get_effective_rotation
 from backend.services.vps_matcher import vps_matcher
 
 # Optional archive support
@@ -352,6 +353,22 @@ async def import_table(
         old_ini_dir = table_dir / "pinmame" / "ini"
         if old_ini_dir.exists():
             shutil.rmtree(old_ini_dir)
+    else:
+        # Auto-generate Smart Auto-Fit INI on first upload
+        try:
+            rotation = get_effective_rotation(config.master_orientation)
+            ini_lines = [
+                "[Player]",
+                f"Rotation = {rotation}",
+                "CabinetAutofitMode = 1",
+                "CabinetAutofitPos = 0.1",
+            ]
+            target = table_dir / f"{standard_name}.ini"
+            with open(target, "w", encoding="utf-8") as f:
+                f.write("\n".join(ini_lines) + "\n")
+            results.append({"type": "ini", "status": "auto-generated", "destination": str(target)})
+        except Exception as e:
+            logger.error(f"Failed to auto-generate INI during import: {e}")
 
     # 8. NVRAM files (optional) — copy from master repo or save uploaded files to pinmame/nvram/
 

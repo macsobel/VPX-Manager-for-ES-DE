@@ -153,6 +153,17 @@ const SettingsPage = {
                                 <option value="Cabinet" ${data.vpx_display_mode === 'Cabinet' ? 'selected' : ''}>Cabinet</option>
                             </select>
                         </div>
+                        <div class="input-group">
+                            <label class="input-label">Master Table Orientation</label>
+                            <select class="input-field" id="setting-master-orientation">
+                                <option value="" ${data.master_orientation === '' ? 'selected' : ''}>Auto-Detect</option>
+                                <option value="0" ${data.master_orientation === '0' ? 'selected' : ''}>0 Degrees (Landscape)</option>
+                                <option value="90" ${data.master_orientation === '90' ? 'selected' : ''}>90 Degrees</option>
+                                <option value="180" ${data.master_orientation === '180' ? 'selected' : ''}>180 Degrees</option>
+                                <option value="270" ${data.master_orientation === '270' ? 'selected' : ''}>270 Degrees (Portrait)</option>
+                            </select>
+                            <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4px;">Sets default rotation in newly generated INI files. Auto-detects based on server primary monitor if left empty.</div>
+                        </div>
                     </div>
                 </div>
 
@@ -349,6 +360,7 @@ const SettingsPage = {
                 esde_app_path: getVal('setting-esde-app'),
                 vpx_use_flavor: getVal('setting-vpx-flavor'),
                 vpx_display_mode: getVal('setting-vpx-display-mode'),
+                master_orientation: getVal('setting-master-orientation'),
                 screenscraper_username: getVal('setting-ss-user'),
                 screenscraper_password: getVal('setting-ss-pass'),
             };

@@ -102,6 +102,12 @@ const IniManagerPage = {
                     <!-- Editor Footer -->
                     <div class="ini-editor-footer" id="editor-footer" style="padding: 1rem; border-top: 1px solid var(--border-color); background: var(--bg-tertiary); display: none; justify-content: space-between; align-items: flex-start; gap: 1rem;">
                         <div style="display: flex; flex-direction: column; gap: 0.75rem; flex: 1;" id="quick-fixes-container">
+                            <!-- Row 0: Smart Auto-Fit -->
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <button class="btn btn-secondary btn-sm" onclick="IniManagerPage.applyAutoFit()" title="Automatically fit the table to the screen orientation">Smart Auto-Fit Setup</button>
+                                <span style="font-size: 0.75rem; color: var(--text-tertiary); margin-left: 0.5rem;">Clears manual camera tweaks and uses auto-calculated dimensions</span>
+                            </div>
+
                             <!-- Row 1: Video Preset -->
                             <div style="display: flex; gap: 0.5rem; align-items: center;">
                                 <select id="video-preset-select" class="input-field" style="width: auto; min-width: 180px; font-size: 0.85rem; padding: 0.25rem 0.5rem; height: 32px;">
@@ -455,6 +461,31 @@ const IniManagerPage = {
 
         this.state.editor.setValue(content, -1);
         this.state.editor.focus();
+    },
+
+    async applyAutoFit() {
+        if (!this.state.selectedTable) return;
+        Modal.confirm('Smart Auto-Fit', 'This will remove any manual camera/view tweaks from the INI and configure it to automatically scale to the screen on next launch. Continue?', async () => {
+            try {
+                const res = await fetch(`/api/ini-manager/${this.state.selectedTable}/autofit`, {
+                    method: 'POST'
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    Toast.success("Smart Auto-Fit applied successfully");
+                    if (this.state.editor) {
+                        this.state.editor.setValue(data.content, -1);
+                    }
+                    this.state.originalContent = data.content;
+                } else {
+                    const data = await res.json();
+                    throw new Error(data.detail || 'Failed to apply Auto-Fit');
+                }
+            } catch (e) {
+                Toast.error(e.message);
+            }
+        });
     },
 
     applyVideoPreset() {

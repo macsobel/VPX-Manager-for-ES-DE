@@ -165,6 +165,9 @@ migrate_legacy_data()
 
 class AppConfig(BaseModel):
     tables_dir: str = "~/ROMs/vpinball"
+    # Master Orientation Setting
+    master_orientation: str = ""  # Empty for auto-detect, or "0", "90", "180", "270"
+
     # ES-DE Integration Settings
     vpx_standalone_app_path: str = (
         "/Applications/VPinballX_BGFX.app"

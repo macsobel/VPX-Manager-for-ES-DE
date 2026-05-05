@@ -44,6 +44,8 @@ class SettingsUpdate(BaseModel):
     tables_dir: Optional[str] = None
     vpx_standalone_app_path: Optional[str] = None
     vpx_use_flavor: Optional[str] = None
+    vpx_display_mode: Optional[str] = None
+    master_orientation: Optional[str] = None
     esde_app_path: Optional[str] = None
     media_storage_mode: Optional[str] = None
     esde_media_dir: Optional[str] = None
