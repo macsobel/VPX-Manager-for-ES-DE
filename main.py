@@ -87,7 +87,7 @@ class RedactingFilter(logging.Filter):
 
 # Configure standard logging
 is_dev = not getattr(sys, "frozen", False)
-handlers = [logging.StreamHandler()]
+handlers: list[logging.Handler] = [logging.StreamHandler()]
 
 if is_dev:
     # Only generate log files in development environment
@@ -164,6 +164,9 @@ async def lifespan(app: FastAPI):
     backglass_monitor.start()
 
     yield
+    
+    # Ensure backglass monitor is stopped cleanly on shutdown
+    backglass_monitor.stop()
 
 
 app = FastAPI(
@@ -296,7 +299,7 @@ if __name__ == "__main__":
                     icon_filename = "MenuBarIconColor.png"
                     if getattr(sys, "frozen", False):
                         # PyInstaller path
-                        base_path = sys._MEIPASS
+                        base_path = getattr(sys, "_MEIPASS", "")
                         icon_path = os.path.join(base_path, "resources", icon_filename)
                     else:
                         # Running from script
@@ -461,22 +464,22 @@ if __name__ == "__main__":
 
         # --- Attempt 1: GTK (gi) ---
         try:
-            import gi
+            import gi  # type: ignore
             gi.require_version('Gtk', '3.0')
-            from gi.repository import Gtk, GLib
+            from gi.repository import Gtk, GLib  # type: ignore
             import threading
 
             # Resolve icon path
             icon_filename = "icon.png"
             if getattr(sys, "frozen", False):
-                icon_path = os.path.join(sys._MEIPASS, "resources", icon_filename)
+                icon_path = os.path.join(getattr(sys, "_MEIPASS", ""), "resources", icon_filename)
             else:
                 icon_path = os.path.join(os.path.dirname(__file__), "resources", icon_filename)
 
             if not os.path.exists(icon_path):
                 icon_filename = "MenuBarIconColor.png"
                 if getattr(sys, "frozen", False):
-                    icon_path = os.path.join(sys._MEIPASS, "resources", icon_filename)
+                    icon_path = os.path.join(getattr(sys, "_MEIPASS", ""), "resources", icon_filename)
                 else:
                     icon_path = os.path.join(os.path.dirname(__file__), "resources", icon_filename)
 
@@ -603,14 +606,14 @@ if __name__ == "__main__":
                 import subprocess
                 import webbrowser
                 import threading
-                from PIL import Image
-                import pystray
-                from pystray import MenuItem as item
+                from PIL import Image  # type: ignore
+                import pystray  # type: ignore
+                from pystray import MenuItem as item  # type: ignore
 
                 # Resolve icon path
                 icon_filename = "icon.png"
                 if getattr(sys, "frozen", False):
-                    icon_path = os.path.join(sys._MEIPASS, "resources", icon_filename)
+                    icon_path = os.path.join(getattr(sys, "_MEIPASS", ""), "resources", icon_filename)
                 else:
                     icon_path = os.path.join(os.path.dirname(__file__), "resources", icon_filename)
 
