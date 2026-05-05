@@ -489,29 +489,31 @@ const ToolsPage = {
                         </div>
                         
                         <div id="display-selector" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0.5rem;">
-                            ${Array.from({ length: settings.display_count }, (_, i) => `
-                                <button class="display-btn ${settings.screen_index === i ? 'active' : ''}" data-index="${i}" style="padding: 1rem 0.5rem; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.03); color: var(--text-secondary); border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                                    <div style="font-size: 0.6rem; opacity: 0.5; margin-bottom: 2px; letter-spacing: 0.05em;">MONITOR</div>
-                                    <div style="font-size: 1.25rem; font-weight: 800;">${i}</div>
+                            ${settings.displays.map(display => `
+                                <button class="display-btn ${settings.screen_name ? (settings.screen_name === display.name ? 'active' : '') : (settings.screen_index === display.index ? 'active' : '')}" data-index="${display.index}" data-name="${display.name}" style="padding: 1rem 0.5rem; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.03); color: var(--text-secondary); border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                    <div style="font-size: 0.6rem; opacity: 0.5; margin-bottom: 2px; letter-spacing: 0.05em;">MONITOR ${display.index}</div>
+                                    <div style="font-size: 0.8rem; font-weight: 800; text-align: center; word-break: break-word;">${display.name}</div>
                                 </button>
                             `).join('')}
                         </div>
                         <input type="hidden" id="bg-screen-index" value="${settings.screen_index}">
+                        <input type="hidden" id="bg-screen-name" value="${settings.screen_name}">
                         <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 1rem;">Click 'Identify' to see numbers on your screens, then select the one for your backglass.</p>
                     </div>
 
-                    </div>
                 </div>
             `;
 
             // Bind display buttons
             const displayBtns = document.querySelectorAll('.display-btn');
             const hiddenInput = document.getElementById('bg-screen-index');
+            const hiddenNameInput = document.getElementById('bg-screen-name');
             displayBtns.forEach(btn => {
                 btn.onclick = () => {
                     displayBtns.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     hiddenInput.value = btn.dataset.index;
+                    hiddenNameInput.value = btn.dataset.name;
                 };
             });
 
@@ -529,7 +531,8 @@ const ToolsPage = {
 
         const settings = {
             enabled: document.getElementById('bg-enabled').checked,
-            screen_index: parseInt(document.getElementById('bg-screen-index').value)
+            screen_index: parseInt(document.getElementById('bg-screen-index').value),
+            screen_name: document.getElementById('bg-screen-name').value
         };
 
         try {
