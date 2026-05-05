@@ -501,7 +501,6 @@ const ToolsPage = {
                         <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 1rem;">Click 'Identify' to see numbers on your screens, then select the one for your backglass.</p>
                     </div>
 
-                    </div>
                 </div>
             `;
 
