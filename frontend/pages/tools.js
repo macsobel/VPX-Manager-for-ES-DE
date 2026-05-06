@@ -100,12 +100,12 @@ const ToolsPage = {
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                         </svg>
-                        Install Emulation Station VPX Launcher Script
+                        Install Emulation Station Integrations
                     </div>
                     <div class="card">
                         <div class="card-body">
                             <p style="color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5; font-size: 0.9rem;">
-                                Configure ES-DE to launch VPX tables and return focus to the frontend after the table closes.
+                                Configure ES-DE to launch VPX tables and other integrations.
                             </p>
                             <button class="btn btn-primary" id="btn-apply-esde">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
