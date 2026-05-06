@@ -536,12 +536,12 @@ async def upload_file_to_table(
 
     elif file_type == "puppack":
         dest = table_dir / "pupvideos"
-        return _extract_zip_safely(content, dest, "PUP Pack", wipe=True)
+        return await _extract_archive_safely(content, filename, dest, "PUP Pack", wipe=True)
 
     elif file_type == "music":
         dest = table_dir / "music"
         if ext == ".zip":
-            return _extract_zip_safely(content, dest, "Music", wipe=True)
+            return await _extract_archive_safely(content, filename, dest, "Music", wipe=True)
         else:
             target = dest / filename
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -549,7 +549,7 @@ async def upload_file_to_table(
     elif file_type == "altsound":
         dest = table_dir / "pinmame" / "altsound"
         if ext == ".zip":
-            return _extract_zip_safely(content, dest, "AltSound", wipe=True)
+            return await _extract_archive_safely(content, filename, dest, "AltSound", wipe=True)
         else:
             target = dest / filename
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -557,7 +557,7 @@ async def upload_file_to_table(
     elif file_type == "altcolor":
         dest = table_dir / "pinmame" / "altcolor"
         if ext == ".zip":
-            return _extract_zip_safely(content, dest, "AltColor", wipe=True)
+            return await _extract_archive_safely(content, filename, dest, "AltColor", wipe=True)
         else:
             # Isolated per-table architecture: place in rom-specific folder
             # For now, use the filename stem as the rom name if not provided

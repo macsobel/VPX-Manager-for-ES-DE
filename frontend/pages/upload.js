@@ -1027,7 +1027,11 @@ const UploadPage = {
                 fetch('/api/tables/scan', { method: 'POST' }).catch(() => { });
                 setTimeout(() => {
                     overlay.style.display = 'none';
-                    this._resetState();
+                    if (this._state.puppackFile && data.id) {
+                        this._showPupPackPrompt(data.id, name);
+                    } else {
+                        this._resetState();
+                    }
                 }, 1500);
             } else {
                 Toast.error(data.error || 'Import failed');
@@ -1039,9 +1043,25 @@ const UploadPage = {
         }
     },
 
+
+    _showPupPackPrompt(tableId, tableName) {
+        document.getElementById('modal-content').innerHTML = `
+            <h3 class="modal-title">Configure PUP Pack?</h3>
+            <p style="margin-bottom: 1rem; color: var(--text-secondary);">You uploaded a PUP Pack for <strong>${this._esc(tableName)}</strong>.</p>
+            <p style="margin-bottom: 2rem; color: var(--text-secondary);">Would you like to review and configure its screen layouts now?</p>
+            <div class="modal-actions" style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn btn-secondary" onclick="document.getElementById('app-modal').classList.remove('open'); window.location.hash='#tables';">No, Thanks</button>
+                <button class="btn btn-primary" onclick="document.getElementById('app-modal').classList.remove('open'); window.location.hash='#puppack-manager/${tableId}';">Yes, Configure</button>
+            </div>
+        `;
+        document.getElementById('app-modal').classList.add('open');
+        this._resetState();
+    },
+
     /* ═══════════════════════════════════════════════════
        Add Files to Existing Table Mode
        ═══════════════════════════════════════════════════ */
+
 
     async renderAddFiles(tableId) {
         const container = document.getElementById('page-container');
@@ -1395,7 +1415,13 @@ const UploadPage = {
             fetch('/api/tables/scan', { method: 'POST' }).catch(() => { });
             setTimeout(() => {
                 overlay.style.display = 'none';
-                window.location.hash = '#tables';
+                if (this._state.puppackFile && tableId) {
+                    // Re-use the prompt we made earlier, getting the table name if possible
+                    const tableName = document.querySelector('.page-header .badge-neutral')?.nextSibling?.textContent?.trim() || "this table";
+                    this._showPupPackPrompt(tableId, tableName);
+                } else {
+                    window.location.hash = '#tables';
+                }
             }, 1500);
         } catch (e) {
             Toast.error('Upload failed: ' + e.message);
