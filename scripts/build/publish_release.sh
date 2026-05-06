@@ -11,6 +11,14 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 VERSION_FILE="${ROOT_DIR}/backend/core/version.txt"
 
+# 0. Ensure we are on the main branch
+cd "${ROOT_DIR}"
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ "${CURRENT_BRANCH}" != "main" ]; then
+    echo "❌ Error: You must be on the 'main' branch to publish a release."
+    exit 1
+fi
+
 # 1. Read current version and increment
 if [ ! -f "${VERSION_FILE}" ]; then
     echo "1" > "${VERSION_FILE}"
