@@ -10,25 +10,34 @@ def get_primary_display_rotation() -> str:
     width, height = 0, 0
     try:
         if platform.system() == "Darwin":
-            # macOS: Use system_profiler
+            # macOS: Use system_profiler with mini detail for speed
             result = subprocess.run(
-                ["system_profiler", "SPDisplaysDataType"],
+                ["system_profiler", "SPDisplaysDataType", "-detailLevel", "mini"],
                 capture_output=True,
                 text=True,
                 check=True
             )
+            
+            current_w, current_h = 0, 0
+            best_w, best_h = 0, 0
+            
             for line in result.stdout.splitlines():
-                if "Resolution:" in line:
-                    parts = line.split()
+                line_stripped = line.strip()
+                if "Resolution:" in line_stripped:
+                    parts = line_stripped.split()
                     try:
                         idx = parts.index("Resolution:")
-                        w_str = parts[idx + 1]
-                        h_str = parts[idx + 3]
-                        width = int(w_str)
-                        height = int(h_str)
-                        break  # Use the first display found
+                        current_w = int(parts[idx + 1])
+                        current_h = int(parts[idx + 3])
+                        if best_w == 0:  # Fallback to the first display found
+                            best_w, best_h = current_w, current_h
                     except (ValueError, IndexError):
-                        continue
+                        pass
+                elif "Main Display: Yes" in line_stripped:
+                    best_w, best_h = current_w, current_h
+                    break
+                    
+            width, height = best_w, best_h
         elif platform.system() == "Linux":
             # Linux: Use xrandr
             result = subprocess.run(
