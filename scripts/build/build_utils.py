@@ -2,14 +2,27 @@ import marshal
 import os
 import sys
 
+def _get_key(key_name: str) -> str:
+    """Get security key from environment or local ignored secrets file."""
+    key = os.environ.get(key_name)
+    if not key:
+        try:
+            import vpx_secrets
+            key = getattr(vpx_secrets, key_name, None)
+        except ImportError:
+            pass
+    if not key:
+        raise RuntimeError(f"Security key {key_name} is missing. Must be set via environment variable or vpx_secrets.py")
+    return key
+
 def _scramble_gen(v: str) -> str:
     """XOR-based scrambling with the general key."""
-    key = os.environ.get("VPX_GENERAL_KEY") or "vpx_secret_key_2026"
+    key = _get_key("VPX_GENERAL_KEY")
     return "".join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(v))
 
 def _scramble_dev(v: str) -> str:
     """XOR-based scrambling with the dev key."""
-    key = os.environ.get("VPX_DEV_KEY") or "dev_vpx_scrambler_99"
+    key = _get_key("VPX_DEV_KEY")
     return "".join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(v))
 
 def generate_config_dat(dev_id, dev_password, dev_user, dev_pass, output_path="config.dat"):

@@ -57,6 +57,8 @@ jobs:
         SS_DEVPASS: ${{ secrets.SS_DEVPASS }}
         SS_USER: ${{ secrets.SS_USER }}
         SS_PASS: ${{ secrets.SS_PASS }}
+        VPX_GENERAL_KEY: ${{ secrets.VPX_GENERAL_KEY || 'dummy_general_key' }}
+        VPX_DEV_KEY: ${{ secrets.VPX_DEV_KEY || 'dummy_dev_key' }}
       run: |
         python3 scripts/build/build_utils.py
         
@@ -67,6 +69,8 @@ jobs:
         SS_DEVPASS: ${{ secrets.SS_DEVPASS }}
         SS_USER: ${{ secrets.SS_USER }}
         SS_PASS: ${{ secrets.SS_PASS }}
+        VPX_GENERAL_KEY: ${{ secrets.VPX_GENERAL_KEY || 'dummy_general_key' }}
+        VPX_DEV_KEY: ${{ secrets.VPX_DEV_KEY || 'dummy_dev_key' }}
       run: |
         chmod +x scripts/build/build_app.sh
         ./scripts/build/build_app.sh
@@ -75,6 +79,9 @@ jobs:
 
     - name: Build Linux AppImage
       if: startsWith(matrix.os, 'ubuntu')
+      env:
+        VPX_GENERAL_KEY: ${{ secrets.VPX_GENERAL_KEY || 'dummy_general_key' }}
+        VPX_DEV_KEY: ${{ secrets.VPX_DEV_KEY || 'dummy_dev_key' }}
       run: |
         chmod +x scripts/build/build_app.sh
         ./scripts/build/build_app.sh

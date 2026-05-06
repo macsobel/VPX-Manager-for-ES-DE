@@ -45,9 +45,23 @@ CONFIG_FILE = APP_SUPPORT_DIR / "vpx_manager.json"
 LOG_FILE = APP_SUPPORT_DIR / "vpx_manager.log"
 
 
+def _get_key(key_name: str) -> str:
+    """Get security key from environment or local ignored secrets file."""
+    key = os.environ.get(key_name)
+    if not key:
+        try:
+            import vpx_secrets
+            key = getattr(vpx_secrets, key_name, None)
+        except ImportError:
+            pass
+    if not key:
+        raise RuntimeError(f"Security key {key_name} is missing. Must be set via environment variable or vpx_secrets.py")
+    return key
+
+
 def _scramble(data: str) -> str:
     """XOR-based scrambling with a fixed key."""
-    key = os.environ.get("VPX_GENERAL_KEY") or "vpx_secret_key_2026"
+    key = _get_key("VPX_GENERAL_KEY")
     return "".join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(data))
 
 
@@ -302,7 +316,7 @@ class AppConfig(BaseModel):
 
 def _scramble_dev(data: str) -> str:
     """XOR-based scrambling for dev secrets (matches build_utils.py)."""
-    key = os.environ.get("VPX_DEV_KEY") or "dev_vpx_scrambler_99"
+    key = _get_key("VPX_DEV_KEY")
     return "".join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(data))
 
 
