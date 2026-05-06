@@ -139,6 +139,8 @@ async def list_tables(
                     else ""
                 )
                 t_dict["community_vps_file_id"] = community_entry.get("id", "")
+                t_dict["community_vps_updated_at"] = community_entry.get("updatedAt", 0)
+                t_dict["vps_updated_at"] = file_entry.get("updatedAt", 0)
                 t_dict["is_community_newer"] = community_entry.get(
                     "id"
                 ) != file_entry.get("id")
@@ -165,25 +167,29 @@ async def get_update_count():
     if not vps_matcher._loaded:
         await vps_matcher._load_cached_async()
 
-    def versions_are_equal(v1: str, v2: str) -> bool:
-        """Mirror of the frontend versionsAreEqual function."""
-        if v1 == v2:
-            return True
-        if not v1 or not v2:
+    def is_version_newer(v_latest: str, v_current: str) -> bool:
+        """Check if v_latest is strictly greater than v_current."""
+        if v_latest == v_current:
             return False
-        parts1 = str(v1).split('.')
-        parts2 = str(v2).split('.')
+        if not v_latest or not v_current:
+            return False
+        parts1 = str(v_latest).split('.')
+        parts2 = str(v_current).split('.')
         length = max(len(parts1), len(parts2))
         for i in range(length):
             p1 = (parts1[i] if i < len(parts1) else '0').strip()
             p2 = (parts2[i] if i < len(parts2) else '0').strip()
             if p1.isdigit() and p2.isdigit():
-                if int(p1) != int(p2):
+                if int(p1) > int(p2):
+                    return True
+                if int(p1) < int(p2):
                     return False
             else:
-                if p1.lower() != p2.lower():
+                if p1.lower() > p2.lower():
+                    return True
+                if p1.lower() < p2.lower():
                     return False
-        return True
+        return False
 
     tables = await db.get_tables(limit=9999)
     updates_count = 0
@@ -217,21 +223,22 @@ async def get_update_count():
         community_version = (community_entry.get("version") or "").strip()
         is_community_newer = community_entry.get("id") != file_entry.get("id")
 
-        # Check for direct update: latest_vps_version != current AND != ignored
+        # Check for direct update: latest_vps_version > current AND > ignored
         has_direct = (
             latest_version
             and current_version
-            and not versions_are_equal(latest_version, current_version)
-            and not versions_are_equal(latest_version, ignored_version)
+            and is_version_newer(latest_version, current_version)
+            and (not ignored_version or is_version_newer(latest_version, ignored_version))
         )
 
-        # Check for community update: same logic but using community version
+        # Check for community update: community file is different and newer updated date
+        current_updated_at = file_entry.get("updatedAt", 0)
+        community_updated_at = community_entry.get("updatedAt", 0)
+
         has_community = (
             is_community_newer
-            and community_version
-            and current_version
-            and not versions_are_equal(community_version, current_version)
-            and not versions_are_equal(community_version, ignored_version)
+            and community_updated_at > current_updated_at
+            and (not ignored_version or is_version_newer(community_version, ignored_version))
         )
 
         if has_direct or has_community:
@@ -360,6 +367,8 @@ async def get_table(table_id: int):
                 else ""
             )
             table["community_vps_file_id"] = community_entry.get("id", "")
+            table["community_vps_updated_at"] = community_entry.get("updatedAt", 0)
+            table["vps_updated_at"] = file_entry.get("updatedAt", 0)
             table["is_community_newer"] = community_entry.get("id") != file_entry.get(
                 "id"
             )

@@ -193,15 +193,36 @@ window.versionsAreEqual = function(v1, v2) {
         let p1 = (parts1[i] || '0').trim();
         let p2 = (parts2[i] || '0').trim();
 
-        // If both are strictly numeric, compare as numbers
         if (/^\d+$/.test(p1) && /^\d+$/.test(p2)) {
             if (parseInt(p1, 10) !== parseInt(p2, 10)) return false;
         } else {
-            // Otherwise string compare
             if (p1.toLowerCase() !== p2.toLowerCase()) return false;
         }
     }
     return true;
+};
+
+window.isVersionNewer = function(vLatest, vCurrent) {
+    if (vLatest === vCurrent) return false;
+    if (vLatest == null || vCurrent == null) return false;
+
+    const parts1 = String(vLatest).split('.');
+    const parts2 = String(vCurrent).split('.');
+    const length = Math.max(parts1.length, parts2.length);
+
+    for (let i = 0; i < length; i++) {
+        let p1 = (parts1[i] || '0').trim();
+        let p2 = (parts2[i] || '0').trim();
+
+        if (/^\d+$/.test(p1) && /^\d+$/.test(p2)) {
+            if (parseInt(p1, 10) > parseInt(p2, 10)) return true;
+            if (parseInt(p1, 10) < parseInt(p2, 10)) return false;
+        } else {
+            if (p1.toLowerCase() > p2.toLowerCase()) return true;
+            if (p1.toLowerCase() < p2.toLowerCase()) return false;
+        }
+    }
+    return false;
 };
 
 /**

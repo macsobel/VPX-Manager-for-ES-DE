@@ -1072,8 +1072,8 @@ const UploadPage = {
             const inv = invData.inventory || {};
 
             // Check for updates
-            const isDirect = t.latest_vps_version && t.version && !versionsAreEqual(t.latest_vps_version, t.version) && !versionsAreEqual(t.latest_vps_version, t.ignored_version);
-            const isCommunity = t.is_community_newer && t.community_vps_version && t.version && !versionsAreEqual(t.community_vps_version, t.version) && !versionsAreEqual(t.community_vps_version, t.ignored_version);
+            const isDirect = t.latest_vps_version && t.version && window.isVersionNewer(t.latest_vps_version, t.version) && (!t.ignored_version || window.isVersionNewer(t.latest_vps_version, t.ignored_version));
+            const isCommunity = t.is_community_newer && t.community_vps_updated_at > t.vps_updated_at && (!t.ignored_version || window.isVersionNewer(t.community_vps_version, t.ignored_version));
 
             let html = `
                 <div class="import-form">

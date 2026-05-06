@@ -510,16 +510,15 @@ class VPSMatcher:
                         pass
             return False
 
-        # Sort by version if possible
-        # We use a simple heuristic for version strings: 1.2 > 1.1 > 1.0
+        # Prioritize newest by updatedAt timestamp
         # We also prioritize files that have URLs and are not broken
         def version_score(f):
-            v = str(f.get("version", "0"))
+            updated_at = f.get("updatedAt", 0)
             has_url = 1 if f.get("urls") else 0
             is_broken = 1 if (f.get("urls") or [{}])[0].get("broken") else 0
             # Penalize if author matches the obfuscated filter
             s_penalty = -5 if _is_s(f.get("authors", [])) else 0
-            return (s_penalty, has_url, 1 - is_broken, v)
+            return (s_penalty, has_url, 1 - is_broken, updated_at)
 
         vpx_files.sort(key=version_score, reverse=True)
         return vpx_files[0] if vpx_files else {}
