@@ -78,6 +78,7 @@ const UploadPage = {
                         ${this._renderFileSlot('nvram', 'PinMAME NVRAMs (.nv)', '.nv', false, 'indigo', 'NVRAM file(s) → pinmame/nvram/', 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z', 0, true)}
                         ${this._renderFileSlot('ini', 'Table Settings INI (.ini)', '.ini', false, 'emerald', 'Table-specific settings file', 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z')}
                         ${this._renderFileSlot('puppack', 'PUP Pack (Archive/Files)', '.zip,.7z,.rar', false, 'amber', 'PuP-Pack arc → extracted to pupvideos/', 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z', 0, true)}
+                        ${this._renderFileSlot('flexdmd', 'FlexDMD / UltraDMD Assets', '.zip,.7z,.rar', false, 'amber', 'Folder matching .vpx name for DMD assets', 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM4 21a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2z', 0, true)}
                         ${this._renderFileSlot('altcolor', 'AltColor (Archive/Files)', '.cRZ,.zip,.7z,.rar,.vni,.pal', false, 'orange', 'Serum or color files → pinmame/altcolor/', 'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485', 0, true)}
                         ${this._renderFileSlot('altsound', 'AltSound (Archive/Files)', '.zip,.7z,.rar', false, 'pink', 'Alt sound pack → pinmame/altsound/', 'M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5.586v12.828a1 1 0 01-1.707.707L5.586 15z', 0, true)}
                         ${this._renderFileSlot('music', 'Music (Archive/Files)', '.zip,.7z,.rar,.mp3,.ogg,.wav', false, 'cyan', 'Music arc → extracted to music/', 'M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z', 0, true)}
@@ -431,7 +432,7 @@ const UploadPage = {
     async _setSlotFile(slotId, fileOrList) {
         const slotMap = {
             vpx: 'vpxFile', b2s: 'b2sFile', rom: 'romFiles',
-            puppack: 'puppackFile', music: 'musicFile',
+            puppack: 'puppackFile', flexdmd: 'flexdmdFile', music: 'musicFile',
             altsound: 'altsoundFile', altcolor: 'altcolorFile', nvram: 'nvramFiles',
             vbs: 'vbsFile', ini: 'iniFile'
         };
@@ -985,6 +986,10 @@ const UploadPage = {
                 if (Array.isArray(this._state.puppackFile)) this._state.puppackFile.forEach(f => formData.append('puppack_file', f));
                 else formData.append('puppack_file', this._state.puppackFile);
             }
+            if (this._state.flexdmdFile) {
+                if (Array.isArray(this._state.flexdmdFile)) this._state.flexdmdFile.forEach(f => formData.append('flexdmd_file', f));
+                else formData.append('flexdmd_file', this._state.flexdmdFile);
+            }
             if (this._state.musicFile) {
                 if (Array.isArray(this._state.musicFile)) this._state.musicFile.forEach(f => formData.append('music_file', f));
                 else formData.append('music_file', this._state.musicFile);
@@ -1180,6 +1185,7 @@ const UploadPage = {
                             ${this._renderFileSlot('nvram', 'PinMAME NVRAMs', '.nv', false, 'indigo', 'NVRAM file(s) → pinmame/nvram/', 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z', inv.nvram, true)}
                             ${this._renderFileSlot('ini', 'Table Settings (.ini)', '.ini', false, 'emerald', 'Replaces standardized .ini file', 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM12 15a3 3 0 100-6 3 3 0 000 6z', inv.ini)}
                             ${this._renderFileSlot('puppack', 'PUP Pack', '.zip', false, 'amber', 'Extract to pupvideos/', 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z', inv.puppack)}
+                            ${this._renderFileSlot('flexdmd', 'FlexDMD / UltraDMD', '.zip,.7z,.rar', false, 'amber', 'Extracted to match .vpx name', 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM4 21a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2z', inv.flexdmd)}
                             ${this._renderFileSlot('altcolor', 'AltColor', '.zip', false, 'orange', 'Extract to altcolor/', 'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485', inv.altcolor)}
                             ${this._renderFileSlot('altsound', 'AltSound', '.zip', false, 'pink', 'Extract to altsound/', 'M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5.586v12.828a1 1 0 01-1.707.707L5.586 15z', inv.altsound)}
                             ${this._renderFileSlot('music', 'Music Pack', '.zip', false, 'cyan', 'Extract to music/', 'M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z', inv.music)}
@@ -1244,13 +1250,13 @@ const UploadPage = {
                 }).catch(err => console.error('Failed to analyze existing table:', err));
 
             // Bind events for slots
-            const slotIds = ['vpx', 'b2s', 'rom', 'puppack', 'music', 'altsound', 'vbs', 'ini'];
+            const slotIds = ['vpx', 'b2s', 'rom', 'puppack', 'flexdmd', 'music', 'altsound', 'vbs', 'ini'];
             slotIds.forEach(slotId => {
                 const input = document.getElementById(`file-${slotId}`);
                 if (!input) return;
 
-                // Set allow folder attributes for puppack
-                if (slotId === 'puppack') {
+                // Set allow folder attributes for puppack and flexdmd
+                if (slotId === 'puppack' || slotId === 'flexdmd') {
                     input.setAttribute('webkitdirectory', '');
                     input.setAttribute('directory', '');
                     input.setAttribute('multiple', '');
@@ -1274,8 +1280,8 @@ const UploadPage = {
                         const items = e.dataTransfer.items;
                         let isFolderDrop = false;
 
-                        // We only process folder drops for puppack, music, altsound, altcolor
-                        if (['puppack', 'music', 'altsound', 'altcolor'].includes(slotId)) {
+                        // We only process folder drops for puppack, flexdmd, music, altsound, altcolor
+                        if (['puppack', 'flexdmd', 'music', 'altsound', 'altcolor'].includes(slotId)) {
                             for (let i = 0; i < items.length; i++) {
                                 const item = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
                                 if (item && item.isDirectory) {
@@ -1425,7 +1431,7 @@ const UploadPage = {
     _updateAddFilesButton() {
         const btn = document.getElementById('btn-upload-files');
         if (!btn) return;
-        const hasAnyStaged = this._state.b2sFile || (this._state.romFiles && this._state.romFiles.length > 0) || this._state.puppackFile ||
+        const hasAnyStaged = this._state.b2sFile || (this._state.romFiles && this._state.romFiles.length > 0) || this._state.puppackFile || this._state.flexdmdFile ||
             this._state.musicFile || this._state.altsoundFile || this._state.altcolorFile || this._state.vpxFile || this._state.vbsFile || this._state.iniFile;
         const hasAnyDeleted = this._state.deletedFiles && this._state.deletedFiles.length > 0;
         btn.disabled = !(hasAnyStaged || hasAnyDeleted);
@@ -1443,6 +1449,7 @@ const UploadPage = {
             ini: { files: this._state.iniFile ? [this._state.iniFile] : [], type: 'ini' },
             rom: { files: this._state.romFiles, type: 'rom' },
             puppack: { files: this._state.puppackFile ? (Array.isArray(this._state.puppackFile) ? this._state.puppackFile : [this._state.puppackFile]) : [], type: 'puppack' },
+            flexdmd: { files: this._state.flexdmdFile ? (Array.isArray(this._state.flexdmdFile) ? this._state.flexdmdFile : [this._state.flexdmdFile]) : [], type: 'flexdmd' },
             music: { files: this._state.musicFile ? (Array.isArray(this._state.musicFile) ? this._state.musicFile : [this._state.musicFile]) : [], type: 'music' },
             altsound: { files: this._state.altsoundFile ? (Array.isArray(this._state.altsoundFile) ? this._state.altsoundFile : [this._state.altsoundFile]) : [], type: 'altsound' },
             altcolor: { files: this._state.altcolorFile ? (Array.isArray(this._state.altcolorFile) ? this._state.altcolorFile : [this._state.altcolorFile]) : [], type: 'altcolor' },

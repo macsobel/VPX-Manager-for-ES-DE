@@ -220,6 +220,8 @@ const SettingsPage = {
                             uuid: sysDisplay.uuid,
                             width: sysDisplay.width,
                             height: sysDisplay.height,
+                            x: sysDisplay.x || 0,
+                            y: sysDisplay.y || 0,
                             scale_factor: sysDisplay.scale_factor
                         });
                     }

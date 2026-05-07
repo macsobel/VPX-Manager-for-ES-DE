@@ -63,12 +63,22 @@ def _get_macos_displays() -> List[Dict]:
                             except ValueError:
                                 pass
 
+
+                    # Calculate basic X/Y offset assumptions based on index if exact offsets aren't in plist
+                    # (This is a rudimentary fallback for positioning)
+                    x_pos = 0
+                    y_pos = 0
+                    if idx > 0:
+                        x_pos = sum([d["width"] for d in displays])
+
                     displays.append({
                         "index": idx,
                         "name": name,
                         "uuid": display.get("_spdisplays_display-uuid", f"unknown-{idx}"),
                         "width": width,
                         "height": height,
+                        "x": x_pos,
+                        "y": y_pos,
                         "scale_factor": scale_factor,
                     })
     except Exception as e:
@@ -92,18 +102,24 @@ pygame.quit()
         """
         result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
         if result.returncode == 0:
+            x_offset = 0
             for line in result.stdout.strip().splitlines():
                 if "|" in line:
                     parts = line.split("|")
                     if len(parts) == 4:
+                        w = int(parts[2])
+                        h = int(parts[3])
                         displays.append({
                             "index": int(parts[0]),
                             "name": parts[1],
                             "uuid": f"linux-{parts[0]}",
-                            "width": int(parts[2]),
-                            "height": int(parts[3]),
+                            "width": w,
+                            "height": h,
+                            "x": x_offset,
+                            "y": 0,
                             "scale_factor": 1.0,
                         })
+                        x_offset += w
     except Exception as e:
         print(f"Error getting Linux displays: {e}")
 
