@@ -52,7 +52,12 @@ async def get_puppack_options(table_id: int):
         pup_dir = subdirs[0]
 
     options = pup_pack_manager.identify_options(pup_dir)
-    return {"options": options, "pup_dir": str(pup_dir.name)}
+    screens = pup_pack_manager.get_active_screens(pup_dir)
+    return {
+        "options": options,
+        "screens": screens,
+        "pup_dir": str(pup_dir.name)
+    }
 
 @router.post("/{table_id}/apply")
 async def apply_puppack_option(table_id: int, req: ApplyOptionRequest):

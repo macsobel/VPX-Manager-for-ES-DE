@@ -129,7 +129,7 @@ const PupPackManagerPage = {
             const res = await fetch(`/api/puppacks/${id}/options`);
             const data = await res.json();
 
-            this.renderOptions(data.options, data.pup_dir);
+            this.renderOptions(data.options, data.pup_dir, data.screens);
         } catch (e) {
             console.error('Failed to load PUP Pack options:', e);
             panel.innerHTML = `
@@ -140,9 +140,30 @@ const PupPackManagerPage = {
         }
     },
 
-    renderOptions(options, pupDir) {
+    renderOptions(options, pupDir, screens = []) {
         const panel = document.getElementById('puppack-main-panel');
         const t = this.state.selectedTable;
+
+        let screensHtml = '';
+        if (screens && screens.length > 0) {
+            screensHtml = `
+                <div style="background: var(--bg-surface); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border-color); margin-bottom: 2rem;">
+                    <h3 style="margin: 0 0 1rem 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary); display: flex; align-items: center; gap: 8px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Current Screen Configuration
+                    </h3>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+                        ${screens.map(s => `
+                            <div class="badge" style="padding: 0.5rem 0.75rem; background: var(--bg-elevated); border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 6px;">
+                                <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-emerald);"></div>
+                                <span style="font-weight: 600; color: var(--text-primary);">${this.escHtml(s.description)}</span>
+                                <span style="font-size: 0.7rem; color: var(--text-tertiary); opacity: 0.7;">(${this.escHtml(s.status)})</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
 
         let optionsHtml = '';
         if (!options || options.length === 0) {
@@ -158,20 +179,29 @@ const PupPackManagerPage = {
         } else {
             optionsHtml = `
                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
-                    ${options.map(opt => `
-                        <div class="card" style="margin: 0; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--radius-lg); transition: all var(--transition-fast);">
-                            <div class="card-body" style="padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; gap: 1rem; height: 100%;">
-                                <div>
-                                    <h4 style="margin: 0 0 0.25rem 0; color: var(--text-primary); font-size: 1rem;">${this.escHtml(opt.name)}</h4>
-                                    <div style="font-family: monospace; font-size: 0.72rem; color: var(--text-tertiary);">${this.escHtml(opt.file)}</div>
+                    ${options.map(opt => {
+                        // Clean up the name
+                        let cleanName = opt.name
+                            .replace(/Option\s*\d+\s*-\s*/gi, '')
+                            .replace(/OPTION\d+_/gi, '')
+                            .replace(/_/g, ' ')
+                            .trim();
+                        
+                        return `
+                            <div class="card" style="margin: 0; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--radius-lg); transition: all var(--transition-fast);">
+                                <div class="card-body" style="padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; gap: 1rem; height: 100%;">
+                                    <div>
+                                        <h4 style="margin: 0 0 0.25rem 0; color: var(--text-primary); font-size: 1rem;">${this.escHtml(cleanName)}</h4>
+                                        <div style="font-family: monospace; font-size: 0.72rem; color: var(--text-tertiary);">${this.escHtml(opt.file)}</div>
+                                    </div>
+                                    <button class="btn btn-primary btn-sm" style="width: 100%; justify-content: center;" onclick="PupPackManagerPage.applyOption('${opt.file}')">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                        Apply Configuration
+                                    </button>
                                 </div>
-                                <button class="btn btn-primary btn-sm" style="width: 100%; justify-content: center;" onclick="PupPackManagerPage.applyOption('${opt.file}')">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                    Apply Configuration
-                                </button>
                             </div>
-                        </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </div>
             `;
         }
@@ -190,8 +220,9 @@ const PupPackManagerPage = {
             </div>
 
             <div style="flex: 1; overflow-y: auto; padding: 1.5rem;">
-                <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color: var(--text-primary);">Available Configurations</h3>
-                <p style="color: var(--text-secondary); margin-bottom: 2rem; font-size: 0.9rem; line-height: 1.5;">Select a screen layout or configuration option below. This will automatically simulate the Windows batch file logic to set up your PUP Pack.</p>
+                <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color: var(--text-primary);">Setup Options</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem; font-size: 0.9rem; line-height: 1.5;">Choose a screen layout below. This will apply the necessary file changes to configure the PUP Pack for your setup.</p>
+                ${screensHtml}
                 ${optionsHtml}
             </div>
         `;
@@ -209,6 +240,8 @@ const PupPackManagerPage = {
 
             if (res.ok) {
                 Toast.success(`Successfully applied configuration: ${filename}`);
+                // Refresh to show updated screen layout
+                this.selectTable(this.state.selectedTable.id);
             } else {
                 const data = await res.json();
                 Toast.error(data.detail || `Failed to apply ${filename}`);

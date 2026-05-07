@@ -1,5 +1,6 @@
 import re
 import os
+import csv
 import shutil
 import logging
 from pathlib import Path
@@ -151,31 +152,53 @@ class PupPackManager:
         return success
 
     @staticmethod
-    def auto_configure(pup_dir: Path, display_count: int) -> Optional[str]:
-        """Attempts to automatically select and apply the correct option based on display count."""
-        options = PupPackManager.identify_options(pup_dir)
-        if not options:
-            return None
+    def get_active_screens(pup_dir: Path) -> List[Dict]:
+        """Parses screens.pup to find which screens are currently active/configured."""
+        screens = []
+        screens_path = pup_dir / "screens.pup"
+        
+        logger.info(f"Checking for screens.pup in {screens_path}")
+        if not screens_path.exists():
+            logger.warning(f"screens.pup not found at {screens_path}")
+            return screens
 
-        target_str = f"{display_count} screen"
-        target_str2 = f"{display_count}-screen"
-        target_str3 = f"{display_count} screens"
-        target_str4 = f"{display_count}-screens"
+        try:
+            # Handle BOM and encoding
+            content = ""
+            try:
+                with open(screens_path, 'r', encoding='utf-16', errors='replace') as f:
+                    content = f.read()
+                    if "ScreenNum" not in content: # Not UTF-16
+                        raise UnicodeError()
+            except:
+                with open(screens_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
 
-        best_match = None
-        for opt in options:
-            name_lower = opt["name"].lower()
-            if target_str in name_lower or target_str2 in name_lower or target_str3 in name_lower or target_str4 in name_lower:
-                best_match = opt
-                break
+            if not content:
+                return screens
 
-        # Fallbacks: If no exact number match, but there are options, maybe pick the first one?
-        # Or better to return None and let the user decide.
-        if best_match:
-            success = PupPackManager.apply_option(pup_dir, best_match["file"])
-            if success:
-                return best_match["name"]
+            # Remove BOM if present
+            if content.startswith('\ufeff'):
+                content = content[1:]
 
-        return None
+            lines = content.splitlines()
+            if not lines:
+                return screens
+
+            reader = csv.DictReader(lines)
+            for row in reader:
+                # Clean keys (remove BOM or spaces)
+                clean_row = {str(k).strip().lstrip('\ufeff'): v for k, v in row.items()}
+                status = clean_row.get("Active", "").strip()
+                if status and status != "0":
+                    screens.append({
+                        "description": clean_row.get("ScreenDes", "Unknown Screen"),
+                        "status": status
+                    })
+            logger.info(f"Found {len(screens)} active screens in {screens_path}")
+        except Exception as e:
+            logger.error(f"Error parsing screens.pup in {pup_dir}: {e}")
+
+        return screens
 
 pup_pack_manager = PupPackManager()

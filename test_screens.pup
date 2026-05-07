@@ -1,0 +1,3 @@
+ScreenNum,ScreenDes,PlayList,PlayFile,Loopit,Active,Priority,CustomPos
+2,Backglass,Backglass,newbackglass2.png,0,ForceBack,,
+5,FullDMD,,,0,ForceBack,100,"5,0,0,100,100"

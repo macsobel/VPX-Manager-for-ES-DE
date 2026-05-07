@@ -175,7 +175,7 @@ class AppConfig(BaseModel):
         else "vpinballx"
     )
     vpx_use_flavor: str = "BGFX"
-    vpx_display_mode: str = "Desktop"
+    vpx_display_mode: str = "Cabinet"
     esde_app_path: str = (
         "/Applications/ES-DE.app" if platform.system() == "Darwin" else "es-de"
     )

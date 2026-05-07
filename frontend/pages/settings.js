@@ -147,14 +147,7 @@ const SettingsPage = {
                         </div>
 
                         <div class="input-group">
-                            <label class="input-label">Display Mode</label>
-                            <select class="input-field" id="setting-vpx-display-mode">
-                                <option value="Desktop" ${data.vpx_display_mode === 'Desktop' ? 'selected' : ''}>Desktop</option>
-                                <option value="Cabinet" ${data.vpx_display_mode === 'Cabinet' ? 'selected' : ''}>Cabinet</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label class="input-label">Master Table Orientation</label>
+                            <label class="input-label">Playfield Orientation</label>
                             <select class="input-field" id="setting-master-orientation">
                                 <option value="" ${data.master_orientation === '' ? 'selected' : ''}>Auto-Detect</option>
                                 <option value="0" ${data.master_orientation === '0' ? 'selected' : ''}>0 Degrees (Landscape)</option>
@@ -166,7 +159,7 @@ const SettingsPage = {
                         </div>
 
                         <div class="input-group">
-                            <label class="input-label">Cabinet Display Count</label>
+                            <label class="input-label">Display Count</label>
                             <select class="input-field" id="setting-display-count">
                                 <option value="1" ${data.display_count === 1 ? 'selected' : ''}>1 Screen (Desktop)</option>
                                 <option value="2" ${data.display_count === 2 ? 'selected' : ''}>2 Screens (Backglass + Playfield)</option>
@@ -369,7 +362,7 @@ const SettingsPage = {
                 vpx_standalone_app_path: getVal('setting-vpx-app'),
                 esde_app_path: getVal('setting-esde-app'),
                 vpx_use_flavor: getVal('setting-vpx-flavor'),
-                vpx_display_mode: getVal('setting-vpx-display-mode'),
+                vpx_display_mode: parseInt(getVal('setting-display-count')) === 1 ? 'Desktop' : 'Cabinet',
                 master_orientation: getVal('setting-master-orientation'),
                 display_count: parseInt(getVal('setting-display-count')) || 2,
                 screenscraper_username: getVal('setting-ss-user'),
