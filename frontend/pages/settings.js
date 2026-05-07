@@ -164,6 +164,16 @@ const SettingsPage = {
                             </select>
                             <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4px;">Sets default rotation in newly generated INI files. Auto-detects based on server primary monitor if left empty.</div>
                         </div>
+
+                        <div class="input-group">
+                            <label class="input-label">Cabinet Display Count</label>
+                            <select class="input-field" id="setting-display-count">
+                                <option value="1" ${data.display_count === 1 ? 'selected' : ''}>1 Screen (Desktop)</option>
+                                <option value="2" ${data.display_count === 2 ? 'selected' : ''}>2 Screens (Backglass + Playfield)</option>
+                                <option value="3" ${data.display_count === 3 ? 'selected' : ''}>3 Screens (DMD + Backglass + Playfield)</option>
+                            </select>
+                            <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4px;">Used to automatically configure PUP Packs for your layout.</div>
+                        </div>
                     </div>
                 </div>
 
@@ -361,6 +371,7 @@ const SettingsPage = {
                 vpx_use_flavor: getVal('setting-vpx-flavor'),
                 vpx_display_mode: getVal('setting-vpx-display-mode'),
                 master_orientation: getVal('setting-master-orientation'),
+                display_count: parseInt(getVal('setting-display-count')) || 2,
                 screenscraper_username: getVal('setting-ss-user'),
                 screenscraper_password: getVal('setting-ss-pass'),
             };

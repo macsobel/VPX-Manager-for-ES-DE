@@ -437,6 +437,10 @@ async def import_table(
             "folder_path": str(table_dir),
             "has_b2s": 1 if directb2s_file else 0,
             "has_rom": 1 if rom_files else 0,
+            "has_pup": 1 if puppack_file else 0,
+            "has_altcolor": 1 if altcolor_file else 0,
+            "has_altsound": 1 if altsound_file else 0,
+            "has_music": 1 if music_file else 0,
             "vbs_hash": vbs_hash,
         }
     )
@@ -629,6 +633,19 @@ async def _process_slot_media(
 ) -> dict:
     """Helper to process a slot that can be either an archive or a list of loose files."""
     if isinstance(file_input, list):
+        if not file_input:
+            return {"type": label.lower().replace(" ", "_"), "status": "skipped"}
+            
+        # If it's exactly one file and it's an archive, extract it instead of saving loose
+        if len(file_input) == 1 and file_input[0].filename:
+            first_file = file_input[0]
+            ext = Path(first_file.filename).suffix.lower()
+            if ext in [".zip", ".7z", ".rar"]:
+                content = await first_file.read()
+                return await _extract_archive_safely(
+                    content, first_file.filename, dest, label, wipe=True
+                )
+
         # Multiple loose files
         dest.mkdir(parents=True, exist_ok=True)
         count = 0
@@ -713,11 +730,6 @@ async def _extract_archive_safely(
                     tmp_path = tmp.name
                 try:
                     patoolib.extract_archive(tmp_path, outdir=str(dest), verbosity=-1)
-                    return {
-                        "type": label.lower().replace(" ", "_"),
-                        "status": "extracted",
-                        "destination": str(dest),
-                    }
                 finally:
                     if os.path.exists(tmp_path):
                         os.unlink(tmp_path)
@@ -733,6 +745,16 @@ async def _extract_archive_safely(
                 "status": "error",
                 "error": f"Unsupported archive format: {suffix}",
             }
+
+        # Cleanup __MACOSX junk if it exists
+        macosx_junk = dest / "__MACOSX"
+        if macosx_junk.exists() and macosx_junk.is_dir():
+            shutil.rmtree(macosx_junk)
+
+        if label == "PUP Pack":
+            from backend.services.puppack.manager import pup_pack_manager
+            from backend.core.config import config
+            pup_pack_manager.auto_configure(dest, config.display_count)
 
         return {
             "type": label.lower().replace(" ", "_"),

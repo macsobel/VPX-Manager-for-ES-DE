@@ -11,22 +11,22 @@ from backend.services.puppack.manager import pup_pack_manager
 
 logger = logging.getLogger("api.puppack")
 
-router = APIRouter(prefix="/puppacks", tags=["PUP Packs"])
+router = APIRouter(prefix="/api/puppacks", tags=["PUP Packs"])
 
 class ApplyOptionRequest(BaseModel):
     filename: str
 
-@router.get("/")
+@router.get("")
 async def list_puppack_tables():
     """Returns a list of all tables that currently have a PUP Pack installed."""
-    tables = await db.get_all_tables()
+    tables = await db.get_tables()
     tables_with_pup = []
 
     for t in tables:
         table_dir = Path(t["folder_path"])
         pup_dir = table_dir / "pupvideos"
 
-        if pup_dir.exists() and pup_dir.is_dir() and any(pup_dir.iterdir()):
+        if pup_dir.exists() and pup_dir.is_dir() and any(not item.name.startswith('.') for item in pup_dir.iterdir()):
             tables_with_pup.append({
                 "id": t["id"],
                 "name": t["display_name"],
@@ -45,9 +45,9 @@ async def get_puppack_options(table_id: int):
     table_dir = Path(table["folder_path"])
     pup_dir = table_dir / "pupvideos"
 
-    # Check if nested
-    subdirs = [d for d in pup_dir.iterdir() if d.is_dir()]
-    files = [f for f in pup_dir.iterdir() if f.is_file()]
+    # Check if nested (ignore __MACOSX and hidden files)
+    subdirs = [d for d in pup_dir.iterdir() if d.is_dir() and not d.name.startswith(('.', '__'))]
+    files = [f for f in pup_dir.iterdir() if f.is_file() and not f.name.startswith('.')]
     if len(subdirs) == 1 and len(files) == 0:
         pup_dir = subdirs[0]
 
@@ -64,9 +64,9 @@ async def apply_puppack_option(table_id: int, req: ApplyOptionRequest):
     table_dir = Path(table["folder_path"])
     pup_dir = table_dir / "pupvideos"
 
-    # Check if nested
-    subdirs = [d for d in pup_dir.iterdir() if d.is_dir()]
-    files = [f for f in pup_dir.iterdir() if f.is_file()]
+    # Check if nested (ignore __MACOSX and hidden files)
+    subdirs = [d for d in pup_dir.iterdir() if d.is_dir() and not d.name.startswith(('.', '__'))]
+    files = [f for f in pup_dir.iterdir() if f.is_file() and not f.name.startswith('.')]
     if len(subdirs) == 1 and len(files) == 0:
         pup_dir = subdirs[0]
 

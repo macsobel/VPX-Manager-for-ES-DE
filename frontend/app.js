@@ -16,6 +16,7 @@ const App = {
         tools: ToolsPage,
         "vbs-manager": VbsManagerPage,
         "ini-manager": IniManagerPage,
+        "puppack-manager": typeof PupPackManagerPage !== 'undefined' ? PupPackManagerPage : null,
         manuals: ManualsPage,
     },
 
@@ -145,6 +146,21 @@ const App = {
             container.offsetHeight;
             container.style.animation = '';
             IniManagerPage.render(parseInt(iniMatch[1]));
+            return;
+        }
+
+        // Handle puppack-manager/{tableId} route
+        const puppackMatch = hash.match(/^puppack-manager\/(\d+)$/);
+        if (puppackMatch) {
+            this.currentPage = 'puppack-manager';
+            Nav.setActive('puppack-manager');
+            const container = document.getElementById('page-container');
+            container.style.animation = 'none';
+            container.offsetHeight;
+            container.style.animation = '';
+            if (typeof PupPackManagerPage !== 'undefined') {
+                PupPackManagerPage.render(parseInt(puppackMatch[1]));
+            }
             return;
         }
 

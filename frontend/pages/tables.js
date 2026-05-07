@@ -403,7 +403,7 @@ const TablesPage = {
                         <div class="table-card-badges">
                             ${t.has_b2s ? '<span class="badge badge-success">Backglass</span>' : ''}
                             ${t.has_rom ? '<span class="badge badge-info">ROM</span>' : ''}
-                            ${t.has_pup ? '<span class="badge badge-warning">PUP</span>' : ''}
+                            ${t.has_pup ? `<a href="#puppack-manager/${t.id}" class="badge badge-warning" style="cursor: pointer; text-decoration: none;" title="Configure PUP Pack">PUP <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="margin-left: 2px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6m4-3h6v6m-6.6 4.6L21 3"/></svg></a>` : ''}
                             ${t.has_altcolor ? '<span class="badge badge-orange">Color DMD</span>' : ''}
                             ${t.has_altsound ? '<span class="badge badge-pink">Alt Sound</span>' : ''}
                             ${t.has_music ? '<span class="badge badge-teal">Music</span>' : ''}
@@ -842,6 +842,15 @@ const TablesPage = {
                         Edit Table Files
                     </button>
                 </div>
+                
+                ${t.has_pup ? `
+                <div style="margin-top: var(--space-sm);">
+                    <button class="btn btn-secondary" id="btn-manage-pup" style="width: 100%; border-color: var(--accent-amber); color: var(--accent-amber);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                        Configure PUP Pack
+                    </button>
+                </div>
+                ` : ''}
 
                 <div style="margin-top: var(--space-sm); display: flex; gap: var(--space-sm);">
                     <button class="btn btn-secondary" id="btn-manage-vbs" style="flex: 1; height: 38px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.85rem;">
@@ -1027,6 +1036,14 @@ const TablesPage = {
                     panel.classList.remove('open');
                     window.location.hash = `#upload-to/${tableId}`;
                 };
+
+                const btnManagePup = document.getElementById('btn-manage-pup');
+                if (btnManagePup) {
+                    btnManagePup.onclick = () => {
+                        panel.classList.remove('open');
+                        window.location.hash = `#puppack-manager/${tableId}`;
+                    };
+                }
 
                 // View Media — show media detail in current panel
                 document.getElementById('btn-view-media').onclick = () => {
