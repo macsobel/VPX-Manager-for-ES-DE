@@ -193,9 +193,10 @@ class AppConfig(BaseModel):
 
     # Backglass Companion Settings
     backglass_enabled: bool = False
-    backglass_screen_index: int = 1
-    backglass_screen_name: str = ""
     display_count: int = 2
+
+    # Global Displays Setup (Replaces single screen index)
+    displays: list = []
 
     # Media Preferences
     media_preferences: dict = {

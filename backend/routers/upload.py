@@ -32,7 +32,7 @@ import zipfile
 from pathlib import Path
 from typing import List, Optional, Union
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, HTTPException
+from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, HTTPException, Request
 
 from backend.core.config import config
 from backend.core.display_utils import get_effective_rotation
@@ -487,6 +487,7 @@ async def import_table(
 @router.post("/file-to-table/{table_id}")
 async def upload_file_to_table(
     table_id: int,
+    request: Request,
     file_type: str = Form(...),
     file: UploadFile = File(...),
 ):
@@ -540,7 +541,33 @@ async def upload_file_to_table(
 
     elif file_type == "puppack":
         dest = table_dir / "pupvideos"
-        return await _extract_archive_safely(content, filename, dest, "PUP Pack", wipe=True)
+        if ext in [".zip", ".rar", ".7z"]:
+            return await _extract_archive_safely(content, filename, dest, "PUP Pack", wipe=True)
+        else:
+            from urllib.parse import unquote
+            # Reconstruct folder from loose file drops
+            rel_path = unquote(request.headers.get("x-webkit-relative-path", "")) or file.filename
+
+            # If the user dropped a folder called "pupvideos", strip it so it doesn't double-nest
+            parts = Path(rel_path).parts
+            if len(parts) > 0 and parts[0].lower() == "pupvideos":
+                parts = parts[1:]
+
+            if len(parts) > 0:
+                target_dest = dest / Path(*parts)
+            else:
+                target_dest = dest / filename
+
+            target_dest.parent.mkdir(parents=True, exist_ok=True)
+            with open(target_dest, "wb") as f:
+                f.write(content)
+
+            return {
+                "success": True,
+                "type": file_type,
+                "file": filename,
+                "destination": str(target_dest),
+            }
 
     elif file_type == "music":
         dest = table_dir / "music"
@@ -751,10 +778,18 @@ async def _extract_archive_safely(
         if macosx_junk.exists() and macosx_junk.is_dir():
             shutil.rmtree(macosx_junk)
 
+        # Ensure root directory structure logic for PuP Packs
         if label == "PUP Pack":
-            from backend.services.puppack.manager import pup_pack_manager
-            from backend.core.config import config
-            pup_pack_manager.auto_configure(dest, config.display_count)
+            subdirs = [d for d in dest.iterdir() if d.is_dir() and not d.name.startswith(('.', '__'))]
+            files = [f for f in dest.iterdir() if f.is_file() and not f.name.startswith('.')]
+
+            # If the user uploaded an archive that was already wrapped in a "pupvideos" folder,
+            # we need to lift its contents out, otherwise we end up with pupvideos/pupvideos/rom
+            if len(subdirs) == 1 and len(files) == 0 and subdirs[0].name.lower() == "pupvideos":
+                inner_dir = subdirs[0]
+                for item in inner_dir.iterdir():
+                    shutil.move(str(item), str(dest))
+                shutil.rmtree(inner_dir)
 
         return {
             "type": label.lower().replace(" ", "_"),
