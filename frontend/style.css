@@ -11,6 +11,9 @@
     --bg-elevated: #181836;
     --bg-surface: #1e1e42;
     --bg-hover: #252550;
+    --bg-secondary: #0c0c1d;
+    --bg-tertiary: #111127;
+    --border-color: rgba(255, 255, 255, 0.08);
 
     /* Glass effect */
     --glass-bg: rgba(255, 255, 255, 0.03);
@@ -21,6 +24,7 @@
     /* Accent palette */
     --accent-blue: #4f8cff;
     --accent-blue-glow: rgba(79, 140, 255, 0.3);
+    --accent-blue-alpha: rgba(79, 140, 255, 0.1);
     --accent-purple: #a855f7;
     --accent-purple-glow: rgba(168, 85, 247, 0.3);
     --accent-emerald: #10b981;
