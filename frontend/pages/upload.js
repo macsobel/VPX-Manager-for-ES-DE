@@ -1248,6 +1248,14 @@ const UploadPage = {
             slotIds.forEach(slotId => {
                 const input = document.getElementById(`file-${slotId}`);
                 if (!input) return;
+
+                // Set allow folder attributes for puppack
+                if (slotId === 'puppack') {
+                    input.setAttribute('webkitdirectory', '');
+                    input.setAttribute('directory', '');
+                    input.setAttribute('multiple', '');
+                }
+
                 input.addEventListener('change', async (e) => {
                     await this._setSlotFile(slotId, e.target.files);
                     this._updateAddFilesButton();
@@ -1259,7 +1267,34 @@ const UploadPage = {
                 slot.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); if (!slot.contains(e.relatedTarget)) slot.classList.remove('dragover'); });
                 slot.addEventListener('drop', async (e) => {
                     e.preventDefault(); e.stopPropagation(); slot.classList.remove('dragover');
-                    const files = e.dataTransfer?.files;
+
+                    let files = [];
+                    // Check if it's a folder drop using DataTransferItem API
+                    if (e.dataTransfer && e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+                        const items = e.dataTransfer.items;
+                        let isFolderDrop = false;
+
+                        // We only process folder drops for puppack, music, altsound, altcolor
+                        if (['puppack', 'music', 'altsound', 'altcolor'].includes(slotId)) {
+                            for (let i = 0; i < items.length; i++) {
+                                const item = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+                                if (item && item.isDirectory) {
+                                    isFolderDrop = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (isFolderDrop) {
+                            Toast.info("Reading folder contents...");
+                            files = await this._traverseFileTree(items);
+                        } else {
+                            files = e.dataTransfer.files;
+                        }
+                    } else {
+                         files = e.dataTransfer?.files;
+                    }
+
                     if (files && files.length > 0) {
                         await this._setSlotFile(slotId, files);
                         this._updateAddFilesButton();
@@ -1347,6 +1382,46 @@ const UploadPage = {
         }
     },
 
+    async _traverseFileTree(items) {
+        const files = [];
+        const readEntriesPromise = (dirReader) => {
+            return new Promise((resolve, reject) => {
+                dirReader.readEntries(resolve, reject);
+            });
+        };
+
+        const traverse = async (entry, path = '') => {
+            if (entry.isFile) {
+                const file = await new Promise((resolve) => entry.file(resolve));
+                // Add the relative path to the file object so the backend knows the structure
+                Object.defineProperty(file, 'webkitRelativePath', {
+                    value: path + file.name,
+                    writable: false
+                });
+                files.push(file);
+            } else if (entry.isDirectory) {
+                const dirReader = entry.createReader();
+                let entries = await readEntriesPromise(dirReader);
+                while (entries.length > 0) {
+                    for (const childEntry of entries) {
+                        await traverse(childEntry, path + entry.name + '/');
+                    }
+                    entries = await readEntriesPromise(dirReader);
+                }
+            }
+        };
+
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+            if (item) {
+                await traverse(item);
+            } else if (items[i].getAsFile) {
+                files.push(items[i].getAsFile());
+            }
+        }
+        return files;
+    },
+
     _updateAddFilesButton() {
         const btn = document.getElementById('btn-upload-files');
         if (!btn) return;
@@ -1399,8 +1474,16 @@ const UploadPage = {
                 const formData = new FormData();
                 formData.append('file_type', type);
                 formData.append('file', file);
+
+                const headers = {};
+                // Pass relative path for folder drops so backend can recreate structure
+                if (file.webkitRelativePath) {
+                    headers['x-webkit-relative-path'] = encodeURIComponent(file.webkitRelativePath);
+                }
+
                 const res = await fetch(`/api/upload/file-to-table/${tableId}`, {
                     method: 'POST',
+                    headers: headers,
                     body: formData,
                 });
                 const data = await res.json();

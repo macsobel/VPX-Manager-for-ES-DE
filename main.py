@@ -48,6 +48,7 @@ from backend.routers import (
     updates,
     backglass,
     puppack,
+    displays,
 )
 from backend.services.esde_sync_service import esde_sync
 import socket
@@ -192,6 +193,7 @@ app.include_router(ini_manager.router)
 app.include_router(updates.router)
 app.include_router(backglass.router)
 app.include_router(puppack.router)
+app.include_router(displays.router)
 
 # ── Static Frontend ─────────────────────────────────────────────────
 from backend.core.config import APP_SUPPORT_DIR

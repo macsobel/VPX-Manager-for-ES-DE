@@ -56,6 +56,7 @@ class SettingsUpdate(BaseModel):
     screenscraper_devpassword: Optional[str] = None
     media_preferences: Optional[dict] = None
     display_count: Optional[int] = None
+    displays: Optional[list] = None
 
 
 @router.get("/settings")

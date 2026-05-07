@@ -135,8 +135,14 @@ class PupPackManager:
                 try:
                     if src_path.is_file():
                         dst_path.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(src_path, dst_path)
-                        logger.info(f"Copied {src_clean} -> {dst_clean}")
+
+                        # Apply specialized processing for screens.pup
+                        if dst_path.name.lower() == "screens.pup":
+                            PupPackManager.process_screens_pup(src_path, dst_path)
+                            logger.info(f"Processed and Scaled {src_clean} -> {dst_clean}")
+                        else:
+                            shutil.copy2(src_path, dst_path)
+                            logger.info(f"Copied {src_clean} -> {dst_clean}")
                     elif src_path.is_dir():
                         # Copy contents of directory
                         shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
@@ -150,6 +156,118 @@ class PupPackManager:
             return False
 
         return success
+
+    @staticmethod
+    def process_screens_pup(src_path: Path, dst_path: Path) -> None:
+        """Parses screens.pup CSV, scales coordinates according to the cabinet profile, and strips Windows-only params."""
+        from backend.core.config import config
+
+        # Load the global displays mapping to get scale factors for each role
+        saved_displays = getattr(config, "displays", [])
+
+        # Mapping from PUP ScreenNum to logical Role
+        # Standard PUP layout:
+        # 0: Topper
+        # 1: DMD
+        # 2: Backglass
+        # 3: PlayField
+        # 4: Music
+        # 5: Menu
+        # 6: Select
+        # 7: Other1/BackGlass2
+        # 8: Other2/Topper2
+        # 9: GameInfo
+        # 10: GameHelp
+
+        role_map = {
+            "1": "DMD",
+            "2": "Backglass",
+            "3": "Playfield",
+        }
+
+        scale_map = {}
+        for screen_num, role in role_map.items():
+            display = next((d for d in saved_displays if d.get("role") == role), None)
+            if display and display.get("scale_factor"):
+                scale_map[screen_num] = float(display.get("scale_factor", 1.0))
+
+        content = ""
+        try:
+            with open(src_path, 'r', encoding='utf-16', errors='replace') as f:
+                content = f.read()
+                if "ScreenNum" not in content:
+                    raise UnicodeError()
+        except:
+            with open(src_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+
+        if not content:
+            shutil.copy2(src_path, dst_path)
+            return
+
+        has_bom = content.startswith('\ufeff')
+        if has_bom:
+            content = content[1:]
+
+        lines = content.splitlines()
+        if not lines:
+            shutil.copy2(src_path, dst_path)
+            return
+
+        try:
+            # We want to output in UTF-8
+            with open(dst_path, 'w', encoding='utf-8', newline='') as f:
+                reader = csv.DictReader(lines)
+
+                # Make sure fieldnames don't have BOM either
+                fieldnames = [str(fn).strip().lstrip('\ufeff') for fn in reader.fieldnames] if reader.fieldnames else []
+                if not fieldnames:
+                    shutil.copy2(src_path, dst_path)
+                    return
+
+                if has_bom:
+                    f.write('\ufeff')
+
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+
+                for row in reader:
+                    clean_row = {str(k).strip().lstrip('\ufeff'): str(v).strip() if v else "" for k, v in row.items()}
+
+                    screen_num = clean_row.get("ScreenNum", "").strip()
+                    custom_pos = clean_row.get("CustomPos", "").strip()
+
+                    if custom_pos:
+                        parts = [p.strip() for p in custom_pos.split(',')]
+                        # Ensure we process standard CustomPos (at least 5 parts: src_screen, x, y, w, h)
+                        if len(parts) >= 5:
+                            # Strip the 6th parameter (Windows-only flag) if it exists
+                            parts = parts[:5]
+
+                            scale_factor = scale_map.get(screen_num, 1.0)
+                            if scale_factor != 1.0:
+                                try:
+                                    # apply scale to x, y, w, h (indices 1, 2, 3, 4)
+                                    for i in range(1, 5):
+                                        if parts[i]:
+                                            val = float(parts[i])
+                                            parts[i] = str(round(val * scale_factor, 2)).rstrip('0').rstrip('.')
+                                except ValueError:
+                                    pass # Leave as is if parsing fails
+
+                            clean_row["CustomPos"] = ",".join(parts)
+
+                    # Re-map back to the original fieldnames order (with possible dirty keys)
+                    out_row = {}
+                    for orig_key in reader.fieldnames:
+                        clean_key = str(orig_key).strip().lstrip('\ufeff')
+                        out_row[orig_key] = clean_row.get(clean_key, "")
+
+                    writer.writerow(out_row)
+
+        except Exception as e:
+            logger.error(f"Failed to process screens.pup, falling back to basic copy: {e}")
+            shutil.copy2(src_path, dst_path)
 
     @staticmethod
     def get_active_screens(pup_dir: Path) -> List[Dict]:

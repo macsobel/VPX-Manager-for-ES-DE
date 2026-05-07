@@ -27,6 +27,24 @@ const SettingsPage = {
                 <div class="settings-section-title">
                     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                         <div style="display: flex; align-items: center; gap: var(--space-xs);">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                            Cabinet Display Profile
+                        </div>
+                        <button class="btn btn-secondary btn-sm" id="btn-identify-displays" style="font-size: 0.75rem; padding: 4px 8px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                            Identify Displays
+                        </button>
+                    </div>
+                </div>
+                <div class="card" id="displays-settings-card">
+                    <div style="text-align: center;"><div class="spinner"></div></div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-section-title">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <div style="display: flex; align-items: center; gap: var(--space-xs);">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                             ScreenScraper Account
                         </div>
@@ -94,6 +112,7 @@ const SettingsPage = {
         `;
 
         this.loadSettings();
+        this.loadDisplays();
         this.loadSystemStatus();
         this.bindEvents();
     },
@@ -114,6 +133,108 @@ const SettingsPage = {
                 ${description ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 3px;">${description}</div>` : ''}
             </div>
         `;
+    },
+
+    async loadDisplays() {
+        try {
+            const res = await fetch('/api/settings');
+            const data = await res.json();
+
+            const sysDisplaysRes = await fetch('/api/displays');
+            const sysDisplaysData = await sysDisplaysRes.json();
+            const sysDisplays = sysDisplaysData.displays || [];
+
+            const savedDisplays = data.displays || [];
+
+            const getSavedUuid = (role) => {
+                const found = savedDisplays.find(d => d.role === role);
+                return found ? found.uuid : '';
+            };
+
+            const renderDisplayOptions = (selectedUuid) => {
+                let options = `<option value="">-- None Assigned --</option>`;
+                sysDisplays.forEach(d => {
+                    const isSelected = d.uuid === selectedUuid ? 'selected' : '';
+                    const scaleStr = d.scale_factor > 1.0 ? ` (Scale: ${d.scale_factor}x)` : '';
+                    options += `<option value="${d.uuid}" ${isSelected}>[ID: ${d.index}] ${d.name} - ${d.width}x${d.height}${scaleStr}</option>`;
+                });
+                return options;
+            };
+
+            document.getElementById('displays-settings-card').innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-md);">
+                    <div class="input-group">
+                        <label class="input-label">Playfield Display</label>
+                        <select class="input-field display-role-select" data-role="Playfield">
+                            ${renderDisplayOptions(getSavedUuid('Playfield'))}
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">Backglass Display</label>
+                        <select class="input-field display-role-select" data-role="Backglass">
+                            ${renderDisplayOptions(getSavedUuid('Backglass'))}
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">DMD Display</label>
+                        <select class="input-field display-role-select" data-role="DMD">
+                            ${renderDisplayOptions(getSavedUuid('DMD'))}
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-top: var(--space-md);">
+                    <button class="btn btn-primary" id="btn-save-displays">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        Save Display Assignments
+                    </button>
+                </div>
+            `;
+
+            // Cache sysDisplays so saveSettings can build the payload
+            this.sysDisplays = sysDisplays;
+
+            document.getElementById('btn-save-displays').onclick = async () => {
+                await this.saveDisplays();
+            };
+
+        } catch (e) {
+            document.getElementById('displays-settings-card').innerHTML = `<span style="color: var(--accent-red);">Failed to load display info: ${e.message}</span>`;
+        }
+    },
+
+    async saveDisplays() {
+        try {
+            const selects = document.querySelectorAll('.display-role-select');
+            const displaysConfig = [];
+
+            selects.forEach(select => {
+                const uuid = select.value;
+                const role = select.dataset.role;
+                if (uuid) {
+                    const sysDisplay = this.sysDisplays.find(d => d.uuid === uuid);
+                    if (sysDisplay) {
+                        displaysConfig.push({
+                            role: role,
+                            index: sysDisplay.index,
+                            name: sysDisplay.name,
+                            uuid: sysDisplay.uuid,
+                            width: sysDisplay.width,
+                            height: sysDisplay.height,
+                            scale_factor: sysDisplay.scale_factor
+                        });
+                    }
+                }
+            });
+
+            await fetch('/api/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ displays: displaysConfig }),
+            });
+            Toast.success('Display assignments saved');
+        } catch (e) {
+            Toast.error('Failed to save displays: ' + e.message);
+        }
     },
 
     async loadSettings() {
@@ -546,6 +667,27 @@ const SettingsPage = {
                 btn.innerHTML = originalHtml;
             }
         };
+
+        const btnIdentify = document.getElementById('btn-identify-displays');
+        if (btnIdentify) {
+            btnIdentify.onclick = async () => {
+                btnIdentify.disabled = true;
+                const originalHtml = btnIdentify.innerHTML;
+                btnIdentify.innerHTML = '<div class="spinner" style="width: 12px; height: 12px; border-width: 2px;"></div>';
+
+                try {
+                    await fetch('/api/displays/identify', { method: 'POST' });
+                    Toast.success('Identification overlay sent to all displays');
+                } catch (e) {
+                    Toast.error('Failed to trigger display identification');
+                }
+
+                setTimeout(() => {
+                    btnIdentify.disabled = false;
+                    btnIdentify.innerHTML = originalHtml;
+                }, 1000);
+            };
+        }
 
         document.getElementById('btn-check-updates').onclick = async () => {
             const btn = document.getElementById('btn-check-updates');
