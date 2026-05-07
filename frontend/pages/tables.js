@@ -257,8 +257,8 @@ const TablesPage = {
                                  <td class="col-version">
                                     <div style="display: flex; align-items: center; gap: 6px;">
                                         ${(() => {
-                                            const hasDirect = t.latest_vps_version && t.version && !versionsAreEqual(t.latest_vps_version, t.version) && !versionsAreEqual(t.latest_vps_version, t.ignored_version);
-                                            const hasCommunity = t.community_vps_version && t.version && !versionsAreEqual(t.community_vps_version, t.version) && !versionsAreEqual(t.community_vps_version, t.ignored_version) && t.is_community_newer;
+                                            const hasDirect = t.latest_vps_version && t.version && window.isVersionNewer(t.latest_vps_version, t.version) && (!t.ignored_version || window.isVersionNewer(t.latest_vps_version, t.ignored_version));
+                                            const hasCommunity = t.is_community_newer && t.community_vps_updated_at > t.vps_updated_at && (!t.ignored_version || window.isVersionNewer(t.community_vps_version, t.ignored_version));
                                             
                                             const badgeClass = t.version ? (hasDirect ? 'badge-warning' : (hasCommunity ? 'badge-info' : 'badge-success')) : 'badge-neutral';
                                             return `
@@ -782,9 +782,9 @@ const TablesPage = {
                     <div class="input-label" style="margin-bottom: var(--space-sm);">File Information</div>
                     <div style="font-size: 0.82rem; color: var(--text-tertiary); display: grid; gap: var(--space-xs);">
                         <div><strong>File:</strong> ${t.filename}</div>
-                        <div><strong>Version:</strong> <span class="badge ${t.version ? (t.latest_vps_version && !versionsAreEqual(t.latest_vps_version, t.version) && !versionsAreEqual(t.latest_vps_version, t.ignored_version) ? 'badge-warning' : 'badge-success') : 'badge-neutral'}">${t.version || 'Unknown'}</span></div>
+                        <div><strong>Version:</strong> <span class="badge ${t.version ? (t.latest_vps_version && window.isVersionNewer(t.latest_vps_version, t.version) && (!t.ignored_version || window.isVersionNewer(t.latest_vps_version, t.ignored_version)) ? 'badge-warning' : 'badge-success') : 'badge-neutral'}">${t.version || 'Unknown'}</span></div>
                         
-                        ${t.latest_vps_version && !versionsAreEqual(t.latest_vps_version, t.version) && !versionsAreEqual(t.latest_vps_version, t.ignored_version) ? `
+                        ${t.latest_vps_version && window.isVersionNewer(t.latest_vps_version, t.version) && (!t.ignored_version || window.isVersionNewer(t.latest_vps_version, t.ignored_version)) ? `
                         <div style="color: var(--accent-amber); font-weight: 600; margin-top: 12px;">
                             <div style="margin-bottom: 8px;"><strong>Direct Update:</strong> ${t.latest_vps_version} (same author)</div>
                             <div style="display: flex; gap: var(--space-xs);">
@@ -794,7 +794,7 @@ const TablesPage = {
                         </div>
                         ` : ''}
 
-                        ${t.is_community_newer && !versionsAreEqual(t.community_vps_version, t.version) && !versionsAreEqual(t.community_vps_version, t.ignored_version) ? `
+                        ${t.is_community_newer && t.community_vps_updated_at > t.vps_updated_at && (!t.ignored_version || window.isVersionNewer(t.community_vps_version, t.ignored_version)) ? `
                         <div style="color: var(--accent-cyan); font-weight: 600; margin-top: 12px;">
                             <div style="margin-bottom: 8px;"><strong>Community Newcomer:</strong> ${t.community_vps_version} (by ${t.community_vps_author})</div>
                             <div style="display: flex; gap: var(--space-xs);">
