@@ -9,7 +9,7 @@ const PupPackManagerPage = {
         container.innerHTML = `
             <div class="page-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <h1 class="page-title">PUP Pack Manager</h1>
+                    <h1 class="page-title">PUP Pack Manager (Beta)</h1>
                     <p class="page-subtitle">Configure screen layouts and options for installed PUP Packs</p>
                 </div>
             </div>
