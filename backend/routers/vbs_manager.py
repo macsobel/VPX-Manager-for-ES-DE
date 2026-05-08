@@ -173,6 +173,8 @@ async def get_table_vbs_details(table_id: int):
         "vbs_hash": vbs_hash,
         "colordmd_enabled": vbs_manager.is_colordmd_enabled(content),
         "has_colordmd": vbs_manager.has_colordmd_setting(content),
+        "puppack_enabled": vbs_manager.is_puppack_enabled(content),
+        "has_puppack_setting": vbs_manager.has_puppack_setting(content),
     }
 
 
