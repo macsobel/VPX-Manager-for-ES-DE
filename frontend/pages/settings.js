@@ -30,7 +30,7 @@ const SettingsPage = {
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                             Cabinet Display Profile
                         </div>
-                        <button class="btn btn-secondary btn-sm" id="btn-identify-displays" style="font-size: 0.75rem; padding: 4px 8px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="event.preventDefault(); event.stopPropagation(); SettingsPage.identifyDisplays(this);" style="font-size: 0.75rem; padding: 4px 8px;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                             Identify Displays
                         </button>
@@ -117,6 +117,33 @@ const SettingsPage = {
         this.bindEvents();
     },
 
+    async identifyDisplays(btn) {
+        if (!btn || btn.disabled) return;
+        
+        // Prevent any bubbling to the router
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        btn.disabled = true;
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<div class="spinner" style="width: 12px; height: 12px; border-width: 2px;"></div>';
+
+        try {
+            // Use the unified display identify endpoint
+            await fetch('/api/displays/identify', { method: 'POST' });
+            Toast.success('Identification overlays sent to all displays');
+        } catch (e) {
+            Toast.error('Failed to trigger display identification');
+        }
+
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }, 1500);
+    },
+
     _renderDirInput(id, label, value, description, pickFiles = false, isLocal = true) {
         return `
             <div class="input-group">
@@ -161,34 +188,61 @@ const SettingsPage = {
                 return options;
             };
 
-            document.getElementById('displays-settings-card').innerHTML = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-md);">
-                    <div class="input-group">
-                        <label class="input-label">Playfield Display</label>
-                        <select class="input-field display-role-select" data-role="Playfield">
-                            ${renderDisplayOptions(getSavedUuid('Playfield'))}
-                        </select>
+            const renderSection = () => {
+                document.getElementById('displays-settings-card').innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-md);">
+                        <div class="input-group">
+                            <label class="input-label">Playfield Display</label>
+                            <div id="select-container-Playfield">
+                                <select class="input-field display-role-select" data-role="Playfield">
+                                    ${renderDisplayOptions(getSavedUuid('Playfield'))}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label">Backglass Display</label>
+                            <div id="select-container-Backglass">
+                                <select class="input-field display-role-select" data-role="Backglass">
+                                    ${renderDisplayOptions(getSavedUuid('Backglass'))}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label">DMD / FullDMD Display</label>
+                            <div id="select-container-DMD_FullDMD">
+                                <select class="input-field display-role-select" data-role="DMD_FullDMD">
+                                    ${renderDisplayOptions(getSavedUuid('DMD') || getSavedUuid('FullDMD'))}
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div class="input-group">
-                        <label class="input-label">Backglass Display</label>
-                        <select class="input-field display-role-select" data-role="Backglass">
-                            ${renderDisplayOptions(getSavedUuid('Backglass'))}
-                        </select>
+                    <div style="margin-top: var(--space-md);">
+                        <button class="btn btn-primary" id="btn-save-displays">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            Save Display Assignments
+                        </button>
                     </div>
-                    <div class="input-group">
-                        <label class="input-label">DMD / FullDMD Display</label>
-                        <select class="input-field display-role-select" data-role="DMD_FullDMD">
-                            ${renderDisplayOptions(getSavedUuid('DMD') || getSavedUuid('FullDMD'))}
-                        </select>
-                    </div>
-                </div>
-                <div style="margin-top: var(--space-md);">
-                    <button class="btn btn-primary" id="btn-save-displays">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                        Save Display Assignments
-                    </button>
-                </div>
-            `;
+                `;
+            };
+
+            const card = document.getElementById('displays-settings-card');
+            // If the card is empty (initial load), render everything. 
+            // If it already has content, only update the select elements to avoid destroying the Save button or identification context.
+            if (!card.querySelector('.display-role-select')) {
+                renderSection();
+            } else {
+                ['Playfield', 'Backglass', 'DMD_FullDMD'].forEach(role => {
+                    const container = document.getElementById(`select-container-${role}`);
+                    if (container) {
+                        const selectedUuid = role === 'DMD_FullDMD' ? (getSavedUuid('DMD') || getSavedUuid('FullDMD')) : getSavedUuid(role);
+                        container.innerHTML = `
+                            <select class="input-field display-role-select" data-role="${role}">
+                                ${renderDisplayOptions(selectedUuid)}
+                            </select>
+                        `;
+                    }
+                });
+            }
 
             // Cache sysDisplays so saveSettings can build the payload
             this.sysDisplays = sysDisplays;
@@ -288,15 +342,6 @@ const SettingsPage = {
                             <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4px;">Sets default rotation in newly generated INI files. Auto-detects based on server primary monitor if left empty.</div>
                         </div>
 
-                        <div class="input-group">
-                            <label class="input-label">Display Count</label>
-                            <select class="input-field" id="setting-display-count">
-                                <option value="1" ${data.display_count === 1 ? 'selected' : ''}>1 Screen (Desktop)</option>
-                                <option value="2" ${data.display_count === 2 ? 'selected' : ''}>2 Screens (Backglass + Playfield)</option>
-                                <option value="3" ${data.display_count === 3 ? 'selected' : ''}>3 Screens (DMD + Backglass + Playfield)</option>
-                            </select>
-                            <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4px;">Used to automatically configure PUP Packs for your layout.</div>
-                        </div>
                     </div>
                 </div>
 
@@ -677,26 +722,7 @@ const SettingsPage = {
             }
         };
 
-        const btnIdentify = document.getElementById('btn-identify-displays');
-        if (btnIdentify) {
-            btnIdentify.onclick = async () => {
-                btnIdentify.disabled = true;
-                const originalHtml = btnIdentify.innerHTML;
-                btnIdentify.innerHTML = '<div class="spinner" style="width: 12px; height: 12px; border-width: 2px;"></div>';
-
-                try {
-                    await fetch('/api/displays/identify', { method: 'POST' });
-                    Toast.success('Identification overlay sent to all displays');
-                } catch (e) {
-                    Toast.error('Failed to trigger display identification');
-                }
-
-                setTimeout(() => {
-                    btnIdentify.disabled = false;
-                    btnIdentify.innerHTML = originalHtml;
-                }, 1000);
-            };
-        }
+        // Display identification is handled via inline onclick to survive re-renders
 
         document.getElementById('btn-check-updates').onclick = async () => {
             const btn = document.getElementById('btn-check-updates');

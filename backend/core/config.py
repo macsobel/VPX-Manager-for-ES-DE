@@ -191,9 +191,7 @@ class AppConfig(BaseModel):
     screenscraper_dev_user: str = ""  # Not saved to JSON
     screenscraper_dev_pass: str = ""  # Not saved to JSON
 
-    # Backglass Companion Settings
     backglass_enabled: bool = False
-    display_count: int = 2
 
     # Global Displays Setup (Replaces single screen index)
     displays: list = []
@@ -300,6 +298,15 @@ class AppConfig(BaseModel):
     def get_gamelist_xml_path(self) -> Path:
         """Get the full path to the gamelist.xml file."""
         return self.expanded_esde_gamelists_dir / "gamelist.xml"
+    @property
+    def display_count(self) -> int:
+        """Dynamically calculated based on active roles in Cabinet Profile."""
+        if not self.displays:
+            return 1
+        # PF is always 1. Count other unique displays assigned to any role.
+        # We use a set of UUIDs to avoid double counting combined roles (like DMD_FullDMD)
+        uuids = {d.get("uuid") for d in self.displays if d.get("role") and d.get("uuid")}
+        return max(1, len(uuids))
 
 
 def _scramble_dev(data: str) -> str:

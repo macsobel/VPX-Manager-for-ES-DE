@@ -1,6 +1,7 @@
 import os
 import subprocess
 import signal
+from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from pathlib import Path
@@ -10,8 +11,8 @@ router = APIRouter(prefix="/api/backglass", tags=["backglass"])
 
 class BackglassSettings(BaseModel):
     enabled: bool
-    screen_index: int
-    screen_name: str = ""
+    screen_index: Optional[int] = 0
+    screen_name: Optional[str] = ""
     displays: list = []
 
 def get_displays():
@@ -74,35 +75,8 @@ async def get_settings():
 async def update_settings(settings: BackglassSettings):
     config.backglass_enabled = settings.enabled
     
-    # Update the 'Backglass' role in the global displays array if a selection was made
-    if settings.screen_name or settings.screen_index is not None:
-        saved_displays = getattr(config, "displays", [])
-        # Remove 'Backglass' role from any existing display
-        for d in saved_displays:
-            if d.get("role") == "Backglass":
-                d["role"] = None
-        
-        # Find the display in the system list (by name or index) and assign the role
-        # We use a helper to match against sys_profiler/pygame results
-        all_sys = get_displays()
-        match = next((d for d in all_sys if d["name"] == settings.screen_name or d["index"] == settings.screen_index), None)
-        
-        if match:
-            # Check if this display is already in config.displays
-            existing = next((d for d in saved_displays if d["uuid"] == match.get("uuid") or d["name"] == match["name"]), None)
-            if existing:
-                existing["role"] = "Backglass"
-            else:
-                saved_displays.append({
-                    "role": "Backglass",
-                    "index": match["index"],
-                    "name": match["name"],
-                    "uuid": match.get("uuid", f"unknown-{match['index']}"),
-                    "scale_factor": 1.0 # Default fallback
-                })
-        
-        config.displays = saved_displays
-        
+    # We no longer save individual screen_index for the backglass helper.
+    # It purely follows the 'Backglass' role in config.displays.
     save_config(config)
     return {"success": True}
 

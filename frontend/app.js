@@ -174,7 +174,6 @@ const App = {
         }
 
         const page = this.pages[hash];
-
         if (page) {
             this.currentPage = hash;
             Nav.setActive(hash);
@@ -185,7 +184,13 @@ const App = {
             container.style.animation = '';
             page.render();
         } else {
-            window.location.hash = 'dashboard';
+            // Only redirect to dashboard if the hash is truly invalid and not empty
+            if (hash && hash !== 'dashboard') {
+                console.warn(`Unknown route: ${hash}. Redirecting to dashboard.`);
+                window.location.hash = 'dashboard';
+            } else if (!hash) {
+                window.location.hash = 'dashboard';
+            }
         }
     },
 };
