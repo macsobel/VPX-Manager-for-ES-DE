@@ -39,3 +39,22 @@ def test_apply_regex_fix_rom_swap():
     content = "GameName=\"test1\""
     fixed = manager.apply_regex_fix(content, "rom_swap", "test2")
     assert fixed == "GameName=\"test2\""
+
+def test_puppack_regex():
+    manager = VBSManagerService()
+
+    content = "Const UsePUP = 0"
+    fixed = manager.apply_regex_fix(content, "puppack", enable=True)
+    assert fixed == "Const UsePUP = 1"
+
+    content = "PuPEvent=false"
+    fixed = manager.apply_regex_fix(content, "puppack", enable=True)
+    assert fixed == "PuPEvent=1"
+
+    content = "usePUPPack = True"
+    fixed = manager.apply_regex_fix(content, "puppack", enable=False)
+    assert fixed == "usePUPPack = 0"
+
+    content = "UsePUP_Pack=1"
+    fixed = manager.apply_regex_fix(content, "puppack", enable=False)
+    assert fixed == "UsePUP_Pack=0"
