@@ -140,20 +140,36 @@ async def list_displays():
 @router.post("/identify")
 async def identify_displays():
     """Flashes the SDL2 identification overlay on all monitors."""
+    import sys
+    from pathlib import Path
+    import asyncio
     import threading
 
     def run_identify():
         try:
-            # We must launch the identify script in separate processes for each display
-            # Or sequentially if we just want to flash them one by one.
-            # Doing it sequentially is safer to avoid SDL context issues.
-            displays_info = _get_macos_displays() if sys.platform == "darwin" else _get_linux_displays()
+            # Detect executable path
+            if getattr(sys, "frozen", False):
+                python_exe = sys.executable
+                main_script = None
+            else:
+                # Use venv if it exists, otherwise system python
+                base_dir = Path(__file__).resolve().parent.parent.parent
+                venv_python = base_dir / ".venv" / "bin" / "python"
+                python_exe = str(venv_python) if venv_python.exists() else sys.executable
+                main_script = str(base_dir / "main.py")
 
-            script_path = os.path.join(os.path.dirname(__file__), "..", "services", "backglass", "identify.py")
+            displays_info = _get_macos_displays() if sys.platform == "darwin" else _get_linux_displays()
 
             for d in displays_info:
                 idx = d["index"]
-                subprocess.Popen([sys.executable, script_path, str(idx)])
+                cmd = [python_exe]
+                if main_script:
+                    cmd.append(main_script)
+                cmd.extend(["--identify", str(idx)])
+                
+                subprocess.Popen(cmd, start_new_session=True)
+                # Small delay to prevent SDL collisions
+                time.sleep(0.3)
 
         except Exception as e:
             print(f"Error launching identify: {e}")

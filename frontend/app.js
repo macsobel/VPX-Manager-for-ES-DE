@@ -37,17 +37,18 @@ const App = {
             this.route();
         });
 
-        // Global click interceptor to prevent any non-link button from triggering a hash change
+        // Global click interceptor to prevent any non-link button from triggering unwanted hash changes
         document.addEventListener('click', (e) => {
             const btn = e.target.closest('button');
             if (btn && btn.type === 'button') {
-                // If it's a button, we explicitly want to stop it from affecting the URL hash
-                // unless it was intentionally designed to do so (like the Nav links)
-                if (!btn.classList.contains('nav-link')) {
-                    e.stopPropagation();
+                // If it's a button, we want to ensure it doesn't accidentally trigger a hash change
+                // unless it was intentionally designed to do so (like the Nav links).
+                // We no longer use stopPropagation here as it blocks the button's own handlers.
+                if (btn.classList.contains('nav-link')) {
+                    return;
                 }
             }
-        }, true);
+        });
 
         this.route();
         this.updateVersion();
