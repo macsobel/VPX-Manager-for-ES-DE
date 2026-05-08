@@ -4,8 +4,9 @@ import subprocess
 import time
 from typing import List, Dict
 
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pathlib import Path
 
 router = APIRouter(prefix="/api/displays", tags=["displays"])
 
@@ -140,9 +141,6 @@ async def list_displays():
 @router.post("/identify")
 async def identify_displays():
     """Flashes the SDL2 identification overlay on all monitors."""
-    import sys
-    from pathlib import Path
-    import asyncio
     import threading
 
     def run_identify():
