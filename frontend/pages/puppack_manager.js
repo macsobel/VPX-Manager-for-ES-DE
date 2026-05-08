@@ -148,16 +148,19 @@ const PupPackManagerPage = {
         if (screens && screens.length > 0) {
             screensHtml = `
                 <div style="background: var(--bg-surface); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border-color); margin-bottom: 2rem;">
-                    <h3 style="margin: 0 0 1rem 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary); display: flex; align-items: center; gap: 8px;">
+                    <h3 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary); display: flex; align-items: center; gap: 8px;">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                        Current Screen Configuration
+                        Current Configuration
                     </h3>
-                    <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.4;">
+                        The badges below show which screens are currently enabled in the pack. These are <strong>indicators</strong> of the active state; use the layout options below to change them.
+                    </p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
                         ${screens.map(s => `
-                            <div class="badge" style="padding: 0.5rem 0.75rem; background: var(--bg-elevated); border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 6px;">
-                                <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-emerald);"></div>
-                                <span style="font-weight: 600; color: var(--text-primary);">${this.escHtml(s.description)}</span>
-                                <span style="font-size: 0.7rem; color: var(--text-tertiary); opacity: 0.7;">(${this.escHtml(s.status)})</span>
+                            <div class="badge" style="padding: 0.4rem 0.75rem; background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 20px; display: flex; align-items: center; gap: 8px; user-select: none;">
+                                <div style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-emerald); box-shadow: 0 0 8px var(--accent-emerald);"></div>
+                                <span style="font-weight: 600; color: var(--text-primary); font-size: 0.85rem;">${this.escHtml(s.description)}</span>
+                                <span style="font-size: 0.7rem; color: var(--accent-emerald); font-weight: 500; opacity: 0.9;">${this.escHtml(s.status)}</span>
                             </div>
                         `).join('')}
                     </div>
@@ -182,13 +185,13 @@ const PupPackManagerPage = {
                     ${options.map(opt => {
                         // Clean up the name
                         let cleanName = opt.name
-                            .replace(/Option\s*\d+\s*-\s*/gi, '')
-                            .replace(/OPTION\d+_/gi, '')
+                            .replace(/Option\s*\d+\s*[-_]\s*/gi, '')
+                            .replace(/OPTION\s*\d+_/gi, '')
                             .replace(/_/g, ' ')
                             .trim();
                         
                         return `
-                            <div class="card" style="margin: 0; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--radius-lg); transition: all var(--transition-fast);">
+                            <div class="card layout-card" style="margin: 0; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--radius-lg); transition: all var(--transition-fast);">
                                 <div class="card-body" style="padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; gap: 1rem; height: 100%;">
                                     <div>
                                         <h4 style="margin: 0 0 0.25rem 0; color: var(--text-primary); font-size: 1rem;">${this.escHtml(cleanName)}</h4>
@@ -196,7 +199,7 @@ const PupPackManagerPage = {
                                     </div>
                                     <button class="btn btn-primary btn-sm" style="width: 100%; justify-content: center;" onclick="PupPackManagerPage.applyOption('${opt.file}')">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                        Apply Configuration
+                                        Apply this Layout
                                     </button>
                                 </div>
                             </div>
@@ -220,9 +223,11 @@ const PupPackManagerPage = {
             </div>
 
             <div style="flex: 1; overflow-y: auto; padding: 1.5rem;">
-                <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color: var(--text-primary);">Setup Options</h3>
-                <p style="color: var(--text-secondary); margin-bottom: 2rem; font-size: 0.9rem; line-height: 1.5;">Choose a screen layout below. This will apply the necessary file changes to configure the PUP Pack for your setup.</p>
                 ${screensHtml}
+                <div style="margin-bottom: 1.5rem;">
+                    <h3 style="margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--text-primary);">Layout Options</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5;">Choose a screen layout below. Applying a layout will automatically copy the appropriate templates and scale the coordinates based on your Cabinet Display Profile settings.</p>
+                </div>
                 ${optionsHtml}
             </div>
         `;

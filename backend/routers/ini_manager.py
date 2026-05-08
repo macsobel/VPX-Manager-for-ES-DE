@@ -247,6 +247,79 @@ async def apply_autofit_ini(table_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def apply_flexdmd_patch(ini_path: Path, table_dir: Path, vpx_filename: str) -> None:
+    """Helper to detect FlexDMD folder and patch the INI configuration."""
+    flexdmd_dir = table_dir / Path(vpx_filename).stem
+    if not (flexdmd_dir.exists() and flexdmd_dir.is_dir()):
+        return
+
+    saved_displays = getattr(config, "displays", [])
+    dmd_display = next((d for d in saved_displays if d.get("role") == "DMD"), None)
+
+    if not dmd_display:
+        return
+
+    scale_factor = float(dmd_display.get("scale_factor", 1.0))
+
+    d_width = int(dmd_display.get("width", 800) * scale_factor)
+    d_height = int(dmd_display.get("height", 200) * scale_factor)
+    d_x = int(dmd_display.get("x", 0) * scale_factor)
+    d_y = int(dmd_display.get("y", 0) * scale_factor)
+
+    try:
+        content = ""
+        try:
+            with open(ini_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception:
+            with open(ini_path, "r", encoding="windows-1252") as f:
+                content = f.read()
+
+        lines = content.splitlines()
+        new_lines = []
+
+        # Remove existing FlexDMDWindow keys
+        keys_to_remove = [
+            "FlexDMDWindow", "FlexDMDWindowX", "FlexDMDWindowY",
+            "FlexDMDWindowWidth", "FlexDMDWindowHeight", "FlexDMDWindowRotation"
+        ]
+
+        for line in lines:
+            is_key = False
+            stripped = line.strip().lower()
+            for key in keys_to_remove:
+                if stripped.startswith(key.lower() + "=") or stripped.startswith(key.lower() + " ="):
+                    is_key = True
+                    break
+            if not is_key:
+                new_lines.append(line)
+
+        # Find [Standalone] block
+        standalone_idx = -1
+        for i, line in enumerate(new_lines):
+            if line.strip().lower() == "[standalone]":
+                standalone_idx = i
+                break
+
+        if standalone_idx == -1:
+            if new_lines and new_lines[-1].strip() != "":
+                new_lines.append("")
+            new_lines.append("[Standalone]")
+            standalone_idx = len(new_lines) - 1
+
+        new_lines.insert(standalone_idx + 1, "FlexDMDWindowRotation = 0")
+        new_lines.insert(standalone_idx + 1, f"FlexDMDWindowHeight = {d_height}")
+        new_lines.insert(standalone_idx + 1, f"FlexDMDWindowWidth = {d_width}")
+        new_lines.insert(standalone_idx + 1, f"FlexDMDWindowY = {d_y}")
+        new_lines.insert(standalone_idx + 1, f"FlexDMDWindowX = {d_x}")
+        new_lines.insert(standalone_idx + 1, "FlexDMDWindow = 1")
+
+        with open(ini_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(new_lines) + "\n")
+
+    except Exception as e:
+        logger.error(f"Failed to patch FlexDMD INI {ini_path}: {e}")
+
 @router.post("/{table_id}/generate")
 async def generate_ini(table_id: int):
     table = await db.get_table(table_id)

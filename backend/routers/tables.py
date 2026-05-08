@@ -710,6 +710,11 @@ async def get_table_inventory(table_id: int):
             if (table_dir / "pinmame" / "altcolor").exists()
             else []
         ),
+        "flexdmd": (
+            [table_dir.name]
+            if (table_dir / table_dir.name).exists() and (table_dir / table_dir.name).is_dir()
+            else []
+        ),
         "medias": get_files(table_dir / "medias", "*.*"),
     }
 

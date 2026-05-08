@@ -32,7 +32,7 @@ import zipfile
 from pathlib import Path
 from typing import List, Optional, Union
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, HTTPException
+from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, HTTPException, Request
 
 from backend.core.config import config
 from backend.core.display_utils import get_effective_rotation
@@ -200,6 +200,7 @@ async def import_table(
     directb2s_file: Optional[UploadFile] = File(None),
     rom_files: List[UploadFile] = File([]),
     puppack_file: Union[UploadFile, List[UploadFile], None] = File(None),
+    flexdmd_file: Union[UploadFile, List[UploadFile], None] = File(None),
     music_file: Union[UploadFile, List[UploadFile], None] = File(None),
     altsound_file: Union[UploadFile, List[UploadFile], None] = File(None),
     altcolor_file: Union[UploadFile, List[UploadFile], None] = File(None),
@@ -289,6 +290,11 @@ async def import_table(
     if puppack_file:
         pup_dest = table_dir / "pupvideos"
         result = await _process_slot_media(puppack_file, pup_dest, "PUP Pack")
+        results.append(result)
+
+    if flexdmd_file:
+        flexdmd_dest = table_dir / Path(new_vpx_filename).stem
+        result = await _process_slot_media(flexdmd_file, flexdmd_dest, "FlexDMD")
         results.append(result)
 
     # 5. Music (optional) — extract or save loose files
@@ -449,6 +455,13 @@ async def import_table(
     from backend.services.table_file_service import TableFileService
     await TableFileService.standardize_names(table_id)
 
+    # Check if a FlexDMD folder was imported, and patch the ini if so
+    if flexdmd_file:
+        from backend.routers.ini_manager import apply_flexdmd_patch
+        ini_path = (table_dir / new_vpx_filename).with_suffix(".ini")
+        if ini_path.exists():
+            apply_flexdmd_patch(ini_path, table_dir, new_vpx_filename)
+
     # 11. Optional: Auto-scrape media (blocking if requested)
     scrape_result = None
     if auto_scrape:
@@ -487,6 +500,7 @@ async def import_table(
 @router.post("/file-to-table/{table_id}")
 async def upload_file_to_table(
     table_id: int,
+    request: Request,
     file_type: str = Form(...),
     file: UploadFile = File(...),
 ):
@@ -540,7 +554,60 @@ async def upload_file_to_table(
 
     elif file_type == "puppack":
         dest = table_dir / "pupvideos"
-        return await _extract_archive_safely(content, filename, dest, "PUP Pack", wipe=True)
+        if ext in [".zip", ".rar", ".7z"]:
+            return await _extract_archive_safely(content, filename, dest, "PUP Pack", wipe=True)
+        else:
+            from urllib.parse import unquote
+            # Reconstruct folder from loose file drops
+            rel_path = unquote(request.headers.get("x-webkit-relative-path", "")) or file.filename
+
+            # If the user dropped a folder called "pupvideos", strip it so it doesn't double-nest
+            parts = Path(rel_path).parts
+            if len(parts) > 0 and parts[0].lower() == "pupvideos":
+                parts = parts[1:]
+
+            if len(parts) > 0:
+                target_dest = dest / Path(*parts)
+            else:
+                target_dest = dest / filename
+
+            target_dest.parent.mkdir(parents=True, exist_ok=True)
+            with open(target_dest, "wb") as f:
+                f.write(content)
+
+            return {
+                "success": True,
+                "type": file_type,
+                "file": filename,
+                "destination": str(target_dest),
+            }
+
+    elif file_type == "flexdmd":
+        dest = table_dir / table_dir.name
+        if ext in [".zip", ".rar", ".7z"]:
+            return await _extract_archive_safely(content, filename, dest, "FlexDMD", wipe=True)
+        else:
+            from urllib.parse import unquote
+            rel_path = unquote(request.headers.get("x-webkit-relative-path", "")) or file.filename
+            parts = Path(rel_path).parts
+            if len(parts) > 0 and parts[0] == dest.name:
+                parts = parts[1:]
+
+            if len(parts) > 0:
+                target_dest = dest / Path(*parts)
+            else:
+                target_dest = dest / filename
+
+            target_dest.parent.mkdir(parents=True, exist_ok=True)
+            with open(target_dest, "wb") as f:
+                f.write(content)
+
+            return {
+                "success": True,
+                "type": file_type,
+                "file": filename,
+                "destination": str(target_dest),
+            }
 
     elif file_type == "music":
         dest = table_dir / "music"
@@ -616,6 +683,13 @@ async def upload_file_to_table(
         from backend.services.vpx_parser import VPXParser
 
         VPXParser.process_vpx_table(target, extract_sidecar=False)
+
+    elif file_type == "flexdmd":
+        # Automatically apply FlexDMD INI patching when a FlexDMD folder is updated
+        from backend.routers.ini_manager import apply_flexdmd_patch
+        ini_path = (table_dir / table["filename"]).with_suffix(".ini")
+        if ini_path.exists():
+            apply_flexdmd_patch(ini_path, table_dir, table["filename"])
 
     return {
         "success": True,
@@ -751,10 +825,28 @@ async def _extract_archive_safely(
         if macosx_junk.exists() and macosx_junk.is_dir():
             shutil.rmtree(macosx_junk)
 
+        # Ensure root directory structure logic for PuP Packs
         if label == "PUP Pack":
-            from backend.services.puppack.manager import pup_pack_manager
-            from backend.core.config import config
-            pup_pack_manager.auto_configure(dest, config.display_count)
+            subdirs = [d for d in dest.iterdir() if d.is_dir() and not d.name.startswith(('.', '__'))]
+            files = [f for f in dest.iterdir() if f.is_file() and not f.name.startswith('.')]
+
+            # If the user uploaded an archive that was already wrapped in a "pupvideos" folder,
+            # we need to lift its contents out, otherwise we end up with pupvideos/pupvideos/rom
+            if len(subdirs) == 1 and len(files) == 0 and subdirs[0].name.lower() == "pupvideos":
+                inner_dir = subdirs[0]
+                for item in inner_dir.iterdir():
+                    shutil.move(str(item), str(dest))
+                shutil.rmtree(inner_dir)
+
+        # Apply similar logic for FlexDMD to lift contents out if wrapped
+        if label == "FlexDMD":
+            subdirs = [d for d in dest.iterdir() if d.is_dir() and not d.name.startswith(('.', '__'))]
+            files = [f for f in dest.iterdir() if f.is_file() and not f.name.startswith('.')]
+            if len(subdirs) == 1 and len(files) == 0 and subdirs[0].name == dest.name:
+                inner_dir = subdirs[0]
+                for item in inner_dir.iterdir():
+                    shutil.move(str(item), str(dest))
+                shutil.rmtree(inner_dir)
 
         return {
             "type": label.lower().replace(" ", "_"),

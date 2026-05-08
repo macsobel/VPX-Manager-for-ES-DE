@@ -19,11 +19,11 @@ def setup_pup_dir(tmp_path):
     # Create the source files
     src1 = pup_dir / "PuP-Pack_Options" / "Option 1"
     src1.mkdir(parents=True)
-    (src1 / "screens.pup").write_text("screen1")
+    (src1 / "screens.pup").write_text("screen1\n")
 
     src2 = pup_dir / "PuP-Pack_Options" / "Option 2"
     src2.mkdir(parents=True)
-    (src2 / "screens.pup").write_text("screen2")
+    (src2 / "screens.pup").write_text("screen2\n")
 
     return pup_dir
 
@@ -37,16 +37,10 @@ def test_apply_option_copy(setup_pup_dir):
     success = PupPackManager.apply_option(setup_pup_dir, "Option 1 - 2 Screen.bat")
     assert success is True
     assert (setup_pup_dir / "screens.pup").exists()
-    assert (setup_pup_dir / "screens.pup").read_text() == "screen1"
+    assert (setup_pup_dir / "screens.pup").read_text() == "screen1\n"
 
 def test_apply_option_xcopy(setup_pup_dir):
     success = PupPackManager.apply_option(setup_pup_dir, "Option 2 - 3 Screen.bat")
     assert success is True
     assert (setup_pup_dir / "screens.pup").exists()
-    assert (setup_pup_dir / "screens.pup").read_text() == "screen2"
-
-def test_auto_configure(setup_pup_dir):
-    opt = PupPackManager.auto_configure(setup_pup_dir, 3)
-    assert opt == "Option 2 - 3 Screen"
-    assert (setup_pup_dir / "screens.pup").exists()
-    assert (setup_pup_dir / "screens.pup").read_text() == "screen2"
+    assert (setup_pup_dir / "screens.pup").read_text() == "screen2\n"

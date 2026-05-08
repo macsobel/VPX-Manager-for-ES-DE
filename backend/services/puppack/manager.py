@@ -110,23 +110,48 @@ class PupPackManager:
 
                 if dst_clean.startswith("./"):
                     dst_clean = dst_clean[2:]
-                if dst_clean == ".":
-                    dst_clean = ""
+                if dst_clean == "." or dst_clean == "":
+                    dst_path = pup_dir
+                else:
+                    dst_path = pup_dir / dst_clean
 
-                # Handle * at end of src (means copy contents of directory)
-                if src_clean.endswith('/*'):
-                    src_clean = src_clean[:-2]
-                elif src_clean.endswith('*'):
-                    src_clean = src_clean[:-1]
+                # Check for wildcards
+                if '*' in src_clean:
+                    try:
+                        # Glob matches are relative to pup_dir
+                        matches = list(pup_dir.glob(src_clean))
+                        if not matches:
+                            logger.warning(f"No files matched glob pattern: {src_clean}")
+                            continue
 
-                # If after stripping *, src_clean ends with /, remove it
-                if src_clean.endswith('/'):
-                    src_clean = src_clean[:-1]
+                        for match in matches:
+                            # Calculate destination
+                            if dst_path.is_dir() or dst_clean == "" or dst_clean == ".":
+                                target = dst_path / match.name
+                            else:
+                                # If dst was a specific filename but we have multiple matches, 
+                                # this is usually a script error, but we'll assume directory-style copy
+                                target = dst_path / match.name
 
-                # Resolve paths relative to the pup_dir
+                            try:
+                                target.parent.mkdir(parents=True, exist_ok=True)
+                                if match.is_file():
+                                    if target.name.lower() == "screens.pup":
+                                        PupPackManager.process_screens_pup(match, target)
+                                    else:
+                                        shutil.copy2(match, target)
+                                elif match.is_dir():
+                                    shutil.copytree(match, target, dirs_exist_ok=True)
+                            except Exception as e:
+                                logger.error(f"Failed to copy match {match.name}: {e}")
+                                success = False
+                    except Exception as e:
+                        logger.error(f"Glob processing failed for {src_clean}: {e}")
+                        success = False
+                    continue
+
+                # Normal copy logic
                 src_path = pup_dir / src_clean
-                dst_path = pup_dir / dst_clean
-
                 if not src_path.exists():
                     logger.warning(f"Source path not found during PUP Pack setup: {src_path}")
                     success = False
@@ -134,13 +159,16 @@ class PupPackManager:
 
                 try:
                     if src_path.is_file():
-                        dst_path.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(src_path, dst_path)
-                        logger.info(f"Copied {src_clean} -> {dst_clean}")
+                        # If dst_path is a directory, append the filename
+                        final_dst = dst_path / src_path.name if (dst_path.exists() and dst_path.is_dir()) or dst_clean == "" else dst_path
+                        final_dst.parent.mkdir(parents=True, exist_ok=True)
+
+                        if final_dst.name.lower() == "screens.pup":
+                            PupPackManager.process_screens_pup(src_path, final_dst)
+                        else:
+                            shutil.copy2(src_path, final_dst)
                     elif src_path.is_dir():
-                        # Copy contents of directory
                         shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
-                        logger.info(f"Copied directory contents {src_clean} -> {dst_clean}")
                 except Exception as e:
                     logger.error(f"Failed to copy {src_clean} to {dst_clean}: {e}")
                     success = False
@@ -150,6 +178,129 @@ class PupPackManager:
             return False
 
         return success
+
+    @staticmethod
+    def process_screens_pup(src_path: Path, dst_path: Path) -> None:
+        """Parses screens.pup CSV, scales coordinates according to the cabinet profile, and strips Windows-only params."""
+        from backend.core.config import config
+
+        # Load the global displays mapping to get scale factors for each role
+        saved_displays = getattr(config, "displays", [])
+
+        # Mapping from PUP ScreenNum to logical Role
+        # Standard PUP layout:
+        # 0: Topper
+        # 1: DMD
+        # 2: Backglass
+        # 3: PlayField
+        # 4: Music
+        # 5: Menu
+        # 6: Select
+        # 7: Other1/BackGlass2
+        # 8: Other2/Topper2
+        # 9: GameInfo
+        # 10: GameHelp
+
+        role_map = {
+            "0": "Topper",
+            "1": "DMD",
+            "2": "Backglass",
+            "3": "Playfield",
+            "5": "FullDMD",
+            "7": "Backglass", # Backglass 2
+            "8": "Topper",    # Topper 2
+        }
+
+        scale_map = {}
+        for screen_num, role in role_map.items():
+            display = next((d for d in saved_displays if d.get("role") == role), None)
+            if display and display.get("scale_factor"):
+                scale_map[screen_num] = float(display.get("scale_factor", 1.0))
+
+        content = ""
+        try:
+            with open(src_path, 'r', encoding='utf-16', errors='replace') as f:
+                content = f.read()
+                if "ScreenNum" not in content:
+                    raise UnicodeError()
+        except:
+            with open(src_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+
+        if not content:
+            shutil.copy2(src_path, dst_path)
+            return
+
+        has_bom = content.startswith('\ufeff')
+        if has_bom:
+            content = content[1:]
+
+        lines = content.splitlines()
+        if not lines:
+            shutil.copy2(src_path, dst_path)
+            return
+
+        try:
+            # We want to output in UTF-8
+            with open(dst_path, 'w', encoding='utf-8', newline='') as f:
+                reader = csv.reader(lines)
+                writer = csv.writer(f)
+
+                header = next(reader, None)
+                if not header:
+                    shutil.copy2(src_path, dst_path)
+                    return
+
+                if has_bom:
+                    f.write('\ufeff')
+
+                writer.writerow(header)
+
+                clean_header = [str(col).strip().lstrip('\ufeff') for col in header]
+
+                try:
+                    screen_num_idx = clean_header.index("ScreenNum")
+                    custom_pos_idx = clean_header.index("CustomPos")
+                except ValueError:
+                    shutil.copy2(src_path, dst_path)
+                    return
+
+                for row in reader:
+                    if not row:
+                        continue
+
+                    if len(row) <= max(screen_num_idx, custom_pos_idx):
+                        writer.writerow(row)
+                        continue
+
+                    screen_num = str(row[screen_num_idx]).strip()
+
+                    # CustomPos might spill into extra columns due to unquoted commas
+                    custom_pos_parts = row[custom_pos_idx:]
+                    custom_pos_str = ",".join(custom_pos_parts).strip()
+
+                    if custom_pos_str:
+                        parts = [p.strip() for p in custom_pos_str.split(',')]
+                        if len(parts) >= 5:
+                            parts = parts[:5]
+
+                            scale_factor = scale_map.get(screen_num, 1.0)
+                            if scale_factor != 1.0:
+                                try:
+                                    for i in range(1, 5):
+                                        if parts[i]:
+                                            val = float(parts[i])
+                                            parts[i] = str(round(val * scale_factor, 2)).rstrip('0').rstrip('.')
+                                except ValueError:
+                                    pass
+
+                            row = row[:custom_pos_idx] + parts
+
+                    writer.writerow(row)
+
+        except Exception as e:
+            logger.error(f"Failed to process screens.pup, falling back to basic copy: {e}")
+            shutil.copy2(src_path, dst_path)
 
     @staticmethod
     def get_active_screens(pup_dir: Path) -> List[Dict]:
@@ -186,15 +337,30 @@ class PupPackManager:
                 return screens
 
             reader = csv.DictReader(lines)
+            status_map = {
+                "1": "ForceBack",
+                "2": "ForcePop",
+                "3": "MusicOnly",
+                "4": "NoDisplay",
+                "5": "Background"
+            }
+            
             for row in reader:
                 # Clean keys (remove BOM or spaces)
                 clean_row = {str(k).strip().lstrip('\ufeff'): v for k, v in row.items()}
-                status = clean_row.get("Active", "").strip()
-                if status and status != "0":
-                    screens.append({
-                        "description": clean_row.get("ScreenDes", "Unknown Screen"),
-                        "status": status
-                    })
+                status_raw = clean_row.get("Active", "").strip()
+                
+                # Filter out inactive screens
+                if not status_raw or status_raw == "0" or status_raw.lower() == "off":
+                    continue
+                
+                # Use mapped name if it's a known number
+                status_name = status_map.get(status_raw, status_raw)
+                
+                screens.append({
+                    "description": clean_row.get("ScreenDes", "Unknown Screen"),
+                    "status": status_name
+                })
             logger.info(f"Found {len(screens)} active screens in {screens_path}")
         except Exception as e:
             logger.error(f"Error parsing screens.pup in {pup_dir}: {e}")

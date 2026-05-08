@@ -78,6 +78,7 @@ const UploadPage = {
                         ${this._renderFileSlot('nvram', 'PinMAME NVRAMs (.nv)', '.nv', false, 'indigo', 'NVRAM file(s) → pinmame/nvram/', 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z', 0, true)}
                         ${this._renderFileSlot('ini', 'Table Settings INI (.ini)', '.ini', false, 'emerald', 'Table-specific settings file', 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z')}
                         ${this._renderFileSlot('puppack', 'PUP Pack (Archive/Files)', '.zip,.7z,.rar', false, 'amber', 'PuP-Pack arc → extracted to pupvideos/', 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z', 0, true)}
+                        ${this._renderFileSlot('flexdmd', 'FlexDMD / UltraDMD Assets', '.zip,.7z,.rar', false, 'amber', 'Folder matching .vpx name for DMD assets', 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM4 21a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2z', 0, true)}
                         ${this._renderFileSlot('altcolor', 'AltColor (Archive/Files)', '.cRZ,.zip,.7z,.rar,.vni,.pal', false, 'orange', 'Serum or color files → pinmame/altcolor/', 'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485', 0, true)}
                         ${this._renderFileSlot('altsound', 'AltSound (Archive/Files)', '.zip,.7z,.rar', false, 'pink', 'Alt sound pack → pinmame/altsound/', 'M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5.586v12.828a1 1 0 01-1.707.707L5.586 15z', 0, true)}
                         ${this._renderFileSlot('music', 'Music (Archive/Files)', '.zip,.7z,.rar,.mp3,.ogg,.wav', false, 'cyan', 'Music arc → extracted to music/', 'M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z', 0, true)}
@@ -431,7 +432,7 @@ const UploadPage = {
     async _setSlotFile(slotId, fileOrList) {
         const slotMap = {
             vpx: 'vpxFile', b2s: 'b2sFile', rom: 'romFiles',
-            puppack: 'puppackFile', music: 'musicFile',
+            puppack: 'puppackFile', flexdmd: 'flexdmdFile', music: 'musicFile',
             altsound: 'altsoundFile', altcolor: 'altcolorFile', nvram: 'nvramFiles',
             vbs: 'vbsFile', ini: 'iniFile'
         };
@@ -884,7 +885,7 @@ const UploadPage = {
         });
 
         // File inputs and Clear buttons
-        const slotIds = ['vpx', 'b2s', 'rom', 'puppack', 'music', 'altsound', 'altcolor', 'nvram', 'vbs', 'ini'];
+        const slotIds = ['vpx', 'b2s', 'rom', 'puppack', 'flexdmd', 'music', 'altsound', 'altcolor', 'nvram', 'vbs', 'ini'];
 
         slotIds.forEach(slotId => {
             const input = document.getElementById(`file-${slotId}`);
@@ -915,7 +916,34 @@ const UploadPage = {
 
             slot.addEventListener('drop', async (e) => {
                 e.preventDefault(); e.stopPropagation(); slot.classList.remove('dragover');
-                const files = e.dataTransfer?.files;
+                
+                let files = [];
+                // Check if it's a folder drop using DataTransferItem API
+                if (e.dataTransfer && e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+                    const items = e.dataTransfer.items;
+                    let isFolderDrop = false;
+
+                    // We only process folder drops for puppack, flexdmd, music, altsound, altcolor
+                    if (['puppack', 'flexdmd', 'music', 'altsound', 'altcolor'].includes(slotId)) {
+                        for (let i = 0; i < items.length; i++) {
+                            const item = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+                            if (item && item.isDirectory) {
+                                isFolderDrop = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (isFolderDrop) {
+                        Toast.info("Reading folder contents...");
+                        files = await this._traverseFileTree(items);
+                    } else {
+                        files = e.dataTransfer.files;
+                    }
+                } else {
+                    files = e.dataTransfer?.files;
+                }
+
                 if (files && files.length > 0) {
                     await this._setSlotFile(slotId, files);
                 }
@@ -970,26 +998,10 @@ const UploadPage = {
             }
 
             if (this._state.b2sFile) formData.append('directb2s_file', this._state.b2sFile);
-            if (this._state.romFiles && this._state.romFiles.length > 0) {
-                this._state.romFiles.forEach(f => formData.append('rom_files', f));
-            }
-            if (this._state.altsoundFile) {
-                if (Array.isArray(this._state.altsoundFile)) this._state.altsoundFile.forEach(f => formData.append('altsound_file', f));
-                else formData.append('altsound_file', this._state.altsoundFile);
-            }
-            if (this._state.altcolorFile) {
-                if (Array.isArray(this._state.altcolorFile)) this._state.altcolorFile.forEach(f => formData.append('altcolor_file', f));
-                else formData.append('altcolor_file', this._state.altcolorFile);
-            }
-            if (this._state.puppackFile) {
-                if (Array.isArray(this._state.puppackFile)) this._state.puppackFile.forEach(f => formData.append('puppack_file', f));
-                else formData.append('puppack_file', this._state.puppackFile);
-            }
-            if (this._state.musicFile) {
-                if (Array.isArray(this._state.musicFile)) this._state.musicFile.forEach(f => formData.append('music_file', f));
-                else formData.append('music_file', this._state.musicFile);
-            }
-
+            
+            // Note: rom_files, puppack_file, flexdmd_file, music_file, altsound_file, altcolor_file
+            // are now handled sequentially after table creation to support folder structures.
+            
             if (this._state.vbsFile) formData.append('vbs_file', this._state.vbsFile);
             if (this._state.iniFile) formData.append('ini_file', this._state.iniFile);
 
@@ -1014,8 +1026,57 @@ const UploadPage = {
             });
 
             if (data.success) {
+                const tableId = data.id;
                 const vpsNote = this._state.vpsId ? ' (VPS matched)' : '';
-                Toast.success(`Table imported: ${data.folder}${vpsNote}`);
+                Toast.success(`Table created: ${data.folder}${vpsNote}`);
+
+                // Now upload secondary files sequentially to ensure folder structure is preserved via headers
+                const secondaryFiles = [];
+                if (this._state.romFiles && this._state.romFiles.length > 0) {
+                    this._state.romFiles.forEach(f => secondaryFiles.push({ file: f, type: 'rom' }));
+                }
+                if (this._state.puppackFile) {
+                    const list = Array.isArray(this._state.puppackFile) ? this._state.puppackFile : [this._state.puppackFile];
+                    list.forEach(f => secondaryFiles.push({ file: f, type: 'puppack' }));
+                }
+                if (this._state.flexdmdFile) {
+                    const list = Array.isArray(this._state.flexdmdFile) ? this._state.flexdmdFile : [this._state.flexdmdFile];
+                    list.forEach(f => secondaryFiles.push({ file: f, type: 'flexdmd' }));
+                }
+                if (this._state.musicFile) {
+                    const list = Array.isArray(this._state.musicFile) ? this._state.musicFile : [this._state.musicFile];
+                    list.forEach(f => secondaryFiles.push({ file: f, type: 'music' }));
+                }
+                if (this._state.altsoundFile) {
+                    const list = Array.isArray(this._state.altsoundFile) ? this._state.altsoundFile : [this._state.altsoundFile];
+                    list.forEach(f => secondaryFiles.push({ file: f, type: 'altsound' }));
+                }
+                if (this._state.altcolorFile) {
+                    const list = Array.isArray(this._state.altcolorFile) ? this._state.altcolorFile : [this._state.altcolorFile];
+                    list.forEach(f => secondaryFiles.push({ file: f, type: 'altcolor' }));
+                }
+
+                if (secondaryFiles.length > 0) {
+                    let uploaded = 0;
+                    for (const { file, type } of secondaryFiles) {
+                        uploaded++;
+                        progressText.textContent = `Uploading ${uploaded}/${secondaryFiles.length}: ${file.name}...`;
+                        const fData = new FormData();
+                        fData.append('file_type', type);
+                        fData.append('file', file);
+
+                        const headers = {};
+                        if (file.webkitRelativePath) {
+                            headers['x-webkit-relative-path'] = encodeURIComponent(file.webkitRelativePath);
+                        }
+
+                        await apiFetch(`/api/upload/file-to-table/${tableId}`, {
+                            method: 'POST',
+                            headers: headers,
+                            body: fData,
+                        });
+                    }
+                }
 
                 if (data.scraped && data.scraped.downloaded && data.scraped.downloaded.length > 0) {
                     Toast.success(`Successfully downloaded ${data.scraped.downloaded.length} media assets!`);
@@ -1028,8 +1089,8 @@ const UploadPage = {
                 setTimeout(() => {
                     overlay.style.display = 'none';
                     const hasPupPack = this._state.puppackFile && (!Array.isArray(this._state.puppackFile) || this._state.puppackFile.length > 0);
-                    if (hasPupPack && data.id) {
-                        this._showPupPackPrompt(data.id, name);
+                    if (hasPupPack && tableId) {
+                        this._showPupPackPrompt(tableId, name);
                     } else {
                         this._resetState();
                     }
@@ -1180,6 +1241,7 @@ const UploadPage = {
                             ${this._renderFileSlot('nvram', 'PinMAME NVRAMs', '.nv', false, 'indigo', 'NVRAM file(s) → pinmame/nvram/', 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z', inv.nvram, true)}
                             ${this._renderFileSlot('ini', 'Table Settings (.ini)', '.ini', false, 'emerald', 'Replaces standardized .ini file', 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM12 15a3 3 0 100-6 3 3 0 000 6z', inv.ini)}
                             ${this._renderFileSlot('puppack', 'PUP Pack', '.zip', false, 'amber', 'Extract to pupvideos/', 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z', inv.puppack)}
+                            ${this._renderFileSlot('flexdmd', 'FlexDMD / UltraDMD', '.zip,.7z,.rar', false, 'amber', 'Extracted to match .vpx name', 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM4 21a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2z', inv.flexdmd)}
                             ${this._renderFileSlot('altcolor', 'AltColor', '.zip', false, 'orange', 'Extract to altcolor/', 'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485', inv.altcolor)}
                             ${this._renderFileSlot('altsound', 'AltSound', '.zip', false, 'pink', 'Extract to altsound/', 'M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5.586v12.828a1 1 0 01-1.707.707L5.586 15z', inv.altsound)}
                             ${this._renderFileSlot('music', 'Music Pack', '.zip', false, 'cyan', 'Extract to music/', 'M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z', inv.music)}
@@ -1244,10 +1306,18 @@ const UploadPage = {
                 }).catch(err => console.error('Failed to analyze existing table:', err));
 
             // Bind events for slots
-            const slotIds = ['vpx', 'b2s', 'rom', 'puppack', 'music', 'altsound', 'vbs', 'ini'];
+            const slotIds = ['vpx', 'b2s', 'rom', 'puppack', 'flexdmd', 'music', 'altsound', 'vbs', 'ini'];
             slotIds.forEach(slotId => {
                 const input = document.getElementById(`file-${slotId}`);
                 if (!input) return;
+
+                // Set allow folder attributes for puppack and flexdmd
+                if (slotId === 'puppack' || slotId === 'flexdmd') {
+                    input.setAttribute('webkitdirectory', '');
+                    input.setAttribute('directory', '');
+                    input.setAttribute('multiple', '');
+                }
+
                 input.addEventListener('change', async (e) => {
                     await this._setSlotFile(slotId, e.target.files);
                     this._updateAddFilesButton();
@@ -1259,7 +1329,34 @@ const UploadPage = {
                 slot.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); if (!slot.contains(e.relatedTarget)) slot.classList.remove('dragover'); });
                 slot.addEventListener('drop', async (e) => {
                     e.preventDefault(); e.stopPropagation(); slot.classList.remove('dragover');
-                    const files = e.dataTransfer?.files;
+
+                    let files = [];
+                    // Check if it's a folder drop using DataTransferItem API
+                    if (e.dataTransfer && e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+                        const items = e.dataTransfer.items;
+                        let isFolderDrop = false;
+
+                        // We only process folder drops for puppack, flexdmd, music, altsound, altcolor
+                        if (['puppack', 'flexdmd', 'music', 'altsound', 'altcolor'].includes(slotId)) {
+                            for (let i = 0; i < items.length; i++) {
+                                const item = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+                                if (item && item.isDirectory) {
+                                    isFolderDrop = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (isFolderDrop) {
+                            Toast.info("Reading folder contents...");
+                            files = await this._traverseFileTree(items);
+                        } else {
+                            files = e.dataTransfer.files;
+                        }
+                    } else {
+                         files = e.dataTransfer?.files;
+                    }
+
                     if (files && files.length > 0) {
                         await this._setSlotFile(slotId, files);
                         this._updateAddFilesButton();
@@ -1347,10 +1444,50 @@ const UploadPage = {
         }
     },
 
+    async _traverseFileTree(items) {
+        const files = [];
+        const readEntriesPromise = (dirReader) => {
+            return new Promise((resolve, reject) => {
+                dirReader.readEntries(resolve, reject);
+            });
+        };
+
+        const traverse = async (entry, path = '') => {
+            if (entry.isFile) {
+                const file = await new Promise((resolve) => entry.file(resolve));
+                // Add the relative path to the file object so the backend knows the structure
+                Object.defineProperty(file, 'webkitRelativePath', {
+                    value: path + file.name,
+                    writable: false
+                });
+                files.push(file);
+            } else if (entry.isDirectory) {
+                const dirReader = entry.createReader();
+                let entries = await readEntriesPromise(dirReader);
+                while (entries.length > 0) {
+                    for (const childEntry of entries) {
+                        await traverse(childEntry, path + entry.name + '/');
+                    }
+                    entries = await readEntriesPromise(dirReader);
+                }
+            }
+        };
+
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+            if (item) {
+                await traverse(item);
+            } else if (items[i].getAsFile) {
+                files.push(items[i].getAsFile());
+            }
+        }
+        return files;
+    },
+
     _updateAddFilesButton() {
         const btn = document.getElementById('btn-upload-files');
         if (!btn) return;
-        const hasAnyStaged = this._state.b2sFile || (this._state.romFiles && this._state.romFiles.length > 0) || this._state.puppackFile ||
+        const hasAnyStaged = this._state.b2sFile || (this._state.romFiles && this._state.romFiles.length > 0) || this._state.puppackFile || this._state.flexdmdFile ||
             this._state.musicFile || this._state.altsoundFile || this._state.altcolorFile || this._state.vpxFile || this._state.vbsFile || this._state.iniFile;
         const hasAnyDeleted = this._state.deletedFiles && this._state.deletedFiles.length > 0;
         btn.disabled = !(hasAnyStaged || hasAnyDeleted);
@@ -1368,6 +1505,7 @@ const UploadPage = {
             ini: { files: this._state.iniFile ? [this._state.iniFile] : [], type: 'ini' },
             rom: { files: this._state.romFiles, type: 'rom' },
             puppack: { files: this._state.puppackFile ? (Array.isArray(this._state.puppackFile) ? this._state.puppackFile : [this._state.puppackFile]) : [], type: 'puppack' },
+            flexdmd: { files: this._state.flexdmdFile ? (Array.isArray(this._state.flexdmdFile) ? this._state.flexdmdFile : [this._state.flexdmdFile]) : [], type: 'flexdmd' },
             music: { files: this._state.musicFile ? (Array.isArray(this._state.musicFile) ? this._state.musicFile : [this._state.musicFile]) : [], type: 'music' },
             altsound: { files: this._state.altsoundFile ? (Array.isArray(this._state.altsoundFile) ? this._state.altsoundFile : [this._state.altsoundFile]) : [], type: 'altsound' },
             altcolor: { files: this._state.altcolorFile ? (Array.isArray(this._state.altcolorFile) ? this._state.altcolorFile : [this._state.altcolorFile]) : [], type: 'altcolor' },
@@ -1399,8 +1537,16 @@ const UploadPage = {
                 const formData = new FormData();
                 formData.append('file_type', type);
                 formData.append('file', file);
+
+                const headers = {};
+                // Pass relative path for folder drops so backend can recreate structure
+                if (file.webkitRelativePath) {
+                    headers['x-webkit-relative-path'] = encodeURIComponent(file.webkitRelativePath);
+                }
+
                 const res = await fetch(`/api/upload/file-to-table/${tableId}`, {
                     method: 'POST',
+                    headers: headers,
                     body: formData,
                 });
                 const data = await res.json();
