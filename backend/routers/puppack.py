@@ -36,17 +36,56 @@ async def list_puppack_tables():
     return {"tables": tables_with_pup}
 
 def resolve_pup_root(pup_dir: Path) -> Path:
-    """Robustly find the true PUP root (where screens.pup lives)."""
-    if pup_dir.exists():
-        if not (pup_dir / "screens.pup").exists():
-            # Search for screens.pup up to 2 levels deep
-            found = list(pup_dir.glob("**/screens.pup"))
-            if found:
-                # Use the first one found that isn't in a __MACOSX folder
-                valid = [f.parent for f in found if "__MACOSX" not in str(f)]
-                if valid:
-                    return valid[0]
-    return pup_dir
+    """Robustly find the true PUP root (where screens.pup or setup scripts live)."""
+    if not pup_dir.exists():
+        return pup_dir
+
+    EXCLUSIONS = {
+        "pupinit.bat", "getcodec.bat", "getcodec2.bat", "getlen.bat",
+        "normalizemp3.bat", "editthispuppack.bat", "vlc-kill.bat",
+        "ffmpeg.bat", "ffprobe.bat"
+    }
+
+    # 1. Check if the current dir is already a root
+    if (pup_dir / "screens.pup").exists():
+        return pup_dir
+    
+    # Check for setup scripts in current dir
+    try:
+        if any(f.suffix.lower() == ".bat" and f.name.lower() not in EXCLUSIONS 
+               for f in pup_dir.iterdir() if f.is_file()):
+            return pup_dir
+    except:
+        pass
+
+    # 2. Search recursively
+    # We want to find the shallowest directory that contains either screens.pup OR .bat options
+    best_root = None
+    min_depth = 999
+
+    # Search for screens.pup
+    for f in pup_dir.glob("**/screens.pup"):
+        if "__MACOSX" in str(f).lower():
+            continue
+        depth = len(f.parts)
+        if depth < min_depth:
+            min_depth = depth
+            best_root = f.parent
+
+    # Search for .bat options
+    for f in pup_dir.glob("**/*.bat"):
+        if "__MACOSX" in str(f).lower() or f.name.lower() in EXCLUSIONS:
+            continue
+        depth = len(f.parts)
+        if depth < min_depth:
+            min_depth = depth
+            best_root = f.parent
+        elif depth == min_depth:
+            # If same depth, screens.pup usually wins as a root indicator, 
+            # but we already have a root at this depth
+            pass
+
+    return best_root if best_root else pup_dir
 
 @router.get("/{table_id}/options")
 async def get_puppack_options(table_id: int):

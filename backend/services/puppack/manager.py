@@ -16,11 +16,31 @@ class PupPackManager:
         if not pup_dir.exists() or not pup_dir.is_dir():
             return options
 
-        # Look for .bat files that represent setup options
-        for bat_file in pup_dir.glob("*.bat"):
+        # Utility scripts that are NOT setup options
+        EXCLUSIONS = {
+            "pupinit.bat", "getcodec.bat", "getcodec2.bat", "getlen.bat",
+            "normalizemp3.bat", "editthispuppack.bat", "vlc-kill.bat",
+            "ffmpeg.bat", "ffprobe.bat"
+        }
+
+        # Look for .bat files recursively (up to 2 levels deep from identified root)
+        for bat_file in pup_dir.glob("**/*.bat"):
+            if bat_file.name.lower() in EXCLUSIONS:
+                continue
+            
+            # Skip files in common internal folders or those that seem like component parts
+            if "__macosx" in str(bat_file).lower():
+                continue
+
+            # Calculate relative path from pup_dir to use as file identifier
+            try:
+                rel_path = bat_file.relative_to(pup_dir)
+            except ValueError:
+                rel_path = Path(bat_file.name)
+            
             options.append({
                 "name": bat_file.stem,
-                "file": bat_file.name,
+                "file": str(rel_path),
                 "path": str(bat_file)
             })
 
@@ -31,12 +51,16 @@ class PupPackManager:
     @staticmethod
     def apply_option(pup_dir: Path, bat_file_name: str) -> bool:
         """Parses a .bat file to find `copy` commands and applies them to the filesystem."""
+        # bat_file_name might be a relative path (e.g. "Options/2-screen.bat")
         bat_path = pup_dir / bat_file_name
         if not bat_path.exists():
             logger.error(f"PUP Pack setup script not found: {bat_path}")
             return False
 
-        logger.info(f"Applying PUP Pack option from script: {bat_file_name}")
+        # All relative paths in the .bat file should be relative to where the .bat file is
+        base_dir = bat_path.parent
+
+        logger.info(f"Applying PUP Pack option from script: {bat_file_name} (Base: {base_dir})")
 
         success = True
         try:
@@ -90,7 +114,7 @@ class PupPackManager:
             # Handle deletions first
             for target in deletions:
                 target_clean = target.replace('\\', '/')
-                target_path = pup_dir / target_clean
+                target_path = base_dir / target_clean
                 if target_path.exists():
                     try:
                         if target_path.is_file():
@@ -111,15 +135,15 @@ class PupPackManager:
                 if dst_clean.startswith("./"):
                     dst_clean = dst_clean[2:]
                 if dst_clean == "." or dst_clean == "":
-                    dst_path = pup_dir
+                    dst_path = base_dir
                 else:
-                    dst_path = pup_dir / dst_clean
+                    dst_path = base_dir / dst_clean
 
                 # Check for wildcards
                 if '*' in src_clean:
                     try:
-                        # Glob matches are relative to pup_dir
-                        matches = list(pup_dir.glob(src_clean))
+                        # Glob matches are relative to base_dir
+                        matches = list(base_dir.glob(src_clean))
                         if not matches:
                             logger.warning(f"No files matched glob pattern: {src_clean}")
                             continue
@@ -151,7 +175,7 @@ class PupPackManager:
                     continue
 
                 # Normal copy logic
-                src_path = pup_dir / src_clean
+                src_path = base_dir / src_clean
                 if not src_path.exists():
                     logger.warning(f"Source path not found during PUP Pack setup: {src_path}")
                     success = False
