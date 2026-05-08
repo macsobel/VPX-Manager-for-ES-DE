@@ -25,7 +25,30 @@ const App = {
     async init() {
         Nav.init();
         if (window.Onboarding) Onboarding.init();
-        window.addEventListener('hashchange', () => this.route());
+        
+        // Use a flag to prevent rapid-fire hash changes from UI interactions
+        this.isNavigating = false;
+        
+        window.addEventListener('hashchange', (e) => {
+            if (this.ignoreNextHashChange) {
+                this.ignoreNextHashChange = false;
+                return;
+            }
+            this.route();
+        });
+
+        // Global click interceptor to prevent any non-link button from triggering a hash change
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('button');
+            if (btn && btn.type === 'button') {
+                // If it's a button, we explicitly want to stop it from affecting the URL hash
+                // unless it was intentionally designed to do so (like the Nav links)
+                if (!btn.classList.contains('nav-link')) {
+                    e.stopPropagation();
+                }
+            }
+        }, true);
+
         this.route();
         this.updateVersion();
     },
@@ -184,13 +207,16 @@ const App = {
             container.style.animation = '';
             page.render();
         } else {
-            // Only redirect to dashboard if the hash is truly invalid and not empty
-            if (hash && hash !== 'dashboard') {
-                console.warn(`Unknown route: ${hash}. Redirecting to dashboard.`);
-                window.location.hash = 'dashboard';
-            } else if (!hash) {
-                window.location.hash = 'dashboard';
+            // CRITICAL FIX: If we have a current page and the hash goes weird, STAY ON THE PAGE.
+            if (this.currentPage) {
+                console.log(`Hash went to "${hash}", but we are sticking with "${this.currentPage}" to prevent accidental dashboard jump.`);
+                this.ignoreNextHashChange = true;
+                window.location.hash = this.currentPage;
+                return;
             }
+
+            // Fallback for initial load or total failure
+            window.location.hash = 'dashboard';
         }
     },
 };
