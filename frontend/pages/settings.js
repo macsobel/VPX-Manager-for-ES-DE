@@ -30,7 +30,7 @@ const SettingsPage = {
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                             Cabinet Display Profile
                         </div>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="event.preventDefault(); event.stopPropagation(); SettingsPage.identifyDisplays(this);" style="font-size: 0.75rem; padding: 4px 8px;">
+                        <button type="button" class="btn btn-secondary btn-sm" id="btn-identify-displays" style="font-size: 0.75rem; padding: 4px 8px;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                             Identify Displays
                         </button>
@@ -119,12 +119,6 @@ const SettingsPage = {
 
     async identifyDisplays(btn) {
         if (!btn || btn.disabled) return;
-        
-        // Prevent any bubbling to the router
-        if (event) {
-            event.preventDefault();
-            event.stopPropagation();
-        }
 
         btn.disabled = true;
         const originalHtml = btn.innerHTML;
@@ -134,14 +128,16 @@ const SettingsPage = {
             // Use the unified display identify endpoint
             await fetch('/api/displays/identify', { method: 'POST' });
             Toast.success('Identification overlays sent to all displays');
+            
+            // Reload the display options after identification
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await this.loadDisplays();
         } catch (e) {
             Toast.error('Failed to trigger display identification');
         }
 
-        setTimeout(() => {
-            btn.disabled = false;
-            btn.innerHTML = originalHtml;
-        }, 1500);
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
     },
 
     _renderDirInput(id, label, value, description, pickFiles = false, isLocal = true) {
@@ -250,6 +246,16 @@ const SettingsPage = {
             document.getElementById('btn-save-displays').onclick = async () => {
                 await this.saveDisplays();
             };
+
+            // Bind the Identify Displays button with proper event handling
+            const identifyBtn = document.getElementById('btn-identify-displays');
+            if (identifyBtn) {
+                identifyBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.identifyDisplays(identifyBtn);
+                };
+            }
 
         } catch (e) {
             document.getElementById('displays-settings-card').innerHTML = `<span style="color: var(--accent-red);">Failed to load display info: ${e.message}</span>`;
