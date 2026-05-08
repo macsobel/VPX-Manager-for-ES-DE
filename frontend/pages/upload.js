@@ -885,7 +885,7 @@ const UploadPage = {
         });
 
         // File inputs and Clear buttons
-        const slotIds = ['vpx', 'b2s', 'rom', 'puppack', 'music', 'altsound', 'altcolor', 'nvram', 'vbs', 'ini'];
+        const slotIds = ['vpx', 'b2s', 'rom', 'puppack', 'flexdmd', 'music', 'altsound', 'altcolor', 'nvram', 'vbs', 'ini'];
 
         slotIds.forEach(slotId => {
             const input = document.getElementById(`file-${slotId}`);
@@ -916,7 +916,34 @@ const UploadPage = {
 
             slot.addEventListener('drop', async (e) => {
                 e.preventDefault(); e.stopPropagation(); slot.classList.remove('dragover');
-                const files = e.dataTransfer?.files;
+                
+                let files = [];
+                // Check if it's a folder drop using DataTransferItem API
+                if (e.dataTransfer && e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+                    const items = e.dataTransfer.items;
+                    let isFolderDrop = false;
+
+                    // We only process folder drops for puppack, flexdmd, music, altsound, altcolor
+                    if (['puppack', 'flexdmd', 'music', 'altsound', 'altcolor'].includes(slotId)) {
+                        for (let i = 0; i < items.length; i++) {
+                            const item = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+                            if (item && item.isDirectory) {
+                                isFolderDrop = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (isFolderDrop) {
+                        Toast.info("Reading folder contents...");
+                        files = await this._traverseFileTree(items);
+                    } else {
+                        files = e.dataTransfer.files;
+                    }
+                } else {
+                    files = e.dataTransfer?.files;
+                }
+
                 if (files && files.length > 0) {
                     await this._setSlotFile(slotId, files);
                 }
@@ -971,30 +998,10 @@ const UploadPage = {
             }
 
             if (this._state.b2sFile) formData.append('directb2s_file', this._state.b2sFile);
-            if (this._state.romFiles && this._state.romFiles.length > 0) {
-                this._state.romFiles.forEach(f => formData.append('rom_files', f));
-            }
-            if (this._state.altsoundFile) {
-                if (Array.isArray(this._state.altsoundFile)) this._state.altsoundFile.forEach(f => formData.append('altsound_file', f));
-                else formData.append('altsound_file', this._state.altsoundFile);
-            }
-            if (this._state.altcolorFile) {
-                if (Array.isArray(this._state.altcolorFile)) this._state.altcolorFile.forEach(f => formData.append('altcolor_file', f));
-                else formData.append('altcolor_file', this._state.altcolorFile);
-            }
-            if (this._state.puppackFile) {
-                if (Array.isArray(this._state.puppackFile)) this._state.puppackFile.forEach(f => formData.append('puppack_file', f));
-                else formData.append('puppack_file', this._state.puppackFile);
-            }
-            if (this._state.flexdmdFile) {
-                if (Array.isArray(this._state.flexdmdFile)) this._state.flexdmdFile.forEach(f => formData.append('flexdmd_file', f));
-                else formData.append('flexdmd_file', this._state.flexdmdFile);
-            }
-            if (this._state.musicFile) {
-                if (Array.isArray(this._state.musicFile)) this._state.musicFile.forEach(f => formData.append('music_file', f));
-                else formData.append('music_file', this._state.musicFile);
-            }
-
+            
+            // Note: rom_files, puppack_file, flexdmd_file, music_file, altsound_file, altcolor_file
+            // are now handled sequentially after table creation to support folder structures.
+            
             if (this._state.vbsFile) formData.append('vbs_file', this._state.vbsFile);
             if (this._state.iniFile) formData.append('ini_file', this._state.iniFile);
 
@@ -1019,8 +1026,57 @@ const UploadPage = {
             });
 
             if (data.success) {
+                const tableId = data.id;
                 const vpsNote = this._state.vpsId ? ' (VPS matched)' : '';
-                Toast.success(`Table imported: ${data.folder}${vpsNote}`);
+                Toast.success(`Table created: ${data.folder}${vpsNote}`);
+
+                // Now upload secondary files sequentially to ensure folder structure is preserved via headers
+                const secondaryFiles = [];
+                if (this._state.romFiles && this._state.romFiles.length > 0) {
+                    this._state.romFiles.forEach(f => secondaryFiles.push({ file: f, type: 'rom' }));
+                }
+                if (this._state.puppackFile) {
+                    const list = Array.isArray(this._state.puppackFile) ? this._state.puppackFile : [this._state.puppackFile];
+                    list.forEach(f => secondaryFiles.push({ file: f, type: 'puppack' }));
+                }
+                if (this._state.flexdmdFile) {
+                    const list = Array.isArray(this._state.flexdmdFile) ? this._state.flexdmdFile : [this._state.flexdmdFile];
+                    list.forEach(f => secondaryFiles.push({ file: f, type: 'flexdmd' }));
+                }
+                if (this._state.musicFile) {
+                    const list = Array.isArray(this._state.musicFile) ? this._state.musicFile : [this._state.musicFile];
+                    list.forEach(f => secondaryFiles.push({ file: f, type: 'music' }));
+                }
+                if (this._state.altsoundFile) {
+                    const list = Array.isArray(this._state.altsoundFile) ? this._state.altsoundFile : [this._state.altsoundFile];
+                    list.forEach(f => secondaryFiles.push({ file: f, type: 'altsound' }));
+                }
+                if (this._state.altcolorFile) {
+                    const list = Array.isArray(this._state.altcolorFile) ? this._state.altcolorFile : [this._state.altcolorFile];
+                    list.forEach(f => secondaryFiles.push({ file: f, type: 'altcolor' }));
+                }
+
+                if (secondaryFiles.length > 0) {
+                    let uploaded = 0;
+                    for (const { file, type } of secondaryFiles) {
+                        uploaded++;
+                        progressText.textContent = `Uploading ${uploaded}/${secondaryFiles.length}: ${file.name}...`;
+                        const fData = new FormData();
+                        fData.append('file_type', type);
+                        fData.append('file', file);
+
+                        const headers = {};
+                        if (file.webkitRelativePath) {
+                            headers['x-webkit-relative-path'] = encodeURIComponent(file.webkitRelativePath);
+                        }
+
+                        await apiFetch(`/api/upload/file-to-table/${tableId}`, {
+                            method: 'POST',
+                            headers: headers,
+                            body: fData,
+                        });
+                    }
+                }
 
                 if (data.scraped && data.scraped.downloaded && data.scraped.downloaded.length > 0) {
                     Toast.success(`Successfully downloaded ${data.scraped.downloaded.length} media assets!`);
@@ -1033,8 +1089,8 @@ const UploadPage = {
                 setTimeout(() => {
                     overlay.style.display = 'none';
                     const hasPupPack = this._state.puppackFile && (!Array.isArray(this._state.puppackFile) || this._state.puppackFile.length > 0);
-                    if (hasPupPack && data.id) {
-                        this._showPupPackPrompt(data.id, name);
+                    if (hasPupPack && tableId) {
+                        this._showPupPackPrompt(tableId, name);
                     } else {
                         this._resetState();
                     }

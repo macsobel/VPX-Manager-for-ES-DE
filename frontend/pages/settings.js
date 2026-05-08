@@ -176,9 +176,9 @@ const SettingsPage = {
                         </select>
                     </div>
                     <div class="input-group">
-                        <label class="input-label">DMD Display</label>
-                        <select class="input-field display-role-select" data-role="DMD">
-                            ${renderDisplayOptions(getSavedUuid('DMD'))}
+                        <label class="input-label">DMD / FullDMD Display</label>
+                        <select class="input-field display-role-select" data-role="DMD_FullDMD">
+                            ${renderDisplayOptions(getSavedUuid('DMD') || getSavedUuid('FullDMD'))}
                         </select>
                     </div>
                 </div>
@@ -213,8 +213,7 @@ const SettingsPage = {
                 if (uuid) {
                     const sysDisplay = this.sysDisplays.find(d => d.uuid === uuid);
                     if (sysDisplay) {
-                        displaysConfig.push({
-                            role: role,
+                        const baseConfig = {
                             index: sysDisplay.index,
                             name: sysDisplay.name,
                             uuid: sysDisplay.uuid,
@@ -223,7 +222,15 @@ const SettingsPage = {
                             x: sysDisplay.x || 0,
                             y: sysDisplay.y || 0,
                             scale_factor: sysDisplay.scale_factor
-                        });
+                        };
+
+                        if (role === 'DMD_FullDMD') {
+                            // Assign to BOTH roles for modern PUP compatibility
+                            displaysConfig.push({ ...baseConfig, role: 'DMD' });
+                            displaysConfig.push({ ...baseConfig, role: 'FullDMD' });
+                        } else {
+                            displaysConfig.push({ ...baseConfig, role: role });
+                        }
                     }
                 }
             });

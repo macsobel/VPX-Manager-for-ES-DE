@@ -60,23 +60,50 @@ def get_display_count():
 
 @router.get("/settings", response_model=BackglassSettings)
 async def get_settings():
-    # Never import or use pygame here on macOS as it crashes the Uvicorn thread
+    # Find the display assigned to the 'Backglass' role in the global config
+    bg_display = next((d for d in config.displays if d.get("role") == "Backglass"), None)
+    
     return BackglassSettings(
         enabled=config.backglass_enabled,
-        screen_index=config.backglass_screen_index,
-        screen_name=config.backglass_screen_name,
+        screen_index=bg_display.get("index", 0) if bg_display else 0,
+        screen_name=bg_display.get("name", "") if bg_display else "",
         displays=get_displays()
     )
 
 @router.post("/settings")
 async def update_settings(settings: BackglassSettings):
     config.backglass_enabled = settings.enabled
-    config.backglass_screen_index = settings.screen_index
-    config.backglass_screen_name = settings.screen_name
-    save_config(config)
     
-    # If we just enabled it, the monitor service will pick it up on its next loop
-    # If we just disabled it, the monitor service will kill the process
+    # Update the 'Backglass' role in the global displays array if a selection was made
+    if settings.screen_name or settings.screen_index is not None:
+        saved_displays = getattr(config, "displays", [])
+        # Remove 'Backglass' role from any existing display
+        for d in saved_displays:
+            if d.get("role") == "Backglass":
+                d["role"] = None
+        
+        # Find the display in the system list (by name or index) and assign the role
+        # We use a helper to match against sys_profiler/pygame results
+        all_sys = get_displays()
+        match = next((d for d in all_sys if d["name"] == settings.screen_name or d["index"] == settings.screen_index), None)
+        
+        if match:
+            # Check if this display is already in config.displays
+            existing = next((d for d in saved_displays if d["uuid"] == match.get("uuid") or d["name"] == match["name"]), None)
+            if existing:
+                existing["role"] = "Backglass"
+            else:
+                saved_displays.append({
+                    "role": "Backglass",
+                    "index": match["index"],
+                    "name": match["name"],
+                    "uuid": match.get("uuid", f"unknown-{match['index']}"),
+                    "scale_factor": 1.0 # Default fallback
+                })
+        
+        config.displays = saved_displays
+        
+    save_config(config)
     return {"success": True}
 
 @router.get("/status")
@@ -88,11 +115,13 @@ async def get_status():
         is_running = True
         pid = backglass_monitor._companion_process.pid
     
+    bg_display = next((d for d in config.displays if d.get("role") == "Backglass"), None)
+    
     return {
         "running": is_running,
         "pid": pid,
         "enabled": config.backglass_enabled,
-        "screen_index": config.backglass_screen_index
+        "screen_index": bg_display.get("index", 0) if bg_display else 0
     }
 
 @router.post("/identify")

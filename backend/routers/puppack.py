@@ -35,6 +35,19 @@ async def list_puppack_tables():
 
     return {"tables": tables_with_pup}
 
+def resolve_pup_root(pup_dir: Path) -> Path:
+    """Robustly find the true PUP root (where screens.pup lives)."""
+    if pup_dir.exists():
+        if not (pup_dir / "screens.pup").exists():
+            # Search for screens.pup up to 2 levels deep
+            found = list(pup_dir.glob("**/screens.pup"))
+            if found:
+                # Use the first one found that isn't in a __MACOSX folder
+                valid = [f.parent for f in found if "__MACOSX" not in str(f)]
+                if valid:
+                    return valid[0]
+    return pup_dir
+
 @router.get("/{table_id}/options")
 async def get_puppack_options(table_id: int):
     """Returns available setup .bat options for a specific table's PUP Pack."""
@@ -43,13 +56,7 @@ async def get_puppack_options(table_id: int):
         raise HTTPException(status_code=404, detail="Table not found")
 
     table_dir = Path(table["folder_path"])
-    pup_dir = table_dir / "pupvideos"
-
-    # Check if nested (ignore __MACOSX and hidden files)
-    subdirs = [d for d in pup_dir.iterdir() if d.is_dir() and not d.name.startswith(('.', '__'))]
-    files = [f for f in pup_dir.iterdir() if f.is_file() and not f.name.startswith('.')]
-    if len(subdirs) == 1 and len(files) == 0:
-        pup_dir = subdirs[0]
+    pup_dir = resolve_pup_root(table_dir / "pupvideos")
 
     options = pup_pack_manager.identify_options(pup_dir)
     screens = pup_pack_manager.get_active_screens(pup_dir)
@@ -67,13 +74,7 @@ async def apply_puppack_option(table_id: int, req: ApplyOptionRequest):
         raise HTTPException(status_code=404, detail="Table not found")
 
     table_dir = Path(table["folder_path"])
-    pup_dir = table_dir / "pupvideos"
-
-    # Check if nested (ignore __MACOSX and hidden files)
-    subdirs = [d for d in pup_dir.iterdir() if d.is_dir() and not d.name.startswith(('.', '__'))]
-    files = [f for f in pup_dir.iterdir() if f.is_file() and not f.name.startswith('.')]
-    if len(subdirs) == 1 and len(files) == 0:
-        pup_dir = subdirs[0]
+    pup_dir = resolve_pup_root(table_dir / "pupvideos")
 
     success = pup_pack_manager.apply_option(pup_dir, req.filename)
     if success:
