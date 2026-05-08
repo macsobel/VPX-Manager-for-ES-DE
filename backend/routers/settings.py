@@ -57,6 +57,8 @@ class SettingsUpdate(BaseModel):
     media_preferences: Optional[dict] = None
     display_count: Optional[int] = None
     displays: Optional[list] = None
+    dmd_enabled: Optional[bool] = None
+
 
 
 @router.get("/settings")

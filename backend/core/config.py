@@ -192,6 +192,8 @@ class AppConfig(BaseModel):
     screenscraper_dev_pass: str = ""  # Not saved to JSON
 
     backglass_enabled: bool = False
+    dmd_enabled: bool = True
+
 
     # Global Displays Setup (Replaces single screen index)
     displays: list = []

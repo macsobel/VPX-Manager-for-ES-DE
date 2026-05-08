@@ -81,16 +81,6 @@ const SettingsPage = {
 
             <div class="settings-section">
                 <div class="settings-section-title">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                    System Status
-                </div>
-                <div class="card" id="system-status-card">
-                    <div style="text-align: center;"><div class="spinner"></div></div>
-                </div>
-            </div>
-
-            <div class="settings-section">
-                <div class="settings-section-title">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
                     Maintenance
                 </div>
@@ -107,6 +97,16 @@ const SettingsPage = {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
                         Check for Updates
                     </button>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-section-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    System Status
+                </div>
+                <div class="card" id="system-status-card">
+                    <div style="text-align: center;"><div class="spinner"></div></div>
                 </div>
             </div>
         `;
@@ -205,11 +205,29 @@ const SettingsPage = {
                         </div>
                         <div class="input-group">
                             <label class="input-label">DMD / FullDMD Display</label>
-                            <div id="select-container-DMD_FullDMD">
+                            <div id="select-container-DMD_FullDMD" style="display: flex; flex-direction: column; gap: var(--space-xs);">
                                 <select class="input-field display-role-select" data-role="DMD_FullDMD">
                                     ${renderDisplayOptions(getSavedUuid('DMD') || getSavedUuid('FullDMD'))}
                                 </select>
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; color: var(--text-secondary);">
+                                    <input type="checkbox" id="setting-dmd-enabled" ${data.dmd_enabled !== false ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: var(--accent-blue);">
+                                    Enable DMD / FullDMD Display
+                                </label>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--border-subtle);">
+                        <div class="input-group" style="max-width: 400px;">
+                            <label class="input-label">Playfield Orientation</label>
+                            <select class="input-field" id="setting-master-orientation">
+                                <option value="" ${data.master_orientation === '' ? 'selected' : ''}>Auto-Detect</option>
+                                <option value="0" ${data.master_orientation === '0' ? 'selected' : ''}>0 Degrees (Landscape)</option>
+                                <option value="90" ${data.master_orientation === '90' ? 'selected' : ''}>90 Degrees</option>
+                                <option value="180" ${data.master_orientation === '180' ? 'selected' : ''}>180 Degrees</option>
+                                <option value="270" ${data.master_orientation === '270' ? 'selected' : ''}>270 Degrees (Portrait)</option>
+                            </select>
+                            <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4px;">Sets default rotation in newly generated INI files. Auto-detects based on server primary monitor if left empty.</div>
                         </div>
                     </div>
                     <div style="margin-top: var(--space-md);">
@@ -231,11 +249,29 @@ const SettingsPage = {
                     const container = document.getElementById(`select-container-${role}`);
                     if (container) {
                         const selectedUuid = role === 'DMD_FullDMD' ? (getSavedUuid('DMD') || getSavedUuid('FullDMD')) : getSavedUuid(role);
-                        container.innerHTML = `
+                        const selectHtml = `
                             <select class="input-field display-role-select" data-role="${role}">
                                 ${renderDisplayOptions(selectedUuid)}
                             </select>
                         `;
+                        
+                        if (role === 'DMD_FullDMD') {
+                            // Don't overwrite the checkbox label
+                            const select = container.querySelector('select');
+                            if (select) {
+                                select.innerHTML = renderDisplayOptions(selectedUuid);
+                            } else {
+                                // Fallback
+                                container.innerHTML = selectHtml + (container.innerHTML.includes('type="checkbox"') ? '' : `
+                                    <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; color: var(--text-secondary);">
+                                        <input type="checkbox" id="setting-dmd-enabled" ${data.dmd_enabled !== false ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: var(--accent-blue);">
+                                        Enable DMD / FullDMD Display
+                                    </label>
+                                `);
+                            }
+                        } else {
+                            container.innerHTML = selectHtml;
+                        }
                     }
                 });
             }
@@ -298,7 +334,11 @@ const SettingsPage = {
             await fetch('/api/settings', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ displays: displaysConfig }),
+                body: JSON.stringify({ 
+                    displays: displaysConfig,
+                    master_orientation: document.getElementById('setting-master-orientation')?.value || '',
+                    dmd_enabled: document.getElementById('setting-dmd-enabled')?.checked
+                }),
             });
             Toast.success('Display assignments saved');
         } catch (e) {
@@ -314,8 +354,8 @@ const SettingsPage = {
             document.getElementById('settings-form').innerHTML = `
                 ${this._renderDirInput('setting-tables-dir', 'Tables Directory', data.tables_dir, 'Folder containing your VPX tables', false, data.is_local)}
 
-                <div style="grid-column: 1 / -1; margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border-subtle);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
+                <div style="grid-column: 1 / -1; margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--border-subtle);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
                         <div style="font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: var(--space-xs);">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
                             Visual Pinball Standalone Settings
@@ -330,29 +370,25 @@ const SettingsPage = {
 
                         <div class="input-group">
                             <label class="input-label">VPX Flavor</label>
-                            <select class="input-field" id="setting-vpx-flavor">
-                                <option value="BGFX" ${data.vpx_use_flavor === 'BGFX' ? 'selected' : ''}>BGFX</option>
-                                <option value="GL" ${data.vpx_use_flavor === 'GL' ? 'selected' : ''}>GL</option>
-                            </select>
+                            <div style="display: flex; gap: var(--space-lg); margin-top: 4px;">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-primary); font-size: 0.9rem;">
+                                    <input type="radio" name="vpx-flavor" value="BGFX" ${data.vpx_use_flavor === 'BGFX' || !data.vpx_use_flavor ? 'checked' : ''} style="accent-color: var(--accent-blue);">
+                                    BGFX
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-primary); font-size: 0.9rem;">
+                                    <input type="radio" name="vpx-flavor" value="GL" ${data.vpx_use_flavor === 'GL' ? 'checked' : ''} style="accent-color: var(--accent-blue);">
+                                    GL
+                                </label>
+                            </div>
                         </div>
 
-                        <div class="input-group">
-                            <label class="input-label">Playfield Orientation</label>
-                            <select class="input-field" id="setting-master-orientation">
-                                <option value="" ${data.master_orientation === '' ? 'selected' : ''}>Auto-Detect</option>
-                                <option value="0" ${data.master_orientation === '0' ? 'selected' : ''}>0 Degrees (Landscape)</option>
-                                <option value="90" ${data.master_orientation === '90' ? 'selected' : ''}>90 Degrees</option>
-                                <option value="180" ${data.master_orientation === '180' ? 'selected' : ''}>180 Degrees</option>
-                                <option value="270" ${data.master_orientation === '270' ? 'selected' : ''}>270 Degrees (Portrait)</option>
-                            </select>
-                            <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4px;">Sets default rotation in newly generated INI files. Auto-detects based on server primary monitor if left empty.</div>
-                        </div>
+                    </div>
 
                     </div>
                 </div>
 
-                <div style="grid-column: 1 / -1; margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border-subtle);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
+                <div style="grid-column: 1 / -1; margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--border-subtle);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
                         <div style="font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: var(--space-xs);">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
                             Emulation Station Desktop Edition Settings
@@ -542,7 +578,7 @@ const SettingsPage = {
                 esde_gamelists_dir: getVal('setting-esde-gamelists-dir'),
                 vpx_standalone_app_path: getVal('setting-vpx-app'),
                 esde_app_path: getVal('setting-esde-app'),
-                vpx_use_flavor: getVal('setting-vpx-flavor'),
+                vpx_use_flavor: document.querySelector('input[name="vpx-flavor"]:checked')?.value || 'BGFX',
                 vpx_display_mode: parseInt(getVal('setting-display-count')) === 1 ? 'Desktop' : 'Cabinet',
                 master_orientation: getVal('setting-master-orientation'),
                 display_count: parseInt(getVal('setting-display-count')) || 2,
