@@ -461,11 +461,11 @@ class VBSManagerService:
 
     def is_puppack_enabled(self, content: str) -> bool:
         """Check if PuP Pack is already enabled in the VBS content."""
-        return bool(re.search(r"(?i)\b(?:UsePUP|PuPEvent|UsePUPPack|usePUP_Pack)\s*=\s*(?:1|True|true)", content))
+        return bool(re.search(r"(?i)\b(?:UsePUP|PuPEvent|UsePUPPack|usePUP_Pack|bEnablePuP)\s*=\s*(?:1|True|true)", content))
 
     def has_puppack_setting(self, content: str) -> bool:
         """Check if the PuP Pack setting exists in any form in the VBS content."""
-        return bool(re.search(r"(?i)\b(?:UsePUP|PuPEvent|UsePUPPack|usePUP_Pack)\b", content))
+        return bool(re.search(r"(?i)\b(?:UsePUP|PuPEvent|UsePUPPack|usePUP_Pack|bEnablePuP)\b", content))
 
     def apply_regex_fix(
         self, vbs_content: str, fix_type: str, rom_name: Optional[str] = None, enable: bool = True
@@ -473,9 +473,18 @@ class VBSManagerService:
         if fix_type == "puppack":
             # Enable/Disable PuP Pack
             # Find UsePUP = 0 (or commented out) and change to 1 or 0
-            pattern = re.compile(r"(?i)(\b(?:UsePUP|PuPEvent|UsePUPPack|usePUP_Pack)\s*=\s*)(?:0|1|False|True|false|true)")
-            val = "1" if enable else "0"
-            return pattern.sub(rf"\g<1>{val}", vbs_content)
+            pattern = re.compile(r"(?i)(\b(UsePUP|PuPEvent|UsePUPPack|usePUP_Pack|bEnablePuP)\s*=\s*)(?:0|1|False|True|false|true)")
+            
+            def replacer(match):
+                prefix = match.group(1)
+                setting_name = match.group(2).lower()
+                if setting_name == "benablepup":
+                    val = "True" if enable else "False"
+                else:
+                    val = "1" if enable else "0"
+                return f"{prefix}{val}"
+                
+            return pattern.sub(replacer, vbs_content)
 
         elif fix_type == "colordmd":
             # Enable ColorDMD: Find UseColorDMD = 0 (or commented out) and change to 1
