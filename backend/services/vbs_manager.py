@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
+# pyrefly: ignore [missing-import]
 import httpx
 
 import backend.core.database as db
@@ -461,27 +462,37 @@ class VBSManagerService:
 
     def is_puppack_enabled(self, content: str) -> bool:
         """Check if PuP Pack is already enabled in the VBS content."""
-        return bool(re.search(r"(?i)\b(?:UsePUP|PuPEvent|UsePUPPack|usePUP_Pack|bEnablePuP)\s*=\s*(?:1|True|true)", content))
+        variables = r"bEnablePuP|UsePUP|PuPEvent|UsePUPPack|usePUP_Pack|UsePinup|usePuPDMD|usePUP|PuPOn|UsePUP_Backglass|UsePUP_Pack|pActive|PuPActive|bPuP|use_pup|usePinUpPlayer|PinUpPlayer|PUPEnabled|EnablePUP|useDMDVideos|useRealDMDScale"
+        return bool(re.search(fr"(?i)\b({variables})\s*=\s*(?:1|True|true)", content))
 
     def has_puppack_setting(self, content: str) -> bool:
-        """Check if the PuP Pack setting exists in any form in the VBS content."""
-        return bool(re.search(r"(?i)\b(?:UsePUP|PuPEvent|UsePUPPack|usePUP_Pack|bEnablePuP)\b", content))
+        """Check if the PuP Pack setting exists as a variable assignment in the VBS content."""
+        variables = r"bEnablePuP|UsePUP|PuPEvent|UsePUPPack|usePUP_Pack|UsePinup|usePuPDMD|usePUP|PuPOn|UsePUP_Backglass|UsePUP_Pack|pActive|PuPActive|bPuP|use_pup|usePinUpPlayer|PinUpPlayer|PUPEnabled|EnablePUP|useDMDVideos|useRealDMDScale"
+        # We require an '=' to avoid matching sub calls like PuPEvent 7
+        return bool(re.search(fr"(?i)\b({variables})\s*=", content))
 
     def apply_regex_fix(
         self, vbs_content: str, fix_type: str, rom_name: Optional[str] = None, enable: bool = True
     ) -> str:
         if fix_type == "puppack":
             # Enable/Disable PuP Pack
-            # Find UsePUP = 0 (or commented out) and change to 1 or 0
-            pattern = re.compile(r"(?i)(\b(UsePUP|PuPEvent|UsePUPPack|usePUP_Pack|bEnablePuP)\s*=\s*)(?:0|1|False|True|false|true)")
+            # Expand to cover various table standards (JPSalas, Orbital, Danesi, etc.)
+            variables = r"bEnablePuP|UsePUP|PuPEvent|UsePUPPack|usePUP_Pack|UsePinup|usePuPDMD|usePUP|PuPOn|UsePUP_Backglass|UsePUP_Pack|pActive|PuPActive|bPuP|use_pup|usePinUpPlayer|PinUpPlayer|PUPEnabled|EnablePUP|useDMDVideos|useRealDMDScale"
+            pattern = re.compile(fr"(?i)((?:\b(?:Const|Dim|Public|Private)\s+)?\b({variables})\s*=\s*)(?:0|1|False|True|false|true)")
             
             def replacer(match):
                 prefix = match.group(1)
                 setting_name = match.group(2).lower()
-                if setting_name == "benablepup":
+                current_value = match.group(0).split('=')[-1].strip().lower()
+                
+                # Determine value type based on what was there or common conventions
+                is_boolean = current_value in ['true', 'false'] or setting_name.startswith('b') or setting_name.startswith('enable') or setting_name == "usepupdmd" or setting_name == "usedmdvideos"
+                
+                if is_boolean:
                     val = "True" if enable else "False"
                 else:
                     val = "1" if enable else "0"
+                    
                 return f"{prefix}{val}"
                 
             return pattern.sub(replacer, vbs_content)

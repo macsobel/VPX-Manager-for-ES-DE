@@ -406,13 +406,27 @@ class PupPackManager:
         vbs_path = vpx_path.with_suffix(".vbs")
         ini_path = vpx_path.with_suffix(".ini")
 
-        # 1. Extract VBS if missing
+        # 1. Extract and Enable VBS if missing or just extracted
         if not vbs_path.exists():
             try:
                 logger.info(f"Auto-extracting VBS for {vpx_filename} because PuP Pack was uploaded.")
                 await vbs_manager.extract_vbs(vpx_path)
             except Exception as e:
                 logger.error(f"Failed to auto-extract VBS during PuP Pack setup: {e}")
+        
+        # 2. Ensure PuP is enabled in VBS if it has the setting
+        if vbs_path.exists():
+            try:
+                with open(vbs_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                
+                if vbs_manager.has_puppack_setting(content) and not vbs_manager.is_puppack_enabled(content):
+                    logger.info(f"Auto-enabling PuP Pack in {vbs_path.name}")
+                    new_content = vbs_manager.apply_regex_fix(content, "puppack", enable=True)
+                    with open(vbs_path, "w", encoding="utf-8") as f:
+                        f.write(new_content)
+            except Exception as e:
+                logger.error(f"Failed to auto-enable PuP Pack in VBS: {e}")
 
         # 2. Create/Update INI
         # Even if INI exists, we want to ensure [Plugin.PUP] is configured correctly
