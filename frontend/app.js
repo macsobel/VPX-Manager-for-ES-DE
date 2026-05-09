@@ -80,6 +80,13 @@ const App = {
             }
         }
 
+        // Close any injected slide-in panels that belong to specific pages
+        const layoutPanel = document.getElementById('puppack-layout-panel');
+        if (layoutPanel) {
+            layoutPanel.classList.remove('open');
+            layoutPanel.remove();
+        }
+
         // Handle tables/{tableId} route
         const tablesMatch = hash.match(/^tables\/(\d+)$/);
         if (tablesMatch) {

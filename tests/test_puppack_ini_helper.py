@@ -7,14 +7,14 @@ def test_puppack_ini_config(tmp_path: Path):
     # Create an initial INI file
     ini_file.write_text("[Player]\nVolume = 100\n[Standalone]\nExistingKey = 1\n")
 
-    # Update config
+    # Update config with new BGPad style
     updates = {
-        "PUPBackglassWindow": 1,
-        "PUPBackglassScreen": 2,
-        "PUPBackglassWindowX": 0,
-        "PUPBackglassWindowY": 0,
-        "PUPBackglassWindowWidth": 1920,
-        "PUPBackglassWindowHeight": 1080
+        "Enable": 1,
+        "PUPFolder": '"/Users/macsobel/My Folder"',
+        "BGPadLeft": 100,
+        "BGPadTop": 50,
+        "BGPadRight": 200,
+        "BGPadBottom": 150
     }
 
     success = update_puppack_ini_config(ini_file, updates)
@@ -22,6 +22,14 @@ def test_puppack_ini_config(tmp_path: Path):
 
     # Read config back
     config = read_puppack_ini_config(ini_file)
+    
+    # Check padding values
+    assert config["bgpadleft"] == 100
+    assert config["bgpadright"] == 200
+    
+    # Check synthesized legacy keys (for frontend compatibility)
     assert config["pupbackglasswindow"] == 1
-    assert config["pupbackglassscreen"] == 2
-    assert config["pupbackglasswindowwidth"] == 1920
+    
+    # Check quoting
+    assert config["pupfolder"] == '"/Users/macsobel/My Folder"'
+

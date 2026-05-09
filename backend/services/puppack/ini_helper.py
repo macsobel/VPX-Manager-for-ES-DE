@@ -5,7 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 def update_puppack_ini_config(ini_path: Path, config_updates: dict) -> bool:
-    """Updates the [Standalone] section of the INI with PuP configuration."""
+    """Updates the [Plugin.PUP] section of the INI with PuP configuration."""
     content = ""
     try:
         with open(ini_path, "r", encoding="utf-8") as f:
@@ -24,7 +24,7 @@ def update_puppack_ini_config(ini_path: Path, config_updates: dict) -> bool:
     # Get keys we are updating
     keys_to_update = [k.lower() for k in config_updates.keys()]
 
-    # First pass: strip old values
+    # First pass: strip old values from ANY section
     for line in lines:
         stripped = line.strip().lower()
         is_key = False
@@ -35,20 +35,20 @@ def update_puppack_ini_config(ini_path: Path, config_updates: dict) -> bool:
         if not is_key:
             new_lines.append(line)
 
-    # Find [Standalone] section
-    standalone_idx = -1
+    # Find [Plugin.PUP] section
+    section_idx = -1
     for i, line in enumerate(new_lines):
-        if line.strip().lower() == "[standalone]":
-            standalone_idx = i
+        if line.strip().lower() == "[plugin.pup]":
+            section_idx = i
             break
 
-    if standalone_idx == -1:
+    if section_idx == -1:
         new_lines.append("")
-        new_lines.append("[Standalone]")
-        standalone_idx = len(new_lines) - 1
+        new_lines.append("[Plugin.PUP]")
+        section_idx = len(new_lines) - 1
 
-    # Insert new values
-    insert_idx = standalone_idx + 1
+    # Insert new values after [Plugin.PUP] header
+    insert_idx = section_idx + 1
     for key, value in config_updates.items():
         if value is not None:
             new_lines.insert(insert_idx, f"{key} = {value}")
@@ -65,7 +65,10 @@ def update_puppack_ini_config(ini_path: Path, config_updates: dict) -> bool:
         return False
 
 def read_puppack_ini_config(ini_path: Path) -> dict:
-    """Reads the [Standalone] section of the INI for PuP configuration."""
+    """Reads the [Plugin.PUP] section of the INI for PuP configuration.
+    Returns pad values keyed by the VPX format (e.g. bgpadleft, svpadtop)
+    and also synthesized legacy keys for the frontend (e.g. pupbackglasswindow).
+    """
     content = ""
     if not ini_path.exists():
         return {}
@@ -81,7 +84,7 @@ def read_puppack_ini_config(ini_path: Path) -> dict:
             return {}
 
     config = {}
-    in_standalone = False
+    in_plugin_pup = False
 
     for line in content.splitlines():
         stripped = line.strip()
@@ -89,19 +92,98 @@ def read_puppack_ini_config(ini_path: Path) -> dict:
             continue
 
         if stripped.lower().startswith("["):
-            in_standalone = (stripped.lower() == "[standalone]")
+            in_plugin_pup = (stripped.lower() == "[plugin.pup]")
             continue
 
-        if in_standalone and "=" in stripped:
+        if in_plugin_pup and "=" in stripped:
             key, val = [p.strip() for p in stripped.split("=", 1)]
-            if key.lower().startswith("pup"):
-                # Parse numeric values
-                try:
-                    if "." in val:
-                        config[key.lower()] = float(val)
-                    else:
-                        config[key.lower()] = int(val)
-                except ValueError:
-                    config[key.lower()] = val
+            try:
+                if "." in val:
+                    config[key.lower()] = float(val)
+                else:
+                    config[key.lower()] = int(val)
+            except ValueError:
+                config[key.lower()] = val
+
+    # Synthesize legacy keys from VPX pad values so the frontend can
+    # convert to X, Y, Width, Height using its monitor dimensions.
+    # Frontend reads: pupbackglasswindow, bgpadleft, bgpadtop, bgpadright, bgpadbottom
+    # and similarly for DMD (svpad*).
+    PAD_TO_SCREEN = {
+        "bgpad": "pupbackglass",
+        "svpad": "pupdmd",
+    }
+
+    for pad_prefix, screen_prefix in PAD_TO_SCREEN.items():
+        has_pads = f"{pad_prefix}left" in config
+        if has_pads:
+            config[f"{screen_prefix}window"] = 1
+        # Also mark FullDMD as enabled if SV pads exist
+        if pad_prefix == "svpad" and has_pads:
+            config["pupfulldmdwindow"] = 1
 
     return config
+
+
+def ensure_plugin_pup_section(ini_path: Path, pup_folder: str) -> bool:
+    """Ensures the [Plugin.PUP] section exists with Enable = 1 and PUPFolder set."""
+    content = ""
+    try:
+        with open(ini_path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception:
+        try:
+            with open(ini_path, "r", encoding="windows-1252") as f:
+                content = f.read()
+        except Exception as e:
+            logger.error(f"Error reading INI for Plugin.PUP section: {e}")
+            return False
+
+    lines = content.splitlines()
+
+    # Find existing [Plugin.PUP] section
+    section_start = -1
+    section_end = -1
+    for i, line in enumerate(lines):
+        stripped = line.strip().lower()
+        if stripped == "[plugin.pup]":
+            section_start = i
+        elif section_start >= 0 and stripped.startswith("["):
+            section_end = i
+            break
+
+    if section_start == -1:
+        # Section doesn't exist — append it
+        lines.append("")
+        lines.append("[Plugin.PUP]")
+        lines.append(f"Enable = 1")
+        lines.append(f"PUPFolder = {pup_folder}")
+    else:
+        # Section exists — update Enable and PUPFolder in place
+        if section_end == -1:
+            section_end = len(lines)
+
+        # Remove old Enable/PUPFolder lines within the section
+        new_section_lines = []
+        for i in range(section_start + 1, section_end):
+            key = lines[i].strip().lower().split("=")[0].strip() if "=" in lines[i] else ""
+            if key not in ("enable", "pupfolder"):
+                new_section_lines.append(lines[i])
+
+        # Rebuild: everything before section, section header, new values, remaining section lines, rest of file
+        rebuilt = lines[:section_start + 1]
+        rebuilt.append(f"Enable = 1")
+        rebuilt.append(f"PUPFolder = {pup_folder}")
+        rebuilt.extend(new_section_lines)
+        rebuilt.extend(lines[section_end:])
+        lines = rebuilt
+
+    final_content = "\n".join(lines) + "\n"
+
+    try:
+        with open(ini_path, "w", encoding="utf-8") as f:
+            f.write(final_content)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to write [Plugin.PUP] section: {e}")
+        return False

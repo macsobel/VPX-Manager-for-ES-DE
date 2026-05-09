@@ -391,4 +391,54 @@ class PupPackManager:
 
         return screens
 
+    @staticmethod
+    async def ensure_vbs_and_ini(table_dir: Path, vpx_filename: str) -> None:
+        """
+        Ensures that a .vbs and .ini file exist for the table,
+        auto-extracting the script and creating a PuP-enabled INI if missing.
+        """
+        from backend.services.vbs_manager import vbs_manager
+        from backend.services.puppack.ini_helper import update_puppack_ini_config
+        from backend.core.display_utils import get_effective_rotation
+        from backend.core.config import config
+
+        vpx_path = table_dir / vpx_filename
+        vbs_path = vpx_path.with_suffix(".vbs")
+        ini_path = vpx_path.with_suffix(".ini")
+
+        # 1. Extract VBS if missing
+        if not vbs_path.exists():
+            try:
+                logger.info(f"Auto-extracting VBS for {vpx_filename} because PuP Pack was uploaded.")
+                await vbs_manager.extract_vbs(vpx_path)
+            except Exception as e:
+                logger.error(f"Failed to auto-extract VBS during PuP Pack setup: {e}")
+
+        # 2. Create/Update INI
+        # Even if INI exists, we want to ensure [Plugin.PUP] is configured correctly
+        # unless it was explicitly uploaded (checked by the caller usually, 
+        # but here we just ensure the keys exist).
+        try:
+            # If missing, create a base INI first
+            if not ini_path.exists():
+                rot = get_effective_rotation(config.master_orientation)
+                base_content = f"[Player]\nRotation = {rot}\nCabinetAutofitMode = 1\nCabinetAutofitPos = 0.1\n"
+                with open(ini_path, "w", encoding="utf-8") as f:
+                    f.write(base_content)
+                logger.info(f"Created base INI for {vpx_filename}")
+
+            # Now add PuP Plugin section
+            from backend.routers.puppack import resolve_pup_root
+            pup_root = resolve_pup_root(table_dir / "pupvideos")
+            
+            config_updates = {
+                "Enable": 1,
+                "PUPFolder": f'"{pup_root}"'
+            }
+            
+            update_puppack_ini_config(ini_path, config_updates)
+            logger.info(f"Ensured [Plugin.PUP] is enabled in {ini_path.name}")
+        except Exception as e:
+            logger.error(f"Failed to ensure PuP INI config for {vpx_filename}: {e}")
+
 pup_pack_manager = PupPackManager()

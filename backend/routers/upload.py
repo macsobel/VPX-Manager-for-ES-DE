@@ -32,6 +32,7 @@ import zipfile
 from pathlib import Path
 from typing import List, Optional, Union
 
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, HTTPException, Request
 
 from backend.core.config import config
@@ -40,11 +41,13 @@ from backend.services.vps_matcher import vps_matcher
 
 # Optional archive support
 try:
+    # pyrefly: ignore [missing-import]
     import py7zr
 except ImportError:
     py7zr = None
 
 try:
+    # pyrefly: ignore [missing-import]
     import patoolib
 except ImportError:
     patoolib = None
@@ -88,6 +91,7 @@ async def import_nvram(name: str):
             status_code=404, detail=f"NVRAM {name} not found in repository"
         )
 
+    # pyrefly: ignore [missing-import]
     from fastapi.responses import FileResponse
 
     return FileResponse(
@@ -451,6 +455,11 @@ async def import_table(
         }
     )
 
+    # 10. If a PuP Pack was uploaded, ensure VBS and INI are configured for it
+    if puppack_file:
+        from backend.services.puppack.manager import pup_pack_manager
+        await pup_pack_manager.ensure_vbs_and_ini(table_dir, new_vpx_filename)
+
     # Ensure the physical folder and files are perfectly standardized to the chosen metadata
     from backend.services.table_file_service import TableFileService
     await TableFileService.standardize_names(table_id)
@@ -555,7 +564,11 @@ async def upload_file_to_table(
     elif file_type == "puppack":
         dest = table_dir / "pupvideos"
         if ext in [".zip", ".rar", ".7z"]:
-            return await _extract_archive_safely(content, filename, dest, "PUP Pack", wipe=True)
+            res = await _extract_archive_safely(content, filename, dest, "PUP Pack", wipe=True)
+            if res.get("success"):
+                from backend.services.puppack.manager import pup_pack_manager
+                await pup_pack_manager.ensure_vbs_and_ini(table_dir, table["filename"])
+            return res
         else:
             from urllib.parse import unquote
             # Reconstruct folder from loose file drops
@@ -574,6 +587,9 @@ async def upload_file_to_table(
             target_dest.parent.mkdir(parents=True, exist_ok=True)
             with open(target_dest, "wb") as f:
                 f.write(content)
+
+            from backend.services.puppack.manager import pup_pack_manager
+            await pup_pack_manager.ensure_vbs_and_ini(table_dir, table["filename"])
 
             return {
                 "success": True,

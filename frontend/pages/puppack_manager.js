@@ -280,6 +280,12 @@ const PupPackManagerPage = {
 
             if (res.ok) {
                 Toast.success(`Successfully applied configuration: ${filename}`);
+                
+                // Automatically enable in VBS if setting exists and is currently disabled
+                if (this.state.vbsStatus && this.state.vbsStatus.has_puppack_setting && !this.state.vbsStatus.puppack_enabled) {
+                    await this.toggleVbs(true);
+                }
+
                 // Refresh to show updated screen layout
                 this.selectTable(this.state.selectedTable.id);
             } else {
@@ -308,37 +314,30 @@ const PupPackManagerPage = {
 
 window.PupPackManagerPage = PupPackManagerPage;
 
-// Add modal HTML to index.html or inject it dynamically
-PupPackManagerPage.injectModal = function() {
-    if (document.getElementById('puppack-layout-modal')) return;
-    const modalHtml = `
-    <div id="puppack-layout-modal" class="modal" style="display: none;">
-        <div class="modal-content" style="max-width: 900px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
-            <div class="modal-header">
-                <h2>Configure PuP Screen Layout</h2>
-                <button class="btn-icon" onclick="PupPackManagerPage.closeLayoutModal()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-            </div>
-            <div class="modal-body" style="flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
-
-                <!-- Visual Preview Area -->
-                <div id="pup-preview-container" style="background: #111; border-radius: 8px; border: 1px solid #333; position: relative; overflow: hidden; min-height: 250px; display: flex; justify-content: center; align-items: center; padding: 1rem;">
-                    <div id="pup-preview-workspace" style="position: relative; transform-origin: top left;">
-                        <!-- Monitors and Screen boxes injected here -->
-                    </div>
+// Inject the slide-in detail panel (matches NVRAM Manager pattern)
+PupPackManagerPage.injectPanel = function() {
+    if (document.getElementById('puppack-layout-panel')) return;
+    const panelHtml = `
+    <div class="detail-panel" id="puppack-layout-panel">
+        <div class="detail-panel-header">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div style="width: 32px; height: 32px; background: rgba(79, 140, 255, 0.12); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--accent-blue);">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                 </div>
-
-                <div style="display: flex; flex-direction: column; gap: 1rem;" id="pup-screen-controls">
-                    <!-- Controls injected here -->
-                </div>
+                <h3 class="card-title" style="margin: 0; font-size: 1.1rem;">Screen Layout</h3>
             </div>
-            <div class="modal-footer" style="padding: 1rem 1.5rem; background: var(--bg-tertiary); border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 1rem;">
-                <button class="btn btn-secondary" onclick="PupPackManagerPage.closeLayoutModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="PupPackManagerPage.saveLayout()">Save Configuration</button>
-            </div>
+            <button class="btn-icon" onclick="PupPackManagerPage.closeLayoutPanel()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="detail-panel-body" id="puppack-layout-body" style="padding: var(--space-lg); overflow-y: auto; flex: 1;"></div>
+        <div class="detail-panel-footer" style="padding: 1rem; border-top: 1px solid var(--glass-border); display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <button class="btn btn-secondary" onclick="PupPackManagerPage.closeLayoutPanel()">Cancel</button>
+            <button class="btn btn-primary" onclick="PupPackManagerPage.saveLayout()">Save Configuration</button>
         </div>
     </div>
     `;
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.body.insertAdjacentHTML('beforeend', panelHtml);
 };
 
 PupPackManagerPage.toggleVbs = async function(enable) {
@@ -358,18 +357,17 @@ PupPackManagerPage.toggleVbs = async function(enable) {
         } else {
             const err = await res.json();
             Toast.error(err.detail || "Failed to toggle VBS");
-            document.getElementById('puppack-vbs-toggle').checked = !enable; // revert
+            document.getElementById('puppack-vbs-toggle').checked = !enable;
         }
     } catch (e) {
         Toast.error("Error communicating with server.");
-        document.getElementById('puppack-vbs-toggle').checked = !enable; // revert
+        document.getElementById('puppack-vbs-toggle').checked = !enable;
     }
 };
 
 PupPackManagerPage.openLayoutModal = async function() {
-    this.injectModal();
+    this.injectPanel();
 
-    // Fetch global displays to build the workspace and dropdowns
     try {
         const res = await fetch('/api/settings');
         const settings = await res.json();
@@ -379,86 +377,299 @@ PupPackManagerPage.openLayoutModal = async function() {
         return;
     }
 
-    this.renderLayoutModal();
-    document.getElementById('puppack-layout-modal').style.display = 'flex';
+    this.dragDropInitialized = false;
+    this.renderLayoutPanel();
+    document.getElementById('puppack-layout-panel').classList.add('open');
 };
 
 PupPackManagerPage.closeLayoutModal = function() {
-    document.getElementById('puppack-layout-modal').style.display = 'none';
+    document.getElementById('puppack-layout-panel')?.classList.remove('open');
 };
 
-PupPackManagerPage.renderLayoutModal = function() {
-    // We care about specific screens: Backglass, DMD, FullDMD
-    const screens = ['Backglass', 'DMD', 'FullDMD'];
+PupPackManagerPage.closeLayoutPanel = function() {
+    document.getElementById('puppack-layout-panel')?.classList.remove('open');
+};
 
-    const controlsContainer = document.getElementById('pup-screen-controls');
-    controlsContainer.innerHTML = '';
+PupPackManagerPage.resolveMonitors = function() {
+    // Resolve monitors with fallback: DMD→Backglass→Playfield, Backglass→Playfield
+    const find = (role) => this.state.globalDisplays.find(d => d.role === role) || null;
 
-    screens.forEach(screenName => {
-        const prefix = `pup${screenName.toLowerCase()}`;
-        const isEnabled = this.state.iniConfig[`${prefix}window`] === 1;
-        const mappedMonitor = this.state.iniConfig[`${prefix}screen`] || 0;
+    const pf = find('Playfield');
+    const bg = find('Backglass') || pf;  // fallback to Playfield
+    const dmd = find('DMD') || find('FullDMD') || bg;  // fallback to Backglass, then Playfield
 
-        // Find if they have a global monitor mapped to this role
-        let defaultMonitorIndex = mappedMonitor;
-        if (!mappedMonitor) {
-             const globalMatch = this.state.globalDisplays.find(d => d.role === screenName);
-             if (globalMatch && globalMatch.index !== undefined) {
-                 defaultMonitorIndex = globalMatch.index;
-             }
+    this.state.resolvedMonitor_Backglass = bg;
+    this.state.resolvedMonitor_DMD = dmd;
+
+    // Track unique monitors for default logic
+    const uniqueIds = new Set();
+    if (pf) uniqueIds.add(pf.uuid || pf.index);
+    if (find('Backglass')) uniqueIds.add((find('Backglass')).uuid || (find('Backglass')).index);
+    if (find('DMD') || find('FullDMD')) uniqueIds.add((find('DMD') || find('FullDMD')).uuid || (find('DMD') || find('FullDMD')).index);
+    this.state.uniqueMonitorCount = uniqueIds.size;
+};
+
+PupPackManagerPage.computeDefaults = function() {
+    this.resolveMonitors();
+
+    const bg = this.state.resolvedMonitor_Backglass;
+    const dmd = this.state.resolvedMonitor_DMD;
+    const count = this.state.uniqueMonitorCount;
+
+    const defaults = {
+        Backglass: { enabled: true, x: 0, y: 0, w: 0, h: 0, preset: 'fill' },
+        DMD: { enabled: true, x: 0, y: 0, w: 0, h: 0, preset: 'fill' }
+    };
+
+    if (!bg && !dmd) return defaults;
+
+    if (count >= 3) {
+        // 3 screens: both fill their dedicated monitors
+        if (bg) { defaults.Backglass.w = bg.width; defaults.Backglass.h = bg.height; }
+        if (dmd) { defaults.DMD.w = dmd.width; defaults.DMD.h = dmd.height; }
+        defaults.Backglass.preset = 'fill';
+        defaults.DMD.preset = 'fill';
+    } else if (count === 2) {
+        // 2 screens: Backglass fills its monitor, DMD is a bottom strip on backglass
+        if (bg) {
+            defaults.Backglass.w = bg.width;
+            defaults.Backglass.h = bg.height;
+            defaults.Backglass.preset = 'fill';
+        }
+        // DMD as bottom-center strip on whichever monitor it resolved to (likely Backglass)
+        if (dmd) {
+            const dmdW = Math.round(dmd.width * 0.6);
+            const dmdH = Math.round(dmd.height * 0.15);
+            defaults.DMD.w = dmdW;
+            defaults.DMD.h = dmdH;
+            defaults.DMD.x = Math.round((dmd.width - dmdW) / 2);
+            defaults.DMD.y = dmd.height - dmdH;
+            defaults.DMD.preset = 'custom';
+        }
+    } else {
+        // 1 screen: everything on Playfield — small overlays that don't block the table
+        // Backglass: right 35%, top 45% of screen
+        if (bg) {
+            const bgW = Math.round(bg.width * 0.35);
+            const bgH = Math.round(bg.height * 0.45);
+            defaults.Backglass.x = bg.width - bgW;
+            defaults.Backglass.y = 0;
+            defaults.Backglass.w = bgW;
+            defaults.Backglass.h = bgH;
+            defaults.Backglass.preset = 'custom';
+        }
+        // DMD: right 35%, small strip below the backglass area
+        if (dmd) {
+            const dmdW = Math.round(dmd.width * 0.35);
+            const dmdH = Math.round(dmd.height * 0.10);
+            const bgH = Math.round(dmd.height * 0.45);
+            defaults.DMD.x = dmd.width - dmdW;
+            defaults.DMD.y = bgH;
+            defaults.DMD.w = dmdW;
+            defaults.DMD.h = dmdH;
+            defaults.DMD.preset = 'custom';
+        }
+    }
+
+    return defaults;
+};
+
+PupPackManagerPage.applyDefaults = function() {
+    const defaults = this.computeDefaults();
+
+    ['Backglass', 'DMD'].forEach(key => {
+        const d = defaults[key];
+        const enableEl = document.getElementById(`pup-enable-${key}`);
+        if (enableEl) enableEl.checked = d.enabled;
+        document.getElementById(`pup-x-${key}`).value = d.x;
+        document.getElementById(`pup-y-${key}`).value = d.y;
+        document.getElementById(`pup-w-${key}`).value = d.w;
+        document.getElementById(`pup-h-${key}`).value = d.h;
+
+        const presetEl = document.getElementById(`pup-preset-${key}`);
+        if (presetEl) presetEl.value = d.preset;
+
+        const customDiv = document.getElementById(`pup-custom-${key}`);
+        if (customDiv) customDiv.style.display = d.preset === 'custom' ? 'grid' : 'none';
+    });
+
+    this.updatePreview();
+    Toast.success('Reset to smart defaults');
+};
+
+PupPackManagerPage.renderLayoutPanel = function() {
+    const screenSections = [
+        { label: 'Backglass', key: 'Backglass', role: 'Backglass' },
+        { label: 'DMD / FullDMD', key: 'DMD', role: 'DMD' }
+    ];
+
+    // Resolve monitors with fallback
+    this.resolveMonitors();
+
+    const body = document.getElementById('puppack-layout-body');
+
+    // Mapping from our screen key to VPX pad prefix
+    const PAD_PREFIX = { Backglass: 'bgpad', DMD: 'svpad' };
+
+    // Check if this is a "fresh" config (no existing pad or legacy values)
+    const hasExistingConfig = ('bgpadleft' in this.state.iniConfig) ||
+                              ('svpadleft' in this.state.iniConfig) ||
+                              (this.state.iniConfig.pupbackglasswindowwidth > 0) ||
+                              (this.state.iniConfig.pupdmdwindowwidth > 0);
+
+    // Compute defaults for fresh configs
+    const defaults = this.computeDefaults();
+
+    let html = `
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 0.75rem;">
+            <button class="btn btn-secondary btn-sm" onclick="PupPackManagerPage.applyDefaults()" style="font-size: 0.78rem; padding: 4px 10px; display: flex; align-items: center; gap: 4px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+                Reset to Defaults
+            </button>
+        </div>
+        <div id="pup-preview-container" style="background: #111; border-radius: 8px; border: 1px solid #333; position: relative; overflow: hidden; min-height: 180px; display: flex; justify-content: center; align-items: center; padding: 0.75rem;">
+            <div id="pup-preview-workspace" style="position: relative; transform-origin: center center;"></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem;" id="pup-screen-controls">
+    `;
+
+    screenSections.forEach(section => {
+        const prefix = `pup${section.key.toLowerCase()}`;
+        const padPrefix = PAD_PREFIX[section.key];
+        const monitor = this.state[`resolvedMonitor_${section.key}`];
+
+        // Use existing config if present, otherwise use computed defaults
+        let isEnabled, valX, valY, valW, valH;
+        if (hasExistingConfig) {
+            // Try VPX pad format first (new format)
+            if (padPrefix && `${padPrefix}left` in this.state.iniConfig && monitor) {
+                const padL = this.state.iniConfig[`${padPrefix}left`] || 0;
+                const padT = this.state.iniConfig[`${padPrefix}top`] || 0;
+                const padR = this.state.iniConfig[`${padPrefix}right`] || 0;
+                const padB = this.state.iniConfig[`${padPrefix}bottom`] || 0;
+                valX = padL;
+                valY = padT;
+                valW = monitor.width - padL - padR;
+                valH = monitor.height - padT - padB;
+                isEnabled = this.state.iniConfig[`${prefix}window`] === 1 || valW > 0;
+            } else {
+                // Fallback to old format (legacy)
+                isEnabled = this.state.iniConfig[`${prefix}window`] === 1;
+                valX = this.state.iniConfig[`${prefix}windowx`] || 0;
+                valY = this.state.iniConfig[`${prefix}windowy`] || 0;
+                valW = this.state.iniConfig[`${prefix}windowwidth`] || 0;
+                valH = this.state.iniConfig[`${prefix}windowheight`] || 0;
+            }
+        } else {
+            const d = defaults[section.key];
+            isEnabled = d.enabled;
+            valX = d.x;
+            valY = d.y;
+            valW = d.w;
+            valH = d.h;
         }
 
-        const monitorOptions = this.state.globalDisplays.map(d =>
-            `<option value="${d.index}" ${d.index == defaultMonitorIndex ? 'selected' : ''}>Monitor ${d.index} (${d.width}x${d.height}) - ${d.role || 'Unassigned'}</option>`
-        ).join('');
+        // Show monitor info — with fallback indicator
+        let monitorInfo = '';
+        if (monitor) {
+            const isDedicated = this.state.globalDisplays.find(d => d.role === section.role);
+            if (isDedicated) {
+                monitorInfo = `<span style="font-size: 0.8rem; color: var(--accent-emerald); font-weight: 500;">Monitor ${monitor.index} (${monitor.width}×${monitor.height})</span>`;
+            } else {
+                monitorInfo = `<span style="font-size: 0.8rem; color: var(--accent-blue); font-weight: 500;">Monitor ${monitor.index} (${monitor.width}×${monitor.height}) <span style="color: var(--text-tertiary);">— sharing</span></span>`;
+            }
+        } else {
+            monitorInfo = `<span style="font-size: 0.8rem; color: var(--accent-amber);">No monitors assigned — <a href="#settings" onclick="PupPackManagerPage.closeLayoutPanel()" style="color: var(--accent-blue);">configure in Settings</a></span>`;
+        }
 
-        const html = `
+        html += `
             <div class="card" style="margin: 0; padding: 1rem; background: var(--bg-surface); border: 1px solid var(--border-color);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                     <div style="display: flex; align-items: center; gap: 0.75rem;">
                         <label class="switch" style="margin: 0;">
-                            <input type="checkbox" id="pup-enable-${screenName}" ${isEnabled ? 'checked' : ''} onchange="PupPackManagerPage.updatePreview()">
+                            <input type="checkbox" id="pup-enable-${section.key}" ${isEnabled ? 'checked' : ''} onchange="PupPackManagerPage.updatePreview()">
                             <span class="slider round"></span>
                         </label>
-                        <h4 style="margin: 0; font-size: 1.1rem;">${screenName}</h4>
+                        <div>
+                            <h4 style="margin: 0; font-size: 1rem;">${section.label}</h4>
+                            <div style="margin-top: 2px;">${monitorInfo}</div>
+                        </div>
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start;">
-                    <div>
-                        <label class="input-label">Assign to Monitor</label>
-                        <select class="input-field" id="pup-monitor-${screenName}" onchange="PupPackManagerPage.applyPreset('${screenName}')">
-                            <option value="">Select Monitor...</option>
-                            ${monitorOptions}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="input-label">Layout Preset</label>
-                        <select class="input-field" id="pup-preset-${screenName}" onchange="PupPackManagerPage.applyPreset('${screenName}')">
-                            <option value="fill">Fill Monitor</option>
-                            <option value="center">Center (Keep Ratio)</option>
-                            <option value="bottom">Bottom Half</option>
-                            <option value="custom">Custom (Manual Math)</option>
-                        </select>
-                    </div>
+                <div style="margin-top: 0.5rem;">
+                    <label class="input-label">Layout Preset</label>
+                    <select class="input-field" id="pup-preset-${section.key}" onchange="PupPackManagerPage.applyPreset('${section.key}')">
+                        <option value="fill">Fill Monitor</option>
+                        <option value="center">Center (Keep Ratio)</option>
+                        <option value="bottom">Bottom Half</option>
+                        <option value="custom">Custom (Drag / Manual)</option>
+                    </select>
                 </div>
 
-                <div id="pup-custom-${screenName}" style="display: none; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-color);">
-                    <div><label class="input-label" style="font-size:0.75rem;">X</label><input type="number" class="input-field" id="pup-x-${screenName}" value="${this.state.iniConfig[`${prefix}windowx`] || 0}" oninput="PupPackManagerPage.updatePreview()"></div>
-                    <div><label class="input-label" style="font-size:0.75rem;">Y</label><input type="number" class="input-field" id="pup-y-${screenName}" value="${this.state.iniConfig[`${prefix}windowy`] || 0}" oninput="PupPackManagerPage.updatePreview()"></div>
-                    <div><label class="input-label" style="font-size:0.75rem;">Width</label><input type="number" class="input-field" id="pup-w-${screenName}" value="${this.state.iniConfig[`${prefix}windowwidth`] || 0}" oninput="PupPackManagerPage.updatePreview()"></div>
-                    <div><label class="input-label" style="font-size:0.75rem;">Height</label><input type="number" class="input-field" id="pup-h-${screenName}" value="${this.state.iniConfig[`${prefix}windowheight`] || 0}" oninput="PupPackManagerPage.updatePreview()"></div>
+                <div id="pup-custom-${section.key}" style="display: none; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color);">
+                    <div><label class="input-label" style="font-size:0.75rem;">X</label><input type="number" class="input-field" id="pup-x-${section.key}" value="${valX}" min="0" oninput="PupPackManagerPage.clampValues('${section.key}')"></div>
+                    <div><label class="input-label" style="font-size:0.75rem;">Y</label><input type="number" class="input-field" id="pup-y-${section.key}" value="${valY}" min="0" oninput="PupPackManagerPage.clampValues('${section.key}')"></div>
+                    <div><label class="input-label" style="font-size:0.75rem;">Width</label><input type="number" class="input-field" id="pup-w-${section.key}" value="${valW}" min="1" oninput="PupPackManagerPage.clampValues('${section.key}')"></div>
+                    <div><label class="input-label" style="font-size:0.75rem;">Height</label><input type="number" class="input-field" id="pup-h-${section.key}" value="${valH}" min="1" oninput="PupPackManagerPage.clampValues('${section.key}')"></div>
                 </div>
             </div>
         `;
-        controlsContainer.insertAdjacentHTML('beforeend', html);
+    });
 
-        // Initial setup for this screen to hide/show custom and calculate if it's default
-        if (isEnabled) {
-            this.applyPreset(screenName, true); // true = initial render, don't overwrite if custom
+    html += `</div>`;
+    body.innerHTML = html;
+
+    // Set correct presets and show/hide custom fields
+    screenSections.forEach(section => {
+        const prefix = `pup${section.key.toLowerCase()}`;
+        const isEnabled = document.getElementById(`pup-enable-${section.key}`)?.checked;
+
+        if (!hasExistingConfig) {
+            // Fresh config: use computed default preset
+            const d = defaults[section.key];
+            const presetEl = document.getElementById(`pup-preset-${section.key}`);
+            if (presetEl) presetEl.value = d.preset;
+            const customDiv = document.getElementById(`pup-custom-${section.key}`);
+            if (customDiv) customDiv.style.display = d.preset === 'custom' ? 'grid' : 'none';
+        } else if (isEnabled) {
+            this.applyPreset(section.key, true);
         }
     });
+
     this.initDragDrop();
+    this.updatePreview();
+};
+
+PupPackManagerPage.clampValues = function(screenName) {
+    const monitor = this.state[`resolvedMonitor_${screenName}`];
+    if (!monitor) { this.updatePreview(); return; }
+
+    const mw = monitor.width;
+    const mh = monitor.height;
+
+    const xEl = document.getElementById(`pup-x-${screenName}`);
+    const yEl = document.getElementById(`pup-y-${screenName}`);
+    const wEl = document.getElementById(`pup-w-${screenName}`);
+    const hEl = document.getElementById(`pup-h-${screenName}`);
+
+    let x = parseInt(xEl.value) || 0;
+    let y = parseInt(yEl.value) || 0;
+    let w = parseInt(wEl.value) || 1;
+    let h = parseInt(hEl.value) || 1;
+
+    // Clamp width/height to monitor size
+    w = Math.max(1, Math.min(w, mw));
+    h = Math.max(1, Math.min(h, mh));
+
+    // Clamp position so the box stays within the monitor
+    x = Math.max(0, Math.min(x, mw - w));
+    y = Math.max(0, Math.min(y, mh - h));
+
+    xEl.value = x;
+    yEl.value = y;
+    wEl.value = w;
+    hEl.value = h;
 
     this.updatePreview();
 };
@@ -466,7 +677,6 @@ PupPackManagerPage.renderLayoutModal = function() {
 PupPackManagerPage.applyPreset = function(screenName, isInitial = false) {
     const preset = document.getElementById(`pup-preset-${screenName}`).value;
     const customDiv = document.getElementById(`pup-custom-${screenName}`);
-    const monitorIdx = document.getElementById(`pup-monitor-${screenName}`).value;
 
     if (preset === 'custom') {
         customDiv.style.display = 'grid';
@@ -476,32 +686,27 @@ PupPackManagerPage.applyPreset = function(screenName, isInitial = false) {
         customDiv.style.display = 'none';
     }
 
-    if (!monitorIdx || monitorIdx === "") return;
-
-    const monitor = this.state.globalDisplays.find(d => d.index == monitorIdx);
+    // Resolve monitor from settings (no dropdown)
+    const monitor = this.state[`resolvedMonitor_${screenName}`];
     if (!monitor) return;
 
-    // Use unscaled native width/height of the monitor for the math
     const mw = monitor.width;
     const mh = monitor.height;
 
     let x = 0, y = 0, w = mw, h = mh;
 
     if (preset === 'fill') {
-        // x=0, y=0, w=mw, h=mh
+        // x=0, y=0, w=mw, h=mh (defaults)
     } else if (preset === 'center') {
-        // Assume 16:9 for most PuP videos
         const targetRatio = 16 / 9;
         const monitorRatio = mw / mh;
 
         if (monitorRatio > targetRatio) {
-            // Monitor is wider than 16:9 (e.g. ultrawide), pillarbox (bars on sides)
             w = mh * targetRatio;
             h = mh;
             x = (mw - w) / 2;
             y = 0;
         } else {
-            // Monitor is narrower/taller (e.g. 4:3), letterbox (bars top/bottom)
             w = mw;
             h = mw / targetRatio;
             x = 0;
@@ -514,7 +719,6 @@ PupPackManagerPage.applyPreset = function(screenName, isInitial = false) {
         h = mh / 2;
     }
 
-    // Only overwrite values if it's NOT the initial render, OR if the initial render values are empty/0
     const prefix = `pup${screenName.toLowerCase()}`;
     const hasValues = this.state.iniConfig[`${prefix}windowwidth`] > 0;
 
@@ -524,7 +728,6 @@ PupPackManagerPage.applyPreset = function(screenName, isInitial = false) {
         document.getElementById(`pup-w-${screenName}`).value = Math.round(w);
         document.getElementById(`pup-h-${screenName}`).value = Math.round(h);
     } else {
-        // If it HAS values and it's initial, force it to 'custom' preset to show the existing math
         document.getElementById(`pup-preset-${screenName}`).value = 'custom';
         customDiv.style.display = 'grid';
     }
@@ -551,68 +754,72 @@ PupPackManagerPage.updatePreview = function() {
     const totalW = maxX - minX;
     const totalH = maxY - minY;
 
-    if (totalW === 0 || totalH === 0) return;
+    if (totalW === 0 || totalH === 0) {
+        workspace.innerHTML = '<div style="color: #666; font-size: 0.85rem;">No displays configured</div>';
+        return;
+    }
 
-    // Scale workspace to fit container
+    // Scale workspace to fit container — no arbitrary cap
     const container = document.getElementById('pup-preview-container');
-    const scaleX = (container.clientWidth - 40) / totalW;
-    const scaleY = (container.clientHeight - 40) / totalH;
-    const scale = Math.min(scaleX, scaleY, 0.2); // Cap scale so it doesn't get huge
+    const availW = container.clientWidth - 20;
+    const availH = container.clientHeight - 20;
+    const scale = Math.min(availW / totalW, availH / totalH);
 
-    workspace.style.width = `${totalW}px`;
-    workspace.style.height = `${totalH}px`;
-    workspace.style.transform = `scale(${scale})`;
+    workspace.style.width = `${totalW * scale}px`;
+    workspace.style.height = `${totalH * scale}px`;
+    workspace.style.transform = 'none';
 
     // 2. Draw monitors
     this.state.globalDisplays.forEach(d => {
-        const mx = (d.x || 0) - minX;
-        const my = (d.y || 0) - minY;
+        const mx = ((d.x || 0) - minX) * scale;
+        const my = ((d.y || 0) - minY) * scale;
 
         workspace.insertAdjacentHTML('beforeend', `
-            <div style="position: absolute; left: ${mx}px; top: ${my}px; width: ${d.width}px; height: ${d.height}px; border: 4px solid #555; background: #222; display: flex; align-items: center; justify-content: center; color: #666; font-size: ${40/scale}px; font-weight: bold;">
+            <div style="position: absolute; left: ${mx}px; top: ${my}px; width: ${d.width * scale}px; height: ${d.height * scale}px; border: 2px solid #444; background: #1a1a2e; display: flex; align-items: center; justify-content: center; color: #555; font-size: ${Math.max(12, 14 * scale)}px; font-weight: bold; border-radius: 4px; box-sizing: border-box;">
                 M${d.index}
             </div>
         `);
     });
 
-    // 3. Draw enabled screens
+    // 3. Draw enabled screens (Backglass + DMD only)
     const colors = {
-        'Backglass': 'rgba(59, 130, 246, 0.6)', // Blue
-        'DMD': 'rgba(239, 68, 68, 0.6)',       // Red
-        'FullDMD': 'rgba(16, 185, 129, 0.6)'    // Green
+        'Backglass': 'rgba(59, 130, 246, 0.5)',
+        'DMD': 'rgba(16, 185, 129, 0.5)'
+    };
+    const borderColors = {
+        'Backglass': '#3b82f6',
+        'DMD': '#10b981'
     };
 
-    ['Backglass', 'DMD', 'FullDMD'].forEach(screenName => {
+    ['Backglass', 'DMD'].forEach(screenName => {
         if (!document.getElementById(`pup-enable-${screenName}`)?.checked) return;
 
-        const monitorIdx = document.getElementById(`pup-monitor-${screenName}`).value;
-        const monitor = this.state.globalDisplays.find(d => d.index == monitorIdx);
+        const monitor = this.state[`resolvedMonitor_${screenName}`];
         if (!monitor) return;
 
-        const mx = (monitor.x || 0) - minX;
-        const my = (monitor.y || 0) - minY;
+        const mx = ((monitor.x || 0) - minX) * scale;
+        const my = ((monitor.y || 0) - minY) * scale;
 
         const x = parseFloat(document.getElementById(`pup-x-${screenName}`).value) || 0;
         const y = parseFloat(document.getElementById(`pup-y-${screenName}`).value) || 0;
         const w = parseFloat(document.getElementById(`pup-w-${screenName}`).value) || 0;
         const h = parseFloat(document.getElementById(`pup-h-${screenName}`).value) || 0;
 
-
         const isCustom = document.getElementById(`pup-preset-${screenName}`).value === 'custom';
         const cursorStyle = isCustom ? 'cursor: move;' : '';
+        const label = screenName === 'DMD' ? 'DMD/FullDMD' : screenName;
 
         workspace.insertAdjacentHTML('beforeend', `
             <div id="pup-preview-box-${screenName}"
                  class="pup-preview-box"
                  data-screen="${screenName}"
-                 style="position: absolute; left: ${mx + x}px; top: ${my + y}px; width: ${w}px; height: ${h}px; background: ${colors[screenName]}; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; color: #fff; font-size: ${24/scale}px; text-shadow: 1px 1px 2px #000; box-sizing: border-box; ${cursorStyle}">
-                ${screenName}
+                 style="position: absolute; left: ${mx + x * scale}px; top: ${my + y * scale}px; width: ${w * scale}px; height: ${h * scale}px; background: ${colors[screenName]}; border: 2px solid ${borderColors[screenName]}; display: flex; align-items: center; justify-content: center; color: #fff; font-size: ${Math.max(10, 12)}px; text-shadow: 1px 1px 2px #000; box-sizing: border-box; border-radius: 3px; ${cursorStyle}">
+                ${label}
                 ${isCustom ? `
-                    <div class="resize-handle se" data-screen="${screenName}" style="position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: #fff; border: 1px solid #000; cursor: se-resize;"></div>
+                    <div class="resize-handle se" data-screen="${screenName}" style="position: absolute; right: -4px; bottom: -4px; width: 8px; height: 8px; background: #fff; border: 1px solid #000; cursor: se-resize; border-radius: 2px;"></div>
                 ` : ''}
             </div>
         `);
-
     });
 };
 
@@ -620,30 +827,46 @@ PupPackManagerPage.saveLayout = async function() {
     const table = this.state.selectedTable;
     if (!table) return;
 
-    const payload = {
-        screens: []
-    };
+    const payload = { screens: [] };
 
-    ['Backglass', 'DMD', 'FullDMD'].forEach(screenName => {
-        const enabled = document.getElementById(`pup-enable-${screenName}`).checked;
-        if (enabled) {
-            payload.screens.push({
-                screen: screenName,
-                enable: 1,
-                monitor_index: parseInt(document.getElementById(`pup-monitor-${screenName}`).value) || 0,
-                x: parseFloat(document.getElementById(`pup-x-${screenName}`).value) || 0,
-                y: parseFloat(document.getElementById(`pup-y-${screenName}`).value) || 0,
-                width: parseFloat(document.getElementById(`pup-w-${screenName}`).value) || 0,
-                height: parseFloat(document.getElementById(`pup-h-${screenName}`).value) || 0
-            });
-        } else {
-            payload.screens.push({
-                screen: screenName,
-                enable: 0,
-                monitor_index: 0, x: 0, y: 0, width: 0, height: 0
-            });
-        }
-    });
+    // Backglass
+    const bgEnabled = document.getElementById('pup-enable-Backglass')?.checked;
+    const bgMonitor = this.state.resolvedMonitor_Backglass;
+    if (bgEnabled && bgMonitor) {
+        payload.screens.push({
+            screen: 'Backglass', enable: 1,
+            monitor_index: bgMonitor.index,
+            x: parseFloat(document.getElementById('pup-x-Backglass').value) || 0,
+            y: parseFloat(document.getElementById('pup-y-Backglass').value) || 0,
+            width: parseFloat(document.getElementById('pup-w-Backglass').value) || 0,
+            height: parseFloat(document.getElementById('pup-h-Backglass').value) || 0,
+            monitor_width: bgMonitor.width,
+            monitor_height: bgMonitor.height
+        });
+    } else {
+        payload.screens.push({ screen: 'Backglass', enable: 0, monitor_index: 0, x: 0, y: 0, width: 0, height: 0, monitor_width: 0, monitor_height: 0 });
+    }
+
+    // DMD + FullDMD (merged — same values for both)
+    const dmdEnabled = document.getElementById('pup-enable-DMD')?.checked;
+    const dmdMonitor = this.state.resolvedMonitor_DMD;
+    if (dmdEnabled && dmdMonitor) {
+        const dmdConfig = {
+            enable: 1,
+            monitor_index: dmdMonitor.index,
+            x: parseFloat(document.getElementById('pup-x-DMD').value) || 0,
+            y: parseFloat(document.getElementById('pup-y-DMD').value) || 0,
+            width: parseFloat(document.getElementById('pup-w-DMD').value) || 0,
+            height: parseFloat(document.getElementById('pup-h-DMD').value) || 0,
+            monitor_width: dmdMonitor.width,
+            monitor_height: dmdMonitor.height
+        };
+        payload.screens.push({ screen: 'DMD', ...dmdConfig });
+        payload.screens.push({ screen: 'FullDMD', ...dmdConfig });
+    } else {
+        payload.screens.push({ screen: 'DMD', enable: 0, monitor_index: 0, x: 0, y: 0, width: 0, height: 0, monitor_width: 0, monitor_height: 0 });
+        payload.screens.push({ screen: 'FullDMD', enable: 0, monitor_index: 0, x: 0, y: 0, width: 0, height: 0, monitor_width: 0, monitor_height: 0 });
+    }
 
     try {
         const res = await fetch(`/api/puppacks/${table.id}/ini-config`, {
@@ -654,8 +877,14 @@ PupPackManagerPage.saveLayout = async function() {
 
         if (res.ok) {
             Toast.success('PuP Screen Layout saved successfully.');
-            this.closeLayoutModal();
-            // Refresh to update local cache
+
+            // Automatically enable in VBS if setting exists, is currently disabled, and at least one screen is enabled
+            const anyEnabled = payload.screens.some(s => s.enable === 1);
+            if (anyEnabled && this.state.vbsStatus && this.state.vbsStatus.has_puppack_setting && !this.state.vbsStatus.puppack_enabled) {
+                await this.toggleVbs(true);
+            }
+
+            this.closeLayoutPanel();
             this.selectTable(table.id);
         } else {
             const err = await res.json();
@@ -677,7 +906,6 @@ PupPackManagerPage.initDragDrop = function() {
     let currentScreen = null;
     let startX, startY;
     let startLeft, startTop, startWidth, startHeight;
-    let containerScale = 1;
 
     workspace.addEventListener('mousedown', (e) => {
         if (e.target.classList.contains('resize-handle')) {
@@ -686,7 +914,7 @@ PupPackManagerPage.initDragDrop = function() {
         } else if (e.target.classList.contains('pup-preview-box')) {
             currentScreen = e.target.getAttribute('data-screen');
             if (document.getElementById(`pup-preset-${currentScreen}`).value !== 'custom') {
-                return; // Only drag if custom
+                return;
             }
             isDragging = true;
         } else {
@@ -695,25 +923,8 @@ PupPackManagerPage.initDragDrop = function() {
 
         e.preventDefault();
 
-        // Calculate scale
-        const transform = workspace.style.transform;
-        const scaleMatch = transform.match(/scale\(([^)]+)\)/);
-        containerScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
-
         startX = e.clientX;
         startY = e.clientY;
-
-        const monitorIdx = document.getElementById(`pup-monitor-${currentScreen}`).value;
-        const monitor = this.state.globalDisplays.find(d => d.index == monitorIdx);
-
-        let minX = 0, minY = 0;
-        this.state.globalDisplays.forEach(d => {
-            if ((d.x||0) < minX) minX = d.x||0;
-            if ((d.y||0) < minY) minY = d.y||0;
-        });
-
-        const mx = (monitor.x || 0) - minX;
-        const my = (monitor.y || 0) - minY;
 
         startLeft = parseFloat(document.getElementById(`pup-x-${currentScreen}`).value) || 0;
         startTop = parseFloat(document.getElementById(`pup-y-${currentScreen}`).value) || 0;
@@ -725,8 +936,31 @@ PupPackManagerPage.initDragDrop = function() {
         if (!isDragging && !isResizing) return;
         if (!currentScreen) return;
 
-        const dx = (e.clientX - startX) / containerScale;
-        const dy = (e.clientY - startY) / containerScale;
+        // Calculate the scale that was applied to the workspace
+        const container = document.getElementById('pup-preview-container');
+        const ws = document.getElementById('pup-preview-workspace');
+        if (!container || !ws) return;
+
+        let minX = 0, minY = 0, maxX = 0, maxY = 0;
+        this.state.globalDisplays.forEach(d => {
+            const dx = d.x || 0;
+            const dy = d.y || 0;
+            if (dx < minX) minX = dx;
+            if (dy < minY) minY = dy;
+            if (dx + d.width > maxX) maxX = dx + d.width;
+            if (dy + d.height > maxY) maxY = dy + d.height;
+        });
+        const totalW = maxX - minX;
+        const totalH = maxY - minY;
+        if (totalW === 0 || totalH === 0) return;
+
+        const availW = container.clientWidth - 20;
+        const availH = container.clientHeight - 20;
+        const scale = Math.min(availW / totalW, availH / totalH);
+
+        // Convert pixel movement to native coordinates
+        const dx = (e.clientX - startX) / scale;
+        const dy = (e.clientY - startY) / scale;
 
         if (isDragging) {
             document.getElementById(`pup-x-${currentScreen}`).value = Math.round(startLeft + dx);
@@ -735,6 +969,9 @@ PupPackManagerPage.initDragDrop = function() {
             document.getElementById(`pup-w-${currentScreen}`).value = Math.max(10, Math.round(startWidth + dx));
             document.getElementById(`pup-h-${currentScreen}`).value = Math.max(10, Math.round(startHeight + dy));
         }
+
+        // Clamp to monitor bounds
+        PupPackManagerPage.clampValues(currentScreen);
 
         PupPackManagerPage.updatePreview();
     });

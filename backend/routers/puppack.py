@@ -2,7 +2,9 @@ import logging
 from pathlib import Path
 from typing import List, Dict
 
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, HTTPException
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 
 from backend.core.config import config
@@ -20,13 +22,15 @@ class ToggleVBSRequest(BaseModel):
     enable: bool
 
 class ScreenLayoutConfig(BaseModel):
-    screen: str  # e.g., "Topper", "DMD", "Backglass", "FullDMD", "Playfield"
+    screen: str  # e.g., "Topper", "DMD", "Backglass", "FullDMD"
     enable: int
     monitor_index: int
     x: float
     y: float
     width: float
     height: float
+    monitor_width: int = 0
+    monitor_height: int = 0
 
 class INIConfigRequest(BaseModel):
     screens: List[ScreenLayoutConfig]
@@ -229,15 +233,48 @@ async def save_puppack_ini_config(table_id: int, req: INIConfigRequest):
             raise HTTPException(status_code=500, detail="Failed to generate base INI file")
 
     config_updates = {}
+
+    # Plugin enable + folder path
+    table_dir = Path(table["folder_path"])
+    pup_root = resolve_pup_root(table_dir / "pupvideos")
+    config_updates["Enable"] = 1
+    config_updates["PUPFolder"] = str(pup_root)
+
+    # Map our screen names to VPX's pad prefix
+    SCREEN_TO_PREFIX = {
+        "Backglass": "BGPad",
+        "DMD": "SVPad",       # VPX calls this "Score View"
+        "FullDMD": "SVPad",   # Same as DMD in VPX
+    }
+
+    # Track which prefixes we've already written (DMD and FullDMD both map to SVPad)
+    written_prefixes = set()
+
     for screen_config in req.screens:
-        prefix = f"PUP{screen_config.screen}"
-        config_updates[f"{prefix}Window"] = screen_config.enable
-        if screen_config.enable:
-            config_updates[f"{prefix}Screen"] = screen_config.monitor_index
-            config_updates[f"{prefix}WindowX"] = int(screen_config.x)
-            config_updates[f"{prefix}WindowY"] = int(screen_config.y)
-            config_updates[f"{prefix}WindowWidth"] = int(screen_config.width)
-            config_updates[f"{prefix}WindowHeight"] = int(screen_config.height)
+        prefix = SCREEN_TO_PREFIX.get(screen_config.screen)
+        if not prefix or prefix in written_prefixes:
+            continue
+        written_prefixes.add(prefix)
+
+        if screen_config.enable and screen_config.monitor_width > 0 and screen_config.monitor_height > 0:
+            # Convert X, Y, Width, Height → Pad{Left, Top, Right, Bottom}
+            x = int(screen_config.x)
+            y = int(screen_config.y)
+            w = int(screen_config.width)
+            h = int(screen_config.height)
+            mw = screen_config.monitor_width
+            mh = screen_config.monitor_height
+
+            config_updates[f"{prefix}Left"] = x
+            config_updates[f"{prefix}Top"] = y
+            config_updates[f"{prefix}Right"] = max(0, mw - x - w)
+            config_updates[f"{prefix}Bottom"] = max(0, mh - y - h)
+        else:
+            # Disabled — set all pads to full monitor size (hides the screen)
+            config_updates[f"{prefix}Left"] = 0
+            config_updates[f"{prefix}Top"] = 0
+            config_updates[f"{prefix}Right"] = 0
+            config_updates[f"{prefix}Bottom"] = 0
 
     success = update_puppack_ini_config(ini_path, config_updates)
     if not success:

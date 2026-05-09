@@ -283,6 +283,17 @@ const SettingsPage = {
                 await this.saveDisplays();
             };
 
+            // Auto-uncheck DMD enabled when monitor is set to "None Assigned"
+            const dmdSelect = document.querySelector('.display-role-select[data-role="DMD_FullDMD"]');
+            if (dmdSelect) {
+                dmdSelect.addEventListener('change', () => {
+                    const checkbox = document.getElementById('setting-dmd-enabled');
+                    if (checkbox && !dmdSelect.value) {
+                        checkbox.checked = false;
+                    }
+                });
+            }
+
             // Bind the Identify Displays button with proper event handling
             const identifyBtn = document.getElementById('btn-identify-displays');
             if (identifyBtn) {
