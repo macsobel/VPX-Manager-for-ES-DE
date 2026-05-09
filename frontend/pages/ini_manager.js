@@ -63,7 +63,7 @@ const IniManagerPage = {
                 </div>
 
                 <!-- Right: Detail Workspace -->
-                <div class="adaptive-content" id="ini-detail-workspace">
+                <div class="adaptive-content" id="ini-detail-workspace" style="display: none;">
                     <!-- Detail Header -->
                     <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); background: var(--bg-tertiary); display: flex; justify-content: space-between; align-items: flex-start;">
                         <div style="display: flex; gap: 1rem; align-items: center;">
