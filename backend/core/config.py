@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, validator
 
 
