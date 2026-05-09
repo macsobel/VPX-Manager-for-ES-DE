@@ -381,15 +381,13 @@ const SettingsPage = {
 
                         <div class="input-group">
                             <label class="input-label">VPX Flavor</label>
-                            <div style="display: flex; gap: var(--space-lg); margin-top: 4px;">
-                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-primary); font-size: 0.9rem;">
-                                    <input type="radio" name="vpx-flavor" value="BGFX" ${data.vpx_use_flavor === 'BGFX' || !data.vpx_use_flavor ? 'checked' : ''} style="accent-color: var(--accent-blue);">
-                                    BGFX
+                            <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px;">
+                                <span id="label-flavor-bgfx" style="font-size: 0.85rem; color: ${data.vpx_use_flavor !== 'GL' ? 'var(--text-primary)' : 'var(--text-tertiary)'}; font-weight: 500;">BGFX</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="setting-vpx-flavor-toggle" ${data.vpx_use_flavor === 'GL' ? 'checked' : ''} onchange="document.getElementById('label-flavor-bgfx').style.color = this.checked ? 'var(--text-tertiary)' : 'var(--text-primary)'; document.getElementById('label-flavor-gl').style.color = this.checked ? 'var(--text-primary)' : 'var(--text-tertiary)';">
+                                    <span class="slider round"></span>
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-primary); font-size: 0.9rem;">
-                                    <input type="radio" name="vpx-flavor" value="GL" ${data.vpx_use_flavor === 'GL' ? 'checked' : ''} style="accent-color: var(--accent-blue);">
-                                    GL
-                                </label>
+                                <span id="label-flavor-gl" style="font-size: 0.85rem; color: ${data.vpx_use_flavor === 'GL' ? 'var(--text-primary)' : 'var(--text-tertiary)'}; font-weight: 500;">GL</span>
                             </div>
                         </div>
 
@@ -589,7 +587,7 @@ const SettingsPage = {
                 esde_gamelists_dir: getVal('setting-esde-gamelists-dir'),
                 vpx_standalone_app_path: getVal('setting-vpx-app'),
                 esde_app_path: getVal('setting-esde-app'),
-                vpx_use_flavor: document.querySelector('input[name="vpx-flavor"]:checked')?.value || 'BGFX',
+                vpx_use_flavor: document.getElementById('setting-vpx-flavor-toggle')?.checked ? 'GL' : 'BGFX',
                 vpx_display_mode: parseInt(getVal('setting-display-count')) === 1 ? 'Desktop' : 'Cabinet',
                 master_orientation: getVal('setting-master-orientation'),
                 display_count: parseInt(getVal('setting-display-count')) || 2,

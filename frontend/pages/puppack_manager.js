@@ -352,8 +352,12 @@ PupPackManagerPage.toggleVbs = async function(enable) {
         });
 
         if (res.ok) {
-            Toast.success(`PuP Pack ${enable ? 'enabled' : 'disabled'} in VBS file.`);
-            this.state.vbsStatus.puppack_enabled = enable;
+            const data = await res.json();
+            Toast.success(`PuP Pack ${data.puppack_enabled ? 'enabled' : 'disabled'} in VBS file.`);
+            this.state.vbsStatus.puppack_enabled = data.puppack_enabled;
+            // Update checkbox state directly just in case a re-render is pending
+            const toggle = document.getElementById('puppack-vbs-toggle');
+            if (toggle) toggle.checked = data.puppack_enabled;
         } else {
             const err = await res.json();
             Toast.error(err.detail || "Failed to toggle VBS");

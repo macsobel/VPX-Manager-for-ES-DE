@@ -182,11 +182,14 @@ async def toggle_puppack_vbs(table_id: int, req: ToggleVBSRequest):
                 content = f.read()
 
         new_content = vbs_manager.apply_regex_fix(content, "puppack", enable=req.enable)
+        
+        # Verify if it was actually changed/set as requested
+        actual_enabled = vbs_manager.is_puppack_enabled(new_content)
 
         with open(vbs_sidecar, "w", encoding=used_encoding) as f:
             f.write(new_content)
 
-        return {"success": True, "puppack_enabled": req.enable}
+        return {"success": True, "puppack_enabled": actual_enabled}
     except Exception as e:
         logger.error(f"Failed to toggle PuP Pack in VBS: {e}")
         raise HTTPException(status_code=500, detail=str(e))
