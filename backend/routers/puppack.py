@@ -237,11 +237,8 @@ async def save_puppack_ini_config(table_id: int, req: INIConfigRequest):
 
     config_updates = {}
 
-    # Plugin enable + folder path
-    table_dir = Path(table["folder_path"])
-    pup_root = resolve_pup_root(table_dir / "pupvideos")
+    # Plugin enable
     config_updates["Enable"] = 1
-    config_updates["PUPFolder"] = str(pup_root)
 
     # Map our screen names to VPX's pad prefix
     SCREEN_TO_PREFIX = {

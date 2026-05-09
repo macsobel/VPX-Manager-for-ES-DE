@@ -442,12 +442,8 @@ class PupPackManager:
                 logger.info(f"Created base INI for {vpx_filename}")
 
             # Now add PuP Plugin section
-            from backend.routers.puppack import resolve_pup_root
-            pup_root = resolve_pup_root(table_dir / "pupvideos")
-            
             config_updates = {
-                "Enable": 1,
-                "PUPFolder": f'"{pup_root}"'
+                "Enable": 1
             }
             
             update_puppack_ini_config(ini_path, config_updates)

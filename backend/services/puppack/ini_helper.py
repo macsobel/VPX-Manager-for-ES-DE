@@ -125,8 +125,8 @@ def read_puppack_ini_config(ini_path: Path) -> dict:
     return config
 
 
-def ensure_plugin_pup_section(ini_path: Path, pup_folder: str) -> bool:
-    """Ensures the [Plugin.PUP] section exists with Enable = 1 and PUPFolder set."""
+def ensure_plugin_pup_section(ini_path: Path) -> bool:
+    """Ensures the [Plugin.PUP] section exists with Enable = 1."""
     content = ""
     try:
         with open(ini_path, "r", encoding="utf-8") as f:
@@ -157,7 +157,6 @@ def ensure_plugin_pup_section(ini_path: Path, pup_folder: str) -> bool:
         lines.append("")
         lines.append("[Plugin.PUP]")
         lines.append(f"Enable = 1")
-        lines.append(f"PUPFolder = {pup_folder}")
     else:
         # Section exists — update Enable and PUPFolder in place
         if section_end == -1:
@@ -167,13 +166,12 @@ def ensure_plugin_pup_section(ini_path: Path, pup_folder: str) -> bool:
         new_section_lines = []
         for i in range(section_start + 1, section_end):
             key = lines[i].strip().lower().split("=")[0].strip() if "=" in lines[i] else ""
-            if key not in ("enable", "pupfolder"):
+            if key not in ("enable"):
                 new_section_lines.append(lines[i])
 
         # Rebuild: everything before section, section header, new values, remaining section lines, rest of file
         rebuilt = lines[:section_start + 1]
         rebuilt.append(f"Enable = 1")
-        rebuilt.append(f"PUPFolder = {pup_folder}")
         rebuilt.extend(new_section_lines)
         rebuilt.extend(lines[section_end:])
         lines = rebuilt

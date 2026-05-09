@@ -1,3 +1,5 @@
+const PAD_PREFIX = { Backglass: 'bgpad', DMD: 'svpad' };
+
 const PupPackManagerPage = {
     state: {
         tables: [],
@@ -95,7 +97,7 @@ const PupPackManagerPage = {
             return `
                 <div class="vbs-list-item ${isSelected ? 'active' : ''}" data-id="${t.id}" data-name="${this.escHtml(t.name || t.filename)}" onclick="PupPackManagerPage.selectTable(${t.id})">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
-                        <div style="font-weight: 600; font-size: 0.95rem; color: ${isSelected ? 'var(--accent-blue)' : 'var(--text-primary)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">
+                        <div class="vbs-item-title" style="font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">
                             ${this.escHtml(t.name || t.filename)}
                         </div>
                         <div class="status-badge" style="opacity: ${isSelected ? '1' : '0.4'};">
@@ -224,9 +226,9 @@ const PupPackManagerPage = {
         if (this.state.vbsStatus && this.state.vbsStatus.has_puppack_setting) {
             const isEnabled = this.state.vbsStatus.puppack_enabled;
             headerControls += `
-                <div style="display: flex; align-items: center; gap: 0.75rem; background: var(--bg-secondary); padding: 0.5rem 1rem; border-radius: var(--radius-full); border: 1px solid var(--border-color);">
-                    <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">Enable in VBS</span>
-                    <label class="switch" style="margin: 0;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; background: var(--bg-secondary); padding: 0.5rem 1rem; border-radius: var(--radius-full); border: 1px solid var(--border-color); flex-shrink: 0;">
+                    <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; white-space: nowrap;">Enable in VBS</span>
+                    <label class="switch" style="margin: 0; flex-shrink: 0;">
                         <input type="checkbox" id="puppack-vbs-toggle" ${isEnabled ? 'checked' : ''} onchange="PupPackManagerPage.toggleVbs(this.checked)">
                         <span class="slider round"></span>
                     </label>
@@ -235,7 +237,7 @@ const PupPackManagerPage = {
         }
 
         headerControls += `
-            <button class="btn btn-primary btn-sm" onclick="PupPackManagerPage.openLayoutModal()">
+            <button class="btn btn-primary btn-sm" style="flex-shrink: 0; white-space: nowrap;" onclick="PupPackManagerPage.openLayoutModal()">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
                 Configure Screen Layout
             </button>
@@ -252,7 +254,7 @@ const PupPackManagerPage = {
                         <div style="color: var(--text-secondary); font-size: 0.85rem; font-family: monospace;">pupvideos/${this.escHtml(pupDir)}/</div>
                     </div>
                 </div>
-                <div style="display: flex; gap: 1rem; align-items: center;">
+                <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
                     ${headerControls}
                 </div>
             </div>
@@ -513,7 +515,7 @@ PupPackManagerPage.renderLayoutPanel = function() {
     const body = document.getElementById('puppack-layout-body');
 
     // Mapping from our screen key to VPX pad prefix
-    const PAD_PREFIX = { Backglass: 'bgpad', DMD: 'svpad' };
+
 
     // Check if this is a "fresh" config (no existing pad or legacy values)
     const hasExistingConfig = ('bgpadleft' in this.state.iniConfig) ||
@@ -544,33 +546,36 @@ PupPackManagerPage.renderLayoutPanel = function() {
 
         // Use existing config if present, otherwise use computed defaults
         let isEnabled, valX, valY, valW, valH;
-        if (hasExistingConfig) {
-            // Try VPX pad format first (new format)
-            if (padPrefix && `${padPrefix}left` in this.state.iniConfig && monitor) {
-                const padL = this.state.iniConfig[`${padPrefix}left`] || 0;
-                const padT = this.state.iniConfig[`${padPrefix}top`] || 0;
-                const padR = this.state.iniConfig[`${padPrefix}right`] || 0;
-                const padB = this.state.iniConfig[`${padPrefix}bottom`] || 0;
-                valX = padL;
-                valY = padT;
-                valW = monitor.width - padL - padR;
-                valH = monitor.height - padT - padB;
-                isEnabled = this.state.iniConfig[`${prefix}window`] === 1 || valW > 0;
-            } else {
-                // Fallback to old format (legacy)
-                isEnabled = this.state.iniConfig[`${prefix}window`] === 1;
-                valX = this.state.iniConfig[`${prefix}windowx`] || 0;
-                valY = this.state.iniConfig[`${prefix}windowy`] || 0;
-                valW = this.state.iniConfig[`${prefix}windowwidth`] || 0;
-                valH = this.state.iniConfig[`${prefix}windowheight`] || 0;
-            }
+        // Try to read from existing config first
+        const hasIniPads = padPrefix && `${padPrefix}left` in this.state.iniConfig;
+        const hasIniLegacy = this.state.iniConfig[`${prefix}windowwidth`] > 0;
+        let screenPreset = 'custom';
+
+        if (hasIniPads && monitor) {
+            const padL = this.state.iniConfig[`${padPrefix}left`] || 0;
+            const padT = this.state.iniConfig[`${padPrefix}top`] || 0;
+            const padR = this.state.iniConfig[`${padPrefix}right`] || 0;
+            const padB = this.state.iniConfig[`${padPrefix}bottom`] || 0;
+            valX = padL;
+            valY = padT;
+            valW = monitor.width - padL - padR;
+            valH = monitor.height - padT - padB;
+            isEnabled = this.state.iniConfig[`${prefix}window`] === 1 || valW > 0;
+        } else if (hasIniLegacy) {
+            isEnabled = this.state.iniConfig[`${prefix}window`] === 1;
+            valX = this.state.iniConfig[`${prefix}windowx`] || 0;
+            valY = this.state.iniConfig[`${prefix}windowy`] || 0;
+            valW = this.state.iniConfig[`${prefix}windowwidth`] || 0;
+            valH = this.state.iniConfig[`${prefix}windowheight`] || 0;
         } else {
+            // No existing config for this screen — use smart defaults
             const d = defaults[section.key];
             isEnabled = d.enabled;
             valX = d.x;
             valY = d.y;
             valW = d.w;
             valH = d.h;
+            screenPreset = d.preset;
         }
 
         // Show monitor info — with fallback indicator
@@ -604,10 +609,10 @@ PupPackManagerPage.renderLayoutPanel = function() {
                 <div style="margin-top: 0.5rem;">
                     <label class="input-label">Layout Preset</label>
                     <select class="input-field" id="pup-preset-${section.key}" onchange="PupPackManagerPage.applyPreset('${section.key}')">
+                        <option value="custom">Custom (Drag / Manual)</option>
                         <option value="fill">Fill Monitor</option>
                         <option value="center">Center (Keep Ratio)</option>
                         <option value="bottom">Bottom Half</option>
-                        <option value="custom">Custom (Drag / Manual)</option>
                     </select>
                 </div>
 
@@ -627,17 +632,26 @@ PupPackManagerPage.renderLayoutPanel = function() {
     // Set correct presets and show/hide custom fields
     screenSections.forEach(section => {
         const prefix = `pup${section.key.toLowerCase()}`;
+        const padPrefix = PAD_PREFIX[section.key];
         const isEnabled = document.getElementById(`pup-enable-${section.key}`)?.checked;
 
-        if (!hasExistingConfig) {
+        const hasIniPads = padPrefix && `${padPrefix}left` in this.state.iniConfig;
+        const hasIniLegacy = this.state.iniConfig[`${prefix}windowwidth`] > 0;
+        const hasIniConfig = hasIniPads || hasIniLegacy;
+
+        if (!hasIniConfig) {
             // Fresh config: use computed default preset
             const d = defaults[section.key];
             const presetEl = document.getElementById(`pup-preset-${section.key}`);
             if (presetEl) presetEl.value = d.preset;
             const customDiv = document.getElementById(`pup-custom-${section.key}`);
             if (customDiv) customDiv.style.display = d.preset === 'custom' ? 'grid' : 'none';
-        } else if (isEnabled) {
-            this.applyPreset(section.key, true);
+        } else {
+            // Existing config: stay on 'custom' preset to preserve values
+            const presetEl = document.getElementById(`pup-preset-${section.key}`);
+            if (presetEl) presetEl.value = 'custom';
+            const customDiv = document.getElementById(`pup-custom-${section.key}`);
+            if (customDiv) customDiv.style.display = 'grid';
         }
     });
 
@@ -724,9 +738,12 @@ PupPackManagerPage.applyPreset = function(screenName, isInitial = false) {
     }
 
     const prefix = `pup${screenName.toLowerCase()}`;
-    const hasValues = this.state.iniConfig[`${prefix}windowwidth`] > 0;
+    const padPrefix = PAD_PREFIX[screenName];
+    const hasIniPads = padPrefix && `${padPrefix}left` in this.state.iniConfig;
+    const hasIniLegacy = this.state.iniConfig[`${prefix}windowwidth`] > 0;
+    const hasIniConfig = hasIniPads || hasIniLegacy;
 
-    if (!isInitial || !hasValues) {
+    if (!isInitial || !hasIniConfig) {
         document.getElementById(`pup-x-${screenName}`).value = Math.round(x);
         document.getElementById(`pup-y-${screenName}`).value = Math.round(y);
         document.getElementById(`pup-w-${screenName}`).value = Math.round(w);

@@ -452,6 +452,10 @@ a {
     position: relative;
 }
 
+.vbs-list-item.active .vbs-item-title {
+    color: var(--accent-blue);
+}
+
 .vbs-list-item.active::before {
     content: '';
     position: absolute;
