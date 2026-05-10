@@ -1129,7 +1129,6 @@ const UploadPage = {
         container.innerHTML = `
             <div class="page-header">
                 <h1 class="page-title">Edit Table Files</h1>
-                <p class="page-subtitle">Edit and update table files</p>
             </div>
             <div style="margin-bottom: var(--space-lg);">
                 <button class="btn btn-secondary btn-sm" onclick="window.location.hash='#tables'">
@@ -1248,7 +1247,22 @@ const UploadPage = {
                         </div>
                     </div>
 
-                    <div style="display: flex; gap: var(--space-md); align-items: center; margin-top: var(--space-lg);">
+                    <div class="file-slot" id="group-backup-before" style="cursor: pointer; margin-top: var(--space-lg); border-style: dashed; border-color: var(--accent-emerald-alpha);" onclick="document.getElementById('edit-backup-before').click()">
+                        <div class="file-slot-header">
+                            <div class="file-slot-icon emerald">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            </div>
+                            <div class="file-slot-info">
+                                <div class="file-slot-label" style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="checkbox" id="edit-backup-before" style="width: 16px; height: 16px; accent-color: var(--accent-emerald); cursor: pointer;" onclick="event.stopPropagation()">
+                                    Backup table before applying changes
+                                </div>
+                                <div class="file-slot-desc">Creates a safety snapshot of the current table files before they are replaced.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: var(--space-md); align-items: center; margin-top: var(--space-md);">
                         <button class="btn btn-primary btn-lg" id="btn-upload-files" disabled>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                             Apply Changes
@@ -1496,6 +1510,21 @@ const UploadPage = {
     async _doAddFiles(tableId) {
         const overlay = document.getElementById('import-overlay');
         const progressText = document.getElementById('import-progress-text');
+        const backupRequested = document.getElementById('edit-backup-before')?.checked;
+        if (backupRequested) {
+            progressText.textContent = 'Creating safety snapshot...';
+            try {
+                const res = await fetch(`/api/tables/${tableId}/snapshots`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ label: `Pre-Edit Backup (${new Date().toLocaleString()})` })
+                });
+                if (!res.ok) console.warn("Safety snapshot failed, proceeding anyway.");
+            } catch (err) {
+                console.warn("Safety snapshot error:", err);
+            }
+        }
+
         overlay.style.display = 'flex';
 
         const fileMap = {

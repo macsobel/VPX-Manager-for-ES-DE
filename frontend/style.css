@@ -1484,7 +1484,7 @@ select.input-field option {
     background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
-    z-index: 500;
+    z-index: 100000 !important;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3474,4 +3474,189 @@ input:checked + .slider:before {
     .pup-options-grid {
         grid-template-columns: 1fr !important;
     }
+}
+
+/* ── Snapshot Drawer ────────────────────────────────────────────── */
+.snapshot-drawer {
+    position: fixed;
+    top: 0;
+    right: -480px;
+    width: 480px;
+    height: 100vh;
+    background: var(--bg-elevated);
+    border-left: 1px solid var(--glass-border);
+    z-index: 1100;
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    transition: right var(--transition-base);
+    display: flex;
+    flex-direction: column;
+    box-shadow: -15px 0 40px rgba(0, 0, 0, 0.6);
+}
+
+.snapshot-drawer.open {
+    right: 0;
+}
+
+.snapshot-drawer-header {
+    padding: var(--space-lg) var(--space-xl);
+    border-bottom: 1px solid var(--glass-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.snapshot-drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-xl);
+}
+
+.snapshot-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-lg);
+    transition: all var(--transition-base);
+    position: relative;
+    overflow: hidden;
+}
+
+.snapshot-card:hover {
+    background: var(--glass-hover);
+    border-color: rgba(255, 255, 255, 0.12);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.snapshot-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-sm);
+}
+
+.snapshot-card-time {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+}
+
+.snapshot-card-label {
+    font-size: 0.85rem;
+    color: var(--text-tertiary);
+    margin-bottom: var(--space-md);
+}
+
+.snapshot-card-files {
+    display: flex;
+    gap: 8px;
+    margin-bottom: var(--space-lg);
+    flex-wrap: wrap;
+}
+
+.snapshot-file-badge {
+    font-size: 0.65rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.snapshot-file-badge.vpx { background: rgba(168, 85, 247, 0.12); color: var(--accent-purple); border-color: rgba(168, 85, 247, 0.2); }
+.snapshot-file-badge.vbs { background: rgba(79, 140, 255, 0.12); color: var(--accent-blue); border-color: rgba(79, 140, 255, 0.2); }
+.snapshot-file-badge.pup { background: rgba(16, 185, 129, 0.12); color: var(--accent-emerald); border-color: rgba(16, 185, 129, 0.2); }
+
+.snapshot-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+}
+
+.snapshot-drawer-footer {
+    padding: var(--space-lg) var(--space-xl);
+    border-top: 1px solid var(--glass-border);
+    background: rgba(0, 0, 0, 0.25);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1050;
+    backdrop-filter: blur(3px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-base);
+}
+
+.drawer-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* ── Enhanced Snapshot Timeline ────────────────────────────────── */
+.snapshot-timeline {
+    position: relative;
+    padding-left: 32px;
+}
+
+.snapshot-timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--accent-blue) 0%, var(--accent-purple) 100%);
+    opacity: 0.3;
+    border-radius: var(--radius-full);
+}
+
+.snapshot-card {
+    position: relative;
+}
+
+.snapshot-card::after {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 24px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    border: 3px solid var(--accent-blue);
+    box-shadow: 0 0 10px var(--accent-blue-glow);
+    z-index: 2;
+}
+
+.snapshot-card.auto-backup::after {
+    border-color: var(--accent-purple);
+    box-shadow: 0 0 10px var(--accent-purple-glow);
+}
+
+.snapshot-card-time {
+    font-size: 0.8rem;
+    color: var(--accent-blue);
+    margin-bottom: 4px;
+    font-family: monospace;
+}
+
+.snapshot-confirm-btn {
+    background: var(--accent-red) !important;
+    color: white !important;
+    border: none !important;
+    animation: pulse 1.5s infinite;
 }
