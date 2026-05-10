@@ -31,29 +31,40 @@ class SnapshotService:
         
         # 1. Core Table Files in root
         stem = Path(table["filename"]).stem
-        for ext in [".vpx", ".vbs", ".pov", ".ini"]:
+        # Include VPX, VBS, POV, INI, and now Backglass/RES files
+        for ext in [".vpx", ".vbs", ".pov", ".ini", ".directb2s", ".res"]:
             p = table_dir / f"{stem}{ext}"
             if p.exists():
                 files_to_backup.append(p)
 
-        # 2. PuP Pack "Brain"
+        # 2. PinMAME Support Files (ROMs, NVRAM, etc.)
+        pinmame_dir = table_dir / "pinmame"
+        if pinmame_dir.exists():
+            # We backup the actual files, but skip some logs/temp if they exist
+            for sub in ["roms", "nvram", "altcolor", "altsound", "ini", "cfg"]:
+                sub_path = pinmame_dir / sub
+                if sub_path.exists():
+                    for f in sub_path.rglob("*"):
+                        if f.is_file() and not f.name.endswith(".log"):
+                            files_to_backup.append(f)
+
+        # 3. PuP Pack Configuration
         pup_dir = table_dir / "pupvideos"
         if pup_dir.exists():
-            # Find the specific table folder in pupvideos
-            # Often it matches the stem or is a subfolder
             for sub in pup_dir.iterdir():
                 if sub.is_dir():
-                    # Check for screens.pup
-                    screens_pup = sub / "screens.pup"
-                    if screens_pup.exists():
-                        files_to_backup.append(screens_pup)
-                        # Also grab script.pup and .bat files
-                        script_pup = sub / "script.pup"
-                        if script_pup.exists():
-                            files_to_backup.append(script_pup)
-                        
-                        for bat in sub.glob("*.bat"):
-                            files_to_backup.append(bat)
+                    # Backup all config/script files, but EXCLUDE large mp4/video media
+                    config_extensions = [".pup", ".bat", ".json", ".txt", ".vbs", ".ini"]
+                    for f in sub.rglob("*"):
+                        if f.is_file() and f.suffix.lower() in config_extensions:
+                            files_to_backup.append(f)
+
+        # 4. Music folder
+        music_dir = table_dir / "music"
+        if music_dir.exists():
+            for f in music_dir.rglob("*"):
+                if f.is_file():
+                    files_to_backup.append(f)
 
         if not files_to_backup:
             return {"success": False, "error": "No files found to backup"}
