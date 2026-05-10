@@ -592,9 +592,11 @@ PupPackManagerPage.renderLayoutPanel = function() {
                 <div style="margin-bottom: 1rem;">
                     <label class="input-label">Target Physical Monitor</label>
                     <select class="input-field" id="pup-monitor-select" onchange="PupPackManagerPage.updatePreview()">
-                        ${this.state.globalDisplays.map(d => `
-                            <option value="${d.index}" ${d.index === s_val ? 'selected' : ''}>Monitor ${d.index} (${d.width}x${d.height} ${d.role || ''})</option>
-                        `).join('')}
+                        ${this.state.globalDisplays.map(d => {
+                            const role = d.role || 'Monitor';
+                            const label = `${role}: ${d.width}x${d.height} (Monitor ${d.index})`;
+                            return `<option value="${d.index}" ${d.index === s_val ? 'selected' : ''}>${this.escHtml(label)}</option>`;
+                        }).join('')}
                     </select>
                 </div>
 
@@ -603,7 +605,8 @@ PupPackManagerPage.renderLayoutPanel = function() {
                     <select class="input-field" id="pup-preset" onchange="PupPackManagerPage.applyPreset()">
                         <option value="custom" ${!isLegacyFill ? 'selected' : ''}>Custom (Drag / Manual)</option>
                         <option value="fill" ${isLegacyFill ? 'selected' : ''}>Fill Monitor</option>
-                        <option value="center">Center (16:9 Ratio)</option>
+                        <option value="center_169">Center (16:9 Ratio - 60%)</option>
+                        <option value="center_60">Center (60% Size)</option>
                         <option value="top">Top Half</option>
                         <option value="bottom">Bottom Half</option>
                     </select>
@@ -611,28 +614,30 @@ PupPackManagerPage.renderLayoutPanel = function() {
 
                 <div id="pup-custom-fields" style="display: flex; flex-direction: column; gap: 1.25rem; padding-top: 1.25rem; border-top: 1px dashed var(--border-color);">
                     <div style="display: flex; align-items: center; gap: 1rem;">
-                        <label class="input-label" style="width: 40px; margin: 0; font-size: 0.75rem;">X (%)</label>
+                        <label class="input-label" style="width: 65px; margin: 0; font-size: 0.75rem;">X-Offset</label>
                         <input type="range" min="0" max="100" step="1" class="input-range" id="pup-x-pct" value="${Math.round(x_val)}" style="flex: 1;" oninput="PupPackManagerPage.updatePreview()">
-                        <span id="pup-x-pct-display" style="width: 32px; font-size: 0.85rem; font-weight: 700; color: var(--accent-blue); text-align: right;">${Math.round(x_val)}</span>
+                        <span style="width: 45px; font-size: 0.85rem; font-weight: 700; color: var(--accent-blue); text-align: right;"><span id="pup-x-pct-display">${Math.round(x_val)}</span>%</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 1rem;">
-                        <label class="input-label" style="width: 40px; margin: 0; font-size: 0.75rem;">Y (%)</label>
+                        <label class="input-label" style="width: 65px; margin: 0; font-size: 0.75rem;">Y-Offset</label>
                         <input type="range" min="0" max="100" step="1" class="input-range" id="pup-y-pct" value="${Math.round(y_val)}" style="flex: 1;" oninput="PupPackManagerPage.updatePreview()">
-                        <span id="pup-y-pct-display" style="width: 32px; font-size: 0.85rem; font-weight: 700; color: var(--accent-blue); text-align: right;">${Math.round(y_val)}</span>
+                        <span style="width: 45px; font-size: 0.85rem; font-weight: 700; color: var(--accent-blue); text-align: right;"><span id="pup-y-pct-display">${Math.round(y_val)}</span>%</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 1rem;">
-                        <label class="input-label" style="width: 40px; margin: 0; font-size: 0.75rem;">W (%)</label>
+                        <label class="input-label" style="width: 65px; margin: 0; font-size: 0.75rem;">Width</label>
                         <input type="range" min="0" max="100" step="1" class="input-range" id="pup-w-pct" value="${Math.round(w_val)}" style="flex: 1;" oninput="PupPackManagerPage.updatePreview()">
-                        <span id="pup-w-pct-display" style="width: 32px; font-size: 0.85rem; font-weight: 700; color: var(--accent-blue); text-align: right;">${Math.round(w_val)}</span>
+                        <span style="width: 45px; font-size: 0.85rem; font-weight: 700; color: var(--accent-blue); text-align: right;"><span id="pup-w-pct-display">${Math.round(w_val)}</span>%</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 1rem;">
-                        <label class="input-label" style="width: 40px; margin: 0; font-size: 0.75rem;">H (%)</label>
+                        <label class="input-label" style="width: 65px; margin: 0; font-size: 0.75rem;">Height</label>
                         <input type="range" min="0" max="100" step="1" class="input-range" id="pup-h-pct" value="${Math.round(h_val)}" style="flex: 1;" oninput="PupPackManagerPage.updatePreview()">
-                        <span id="pup-h-pct-display" style="width: 32px; font-size: 0.85rem; font-weight: 700; color: var(--accent-blue); text-align: right;">${Math.round(h_val)}</span>
+                        <span style="width: 45px; font-size: 0.85rem; font-weight: 700; color: var(--accent-blue); text-align: right;"><span id="pup-h-pct-display">${Math.round(h_val)}</span>%</span>
                     </div>
-                </div>
-                <div id="pup-pixel-helper" style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-tertiary); text-align: right; background: var(--bg-deep); padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-color);">
-                    Pixel Output: <strong id="pup-px-val" style="color: var(--text-secondary);">${px_x}</strong>x<strong id="pup-py-val" style="color: var(--text-secondary);">${px_y}</strong> px
+                    
+                    <button class="btn btn-secondary btn-sm" onclick="PupPackManagerPage.centerManualElement()" style="margin-top: 0.5rem; justify-content: center; font-size: 0.75rem;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                        Center Element on Monitor
+                    </button>
                 </div>
             </div>
         </div>
@@ -676,20 +681,23 @@ PupPackManagerPage.applyPreset = function() {
 
     if (preset === 'fill') {
         // Full screen 0,0,100,100
-    } else if (preset === 'center') {
+    } else if (preset === 'center_169') {
         const targetRatio = 16 / 9;
         const monitorRatio = mw / mh;
+        let baseW, baseH;
         if (monitorRatio > targetRatio) {
-            w = (mh * targetRatio / mw) * 100;
-            h = 100;
-            x = (100 - w) / 2;
-            y = 0;
+            baseW = (mh * targetRatio / mw) * 100;
+            baseH = 100;
         } else {
-            w = 100;
-            h = (mw / targetRatio / mh) * 100;
-            x = 0;
-            y = (100 - h) / 2;
+            baseW = 100;
+            baseH = (mw / targetRatio / mh) * 100;
         }
+        w = baseW * 0.6;
+        h = baseH * 0.6;
+        x = (100 - w) / 2;
+        y = (100 - h) / 2;
+    } else if (preset === 'center_60') {
+        w = 60; h = 60; x = 20; y = 20;
     } else if (preset === 'top') {
         x = 0; y = 0; w = 100; h = 50;
     } else if (preset === 'bottom') {
@@ -702,6 +710,20 @@ PupPackManagerPage.applyPreset = function() {
     document.getElementById('pup-h-pct').value = Math.round(h);
 
     this.updatePreview();
+};
+
+PupPackManagerPage.centerManualElement = function() {
+    const w = parseFloat(document.getElementById('pup-w-pct').value) || 0;
+    const h = parseFloat(document.getElementById('pup-h-pct').value) || 0;
+    
+    const x = (100 - w) / 2;
+    const y = (100 - h) / 2;
+    
+    document.getElementById('pup-x-pct').value = Math.round(x);
+    document.getElementById('pup-y-pct').value = Math.round(y);
+    
+    this.updatePreview();
+    Toast.success('Element centered on monitor');
 };
 
 PupPackManagerPage.updatePreview = function() {
@@ -811,12 +833,6 @@ PupPackManagerPage.updatePreview = function() {
     const px_y = (y_pct / 100) * mh;
     const px_w = (w_pct / 100) * mw;
     const px_h = (h_pct / 100) * mh;
-
-    // Update pixel helper text
-    const pxVal = document.getElementById('pup-px-val');
-    const pyVal = document.getElementById('pup-py-val');
-    if (pxVal) pxVal.textContent = Math.round(px_x);
-    if (pyVal) pyVal.textContent = Math.round(px_y);
 
     const isCustom = document.getElementById('pup-preset').value === 'custom';
     const cursorStyle = isCustom ? 'cursor: move;' : '';
