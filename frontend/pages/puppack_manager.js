@@ -1003,6 +1003,8 @@ PupPackManagerPage.initDragDrop = function() {
     let startX, startY;
     let startBoxX, startBoxY, startBoxW, startBoxH;
 
+    let lockAxis = null;
+
     workspace.addEventListener('mousedown', (e) => {
         if (e.target.classList.contains('resize-handle')) {
             isResizing = true;
@@ -1017,6 +1019,7 @@ PupPackManagerPage.initDragDrop = function() {
 
         startX = e.clientX;
         startY = e.clientY;
+        lockAxis = null;
 
         const s_val = parseInt(document.getElementById('pup-monitor-select').value);
         const monitor = this.state.globalDisplays.find(d => d.index === s_val);
@@ -1061,8 +1064,22 @@ PupPackManagerPage.initDragDrop = function() {
         const scale = Math.min(availW / totalW, availH / totalH);
 
         // Convert pixel movement to native monitor coordinates
-        const dx = (e.clientX - startX) / scale;
-        const dy = (e.clientY - startY) / scale;
+        let moveX = (e.clientX - startX) / scale;
+        let moveY = (e.clientY - startY) / scale;
+
+        // Axis locking with Shift key
+        if (isDragging && e.shiftKey) {
+            if (!lockAxis) {
+                // Determine lock direction after a small movement threshold
+                if (Math.abs(moveX) > 5 || Math.abs(moveY) > 5) {
+                    lockAxis = Math.abs(moveX) > Math.abs(moveY) ? 'x' : 'y';
+                }
+            }
+            if (lockAxis === 'x') moveY = 0;
+            else if (lockAxis === 'y') moveX = 0;
+        } else {
+            lockAxis = null;
+        }
 
         const s_val = parseInt(document.getElementById('pup-monitor-select').value);
         const monitor = this.state.globalDisplays.find(d => d.index === s_val);
@@ -1083,11 +1100,11 @@ PupPackManagerPage.initDragDrop = function() {
         const { w: mw, h: mh } = _getEffSize(monitor);
 
         if (isDragging) {
-            newPxX = startBoxX + dx;
-            newPxY = startBoxY + dy;
+            newPxX = startBoxX + moveX;
+            newPxY = startBoxY + moveY;
         } else if (isResizing) {
-            newPxW = Math.max(10, startBoxW + dx);
-            newPxH = Math.max(10, startBoxH + dy);
+            newPxW = Math.max(10, startBoxW + moveX);
+            newPxH = Math.max(10, startBoxH + moveY);
         }
 
         // Convert back to percentages for the input fields
