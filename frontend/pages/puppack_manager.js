@@ -50,10 +50,16 @@ const PupPackManagerPage = {
 
     async loadTables(selectId = null) {
         try {
-            const res = await fetch('/api/puppacks');
-            const data = await res.json();
+            const [pupRes, settingsRes] = await Promise.all([
+                fetch('/api/puppacks'),
+                fetch('/api/settings')
+            ]);
+            const data = await pupRes.json();
+            const settings = await settingsRes.json();
 
             this.state.tables = data.tables;
+            this.state.master_orientation = settings.master_orientation || '';
+            this.state.displayAssignments = settings.displays || [];
             this.renderTableList();
 
             if (selectId) {
@@ -427,6 +433,7 @@ PupPackManagerPage.openLayoutModal = async function(id) {
         const res = await fetch('/api/settings');
         const settings = await res.json();
         this.state.globalDisplays = settings.displays || [];
+        this.state.master_orientation = settings.master_orientation || '';
     } catch(e) {
         Toast.error("Failed to load display settings.");
         return;
@@ -655,8 +662,15 @@ PupPackManagerPage.applyPreset = function() {
     const monitor = this.state.globalDisplays.find(d => d.index === s_val);
     if (!monitor) return;
 
-    const mw = monitor.width;
-    const mh = monitor.height;
+    const _getEffSize = (d) => {
+        let w = d.width, h = d.height;
+        if (d.role === 'Playfield' && (this.state.master_orientation === '90' || this.state.master_orientation === '270')) {
+            w = d.height; h = d.width;
+        }
+        return { w, h };
+    };
+
+    const { w: mw, h: mh } = _getEffSize(monitor);
 
     let x = 0, y = 0, w = 100, h = 100;
 
@@ -695,15 +709,24 @@ PupPackManagerPage.updatePreview = function() {
     if (!workspace) return;
     workspace.innerHTML = '';
 
+    const _getEffSize = (d) => {
+        let w = d.width, h = d.height;
+        if (d.role === 'Playfield' && (this.state.master_orientation === '90' || this.state.master_orientation === '270')) {
+            w = d.height; h = d.width;
+        }
+        return { w, h };
+    };
+
     // 1. Calculate the bounding box of all monitors
     let minX = 0, minY = 0, maxX = 0, maxY = 0;
     this.state.globalDisplays.forEach(d => {
+        const { w, h } = _getEffSize(d);
         const x = d.x || 0;
         const y = d.y || 0;
         if (x < minX) minX = x;
         if (y < minY) minY = y;
-        if (x + d.width > maxX) maxX = x + d.width;
-        if (y + d.height > maxY) maxY = y + d.height;
+        if (x + w > maxX) maxX = x + w;
+        if (y + h > maxY) maxY = y + h;
     });
 
     const totalW = maxX - minX;
@@ -726,16 +749,18 @@ PupPackManagerPage.updatePreview = function() {
 
     // 2. Draw monitors
     this.state.globalDisplays.forEach(d => {
+        const { w, h } = _getEffSize(d);
         const mx = ((d.x || 0) - minX) * scale;
         const my = ((d.y || 0) - minY) * scale;
         const label = d.role ? `${d.role} (M${d.index})` : `Monitor ${d.index}`;
+        const orientLabel = (d.role === 'Playfield' && (this.state.master_orientation === '90' || this.state.master_orientation === '270')) ? ' (Portrait)' : '';
 
         workspace.insertAdjacentHTML('beforeend', `
             <div class="monitor-label" style="position: absolute; left: ${mx}px; top: ${my - 24}px; padding: 2px 8px; background: rgba(30, 30, 46, 0.8); backdrop-filter: blur(4px); border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.1); font-size: 10px; color: #a6adc8; font-weight: 700; white-space: nowrap; pointer-events: none; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-                ${this.escHtml(label)}
+                ${this.escHtml(label + orientLabel)}
             </div>
-            <div style="position: absolute; left: ${mx}px; top: ${my}px; width: ${d.width * scale}px; height: ${d.height * scale}px; border: 1px solid #313244; background: #11111b; display: flex; align-items: center; justify-content: center; color: #45475a; font-size: ${Math.max(10, 11 * scale)}px; font-weight: 500; border-radius: 4px; box-sizing: border-box; overflow: hidden;">
-                ${d.width}x${d.height}
+            <div style="position: absolute; left: ${mx}px; top: ${my}px; width: ${w * scale}px; height: ${h * scale}px; border: 1px solid #313244; background: #11111b; display: flex; align-items: center; justify-content: center; color: #45475a; font-size: ${Math.max(10, 11 * scale)}px; font-weight: 500; border-radius: 4px; box-sizing: border-box; overflow: hidden;">
+                ${w}x${h}
             </div>
         `);
     });
@@ -744,6 +769,8 @@ PupPackManagerPage.updatePreview = function() {
     const s_val = parseInt(document.getElementById('pup-monitor-select')?.value);
     const monitor = this.state.globalDisplays.find(d => d.index === s_val);
     if (!monitor) return;
+
+    const { w: mw, h: mh } = _getEffSize(monitor);
 
     const mx = ((monitor.x || 0) - minX) * scale;
     const my = ((monitor.y || 0) - minY) * scale;
@@ -780,10 +807,10 @@ PupPackManagerPage.updatePreview = function() {
     if (hDisp) hDisp.textContent = Math.round(h_pct);
 
     // Convert back to pixels for the CSS preview
-    const px_x = (x_pct / 100) * monitor.width;
-    const px_y = (y_pct / 100) * monitor.height;
-    const px_w = (w_pct / 100) * monitor.width;
-    const px_h = (h_pct / 100) * monitor.height;
+    const px_x = (x_pct / 100) * mw;
+    const px_y = (y_pct / 100) * mh;
+    const px_w = (w_pct / 100) * mw;
+    const px_h = (h_pct / 100) * mh;
 
     // Update pixel helper text
     const pxVal = document.getElementById('pup-px-val');
@@ -868,10 +895,19 @@ PupPackManagerPage.initDragDrop = function() {
         const s_val = parseInt(document.getElementById('pup-monitor-select').value);
         const monitor = this.state.globalDisplays.find(d => d.index === s_val);
 
-        startBoxX = (parseFloat(document.getElementById('pup-x-pct').value) / 100) * monitor.width;
-        startBoxY = (parseFloat(document.getElementById('pup-y-pct').value) / 100) * monitor.height;
-        startBoxW = (parseFloat(document.getElementById('pup-w-pct').value) / 100) * monitor.width;
-        startBoxH = (parseFloat(document.getElementById('pup-h-pct').value) / 100) * monitor.height;
+        const _getEffSize = (d) => {
+            let w = d.width, h = d.height;
+            if (d.role === 'Playfield' && (this.state.master_orientation === '90' || this.state.master_orientation === '270')) {
+                w = d.height; h = d.width;
+            }
+            return { w, h };
+        };
+        const { w: mw, h: mh } = _getEffSize(monitor);
+
+        startBoxX = (parseFloat(document.getElementById('pup-x-pct').value) / 100) * mw;
+        startBoxY = (parseFloat(document.getElementById('pup-y-pct').value) / 100) * mh;
+        startBoxW = (parseFloat(document.getElementById('pup-w-pct').value) / 100) * mw;
+        startBoxH = (parseFloat(document.getElementById('pup-h-pct').value) / 100) * mh;
     });
 
     window.addEventListener('mousemove', (e) => {
@@ -911,6 +947,15 @@ PupPackManagerPage.initDragDrop = function() {
         let newPxW = startBoxW;
         let newPxH = startBoxH;
 
+        const _getEffSize = (d) => {
+            let w = d.width, h = d.height;
+            if (d.role === 'Playfield' && (this.state.master_orientation === '90' || this.state.master_orientation === '270')) {
+                w = d.height; h = d.width;
+            }
+            return { w, h };
+        };
+        const { w: mw, h: mh } = _getEffSize(monitor);
+
         if (isDragging) {
             newPxX = startBoxX + dx;
             newPxY = startBoxY + dy;
@@ -920,10 +965,10 @@ PupPackManagerPage.initDragDrop = function() {
         }
 
         // Convert back to percentages for the input fields
-        const x_pct = (newPxX / monitor.width) * 100;
-        const y_pct = (newPxY / monitor.height) * 100;
-        const w_pct = (newPxW / monitor.width) * 100;
-        const h_pct = (newPxH / monitor.height) * 100;
+        const x_pct = (newPxX / mw) * 100;
+        const y_pct = (newPxY / mh) * 100;
+        const w_pct = (newPxW / mw) * 100;
+        const h_pct = (newPxH / mh) * 100;
 
         document.getElementById('pup-x-pct').value = x_pct.toFixed(2);
         document.getElementById('pup-y-pct').value = y_pct.toFixed(2);
