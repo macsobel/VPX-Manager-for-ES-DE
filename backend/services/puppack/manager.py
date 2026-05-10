@@ -8,6 +8,22 @@ from typing import Optional, List, Dict
 
 logger = logging.getLogger("puppack_manager")
 
+SCREEN_NAME_MAP = {
+    "0": "Topper",
+    "1": "DMD",
+    "2": "Backglass",
+    "3": "Playfield",
+    "4": "Music",
+    "5": "FullDMD",
+    "6": "Select",
+    "7": "Audio",
+    "8": "Callouts",
+    "9": "GameInfo",
+    "10": "GameHelp",
+    "14": "Overlay",
+    "15": "Game"
+}
+
 class PupPackManager:
     @staticmethod
     def identify_options(pup_dir: Path) -> List[Dict]:
@@ -327,23 +343,20 @@ class PupPackManager:
             shutil.copy2(src_path, dst_path)
 
     @staticmethod
-    def get_active_screens(pup_dir: Path) -> List[Dict]:
-        """Parses screens.pup to find which screens are currently active/configured."""
+    def get_all_screens(pup_dir: Path) -> List[Dict]:
+        """Parses screens.pup to return ALL configuration rows."""
         screens = []
         screens_path = pup_dir / "screens.pup"
         
-        logger.info(f"Checking for screens.pup in {screens_path}")
         if not screens_path.exists():
-            logger.warning(f"screens.pup not found at {screens_path}")
             return screens
 
         try:
-            # Handle BOM and encoding
             content = ""
             try:
                 with open(screens_path, 'r', encoding='utf-16', errors='replace') as f:
                     content = f.read()
-                    if "ScreenNum" not in content: # Not UTF-16
+                    if "ScreenNum" not in content:
                         raise UnicodeError()
             except:
                 with open(screens_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -352,7 +365,6 @@ class PupPackManager:
             if not content:
                 return screens
 
-            # Remove BOM if present
             if content.startswith('\ufeff'):
                 content = content[1:]
 
@@ -361,34 +373,107 @@ class PupPackManager:
                 return screens
 
             reader = csv.DictReader(lines)
-            status_map = {
-                "1": "ForceBack",
-                "2": "ForcePop",
-                "3": "MusicOnly",
-                "4": "NoDisplay",
-                "5": "Background"
-            }
-            
-            for row in reader:
-                # Clean keys (remove BOM or spaces)
+            for i, row in enumerate(reader):
                 clean_row = {str(k).strip().lstrip('\ufeff'): v for k, v in row.items()}
-                status_raw = clean_row.get("Active", "").strip()
-                
-                # Filter out inactive screens
-                if not status_raw or status_raw == "0" or status_raw.lower() == "off":
-                    continue
-                
-                # Use mapped name if it's a known number
-                status_name = status_map.get(status_raw, status_raw)
+                screen_num = clean_row.get("ScreenNum", "").strip()
                 
                 screens.append({
+                    "id": i, # used for updating specific rows
+                    "screen_num": screen_num,
+                    "screen_name": SCREEN_NAME_MAP.get(screen_num, f"Screen {screen_num}"),
                     "description": clean_row.get("ScreenDes", "Unknown Screen"),
-                    "status": status_name
+                    "playlist": clean_row.get("PlayList", ""),
+                    "playfile": clean_row.get("PlayFile", ""),
+                    "loopit": clean_row.get("Loopit", ""),
+                    "active": clean_row.get("Active", ""),
+                    "priority": clean_row.get("Priority", ""),
+                    "custom_pos": clean_row.get("CustomPos", ""),
+                    "full_row": clean_row # keep the rest
                 })
-            logger.info(f"Found {len(screens)} active screens in {screens_path}")
         except Exception as e:
             logger.error(f"Error parsing screens.pup in {pup_dir}: {e}")
 
+        return screens
+
+    @staticmethod
+    def save_screens_pup(pup_dir: Path, screens: List[Dict]) -> bool:
+        """Writes the updated screens configuration back to screens.pup."""
+        screens_path = pup_dir / "screens.pup"
+        
+        # We need the original header to preserve columns
+        try:
+            content = ""
+            try:
+                with open(screens_path, 'r', encoding='utf-16', errors='replace') as f:
+                    content = f.read()
+                    if "ScreenNum" not in content:
+                        raise UnicodeError()
+            except:
+                with open(screens_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+            
+            if content.startswith('\ufeff'):
+                content = content[1:]
+            
+            header = content.splitlines()[0]
+            fieldnames = [f.strip().lstrip('\ufeff') for f in header.split(',')]
+            
+            with open(screens_path, 'w', encoding='utf-8', newline='') as f:
+                # Write BOM for compatibility
+                f.write('\ufeff')
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                
+                for s in screens:
+                    # Merge updated fields back into full_row or reconstruct
+                    row = s.get("full_row", {})
+                    row.update({
+                        "ScreenNum": s.get("screen_num"),
+                        "ScreenDes": s.get("description"),
+                        "Active": s.get("active"),
+                        "CustomPos": s.get("custom_pos"),
+                        "PlayList": s.get("playlist"),
+                        "PlayFile": s.get("playfile"),
+                        "Loopit": s.get("loopit"),
+                        "Priority": s.get("priority")
+                    })
+                    # Ensure only keys in fieldnames are written
+                    clean_row = {k: row.get(k, "") for k in fieldnames}
+                    writer.writerow(clean_row)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save screens.pup: {e}")
+            return False
+
+    @staticmethod
+    def get_active_screens(pup_dir: Path) -> List[Dict]:
+        """Parses screens.pup to find which screens are currently active/configured."""
+        screens = []
+        all_screens = PupPackManager.get_all_screens(pup_dir)
+        
+        status_map = {
+            "1": "ForceBack",
+            "2": "ForcePop",
+            "3": "MusicOnly",
+            "4": "NoDisplay",
+            "5": "Background"
+        }
+        
+        for s in all_screens:
+            status_raw = s["active"].strip()
+            
+            # Filter out inactive screens
+            if not status_raw or status_raw == "0" or status_raw.lower() == "off":
+                continue
+            
+            status_name = status_map.get(status_raw, status_raw)
+            
+            screens.append({
+                "description": s["description"],
+                "status": status_name,
+                "screen_name": s["screen_name"]
+            })
+        
         return screens
 
     @staticmethod

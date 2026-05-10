@@ -21,19 +21,19 @@ class ApplyOptionRequest(BaseModel):
 class ToggleVBSRequest(BaseModel):
     enable: bool
 
-class ScreenLayoutConfig(BaseModel):
-    screen: str  # e.g., "Topper", "DMD", "Backglass", "FullDMD"
-    enable: int
-    monitor_index: int
-    x: float
-    y: float
-    width: float
-    height: float
-    monitor_width: int = 0
-    monitor_height: int = 0
+class ScreenPupConfig(BaseModel):
+    id: int
+    screen_num: str
+    active: str
+    custom_pos: str
+    description: str = ""
+    playlist: str = ""
+    playfile: str = ""
+    loopit: str = ""
+    priority: str = ""
 
-class INIConfigRequest(BaseModel):
-    screens: List[ScreenLayoutConfig]
+class SaveScreensRequest(BaseModel):
+    screens: List[ScreenPupConfig]
 
 @router.get("")
 async def list_puppack_tables():
@@ -124,6 +124,38 @@ async def get_puppack_options(table_id: int):
         "pup_dir": str(pup_dir.name)
     }
 
+@router.get("/{table_id}/screens")
+async def get_all_puppack_screens(table_id: int):
+    """Returns all rows from screens.pup for editing."""
+    table = await db.get_table(table_id)
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    table_dir = Path(table["folder_path"])
+    pup_dir = resolve_pup_root(table_dir / "pupvideos")
+
+    screens = pup_pack_manager.get_all_screens(pup_dir)
+    return {"screens": screens}
+
+@router.post("/{table_id}/screens")
+async def save_puppack_screens(table_id: int, req: SaveScreensRequest):
+    """Saves the entire screens.pup configuration."""
+    table = await db.get_table(table_id)
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    table_dir = Path(table["folder_path"])
+    pup_dir = resolve_pup_root(table_dir / "pupvideos")
+
+    # Convert Pydantic models to dicts
+    screens_data = [s.dict() for s in req.screens]
+    
+    success = pup_pack_manager.save_screens_pup(pup_dir, screens_data)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to save screens.pup")
+
+    return {"success": True}
+
 @router.get("/{table_id}/vbs-status")
 async def get_puppack_vbs_status(table_id: int):
     """Returns the VBS PuP Pack toggle status for a table."""
@@ -193,100 +225,6 @@ async def toggle_puppack_vbs(table_id: int, req: ToggleVBSRequest):
     except Exception as e:
         logger.error(f"Failed to toggle PuP Pack in VBS: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/{table_id}/ini-config")
-async def get_puppack_ini_config(table_id: int):
-    """Returns the parsed PuP Pack configuration from the table's INI file."""
-    table = await db.get_table(table_id)
-    if not table:
-        raise HTTPException(status_code=404, detail="Table not found")
-
-    vpx_path = Path(table["folder_path"]) / table["filename"]
-    ini_path = vpx_path.with_suffix(".ini")
-
-    from backend.services.puppack.ini_helper import read_puppack_ini_config
-    config = read_puppack_ini_config(ini_path)
-
-    return {"config": config}
-
-@router.post("/{table_id}/ini-config")
-async def save_puppack_ini_config(table_id: int, req: INIConfigRequest):
-    """Saves the PuP Pack screen layout to the table's INI file."""
-    from backend.services.puppack.ini_helper import update_puppack_ini_config
-    from backend.core.display_utils import get_effective_rotation
-    from backend.routers.ini_manager import apply_flexdmd_patch
-    from backend.core.config import config
-
-    table = await db.get_table(table_id)
-    if not table:
-        raise HTTPException(status_code=404, detail="Table not found")
-
-    vpx_path = Path(table["folder_path"]) / table["filename"]
-    ini_path = vpx_path.with_suffix(".ini")
-
-    # If INI doesn't exist, generate a default one first
-    if not ini_path.exists():
-        try:
-            rot = get_effective_rotation(config.master_orientation)
-            content = f"[Player]\nRotation = {rot}\nCabinetAutofitMode = 1\nCabinetAutofitPos = 0.1\n\n[Standalone]\n"
-            with open(ini_path, "w", encoding="utf-8") as f:
-                f.write(content)
-        except Exception as e:
-            logger.error(f"Failed to generate base INI for table {table_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate base INI file")
-
-    config_updates = {}
-
-    # Plugin enable
-    config_updates["Enable"] = 1
-
-    # Map our screen names to VPX's pad prefix
-    SCREEN_TO_PREFIX = {
-        "Backglass": "BGPad",
-        "DMD": "SVPad",       # VPX calls this "Score View"
-        "FullDMD": "SVPad",   # Same as DMD in VPX
-    }
-
-    # Track which prefixes we've already written (DMD and FullDMD both map to SVPad)
-    written_prefixes = set()
-
-    for screen_config in req.screens:
-        prefix = SCREEN_TO_PREFIX.get(screen_config.screen)
-        if not prefix or prefix in written_prefixes:
-            continue
-        written_prefixes.add(prefix)
-
-        if screen_config.enable and screen_config.monitor_width > 0 and screen_config.monitor_height > 0:
-            # Convert X, Y, Width, Height → Pad{Left, Top, Right, Bottom}
-            x = int(screen_config.x)
-            y = int(screen_config.y)
-            w = int(screen_config.width)
-            h = int(screen_config.height)
-            mw = screen_config.monitor_width
-            mh = screen_config.monitor_height
-
-            config_updates[f"{prefix}Left"] = x
-            config_updates[f"{prefix}Top"] = y
-            config_updates[f"{prefix}Right"] = max(0, mw - x - w)
-            config_updates[f"{prefix}Bottom"] = max(0, mh - y - h)
-        else:
-            # Disabled — set all pads to full monitor size (hides the screen)
-            config_updates[f"{prefix}Left"] = 0
-            config_updates[f"{prefix}Top"] = 0
-            config_updates[f"{prefix}Right"] = 0
-            config_updates[f"{prefix}Bottom"] = 0
-
-    success = update_puppack_ini_config(ini_path, config_updates)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to save INI configuration")
-
-    # Automatically apply FlexDMD patch while we are at it
-    try:
-        apply_flexdmd_patch(ini_path, Path(table["folder_path"]), table["filename"])
-    except Exception as e:
-        logger.warning(f"Failed to apply FlexDMD patch while saving PuP config: {e}")
-
-    return {"success": True, "message": "Screen layout saved successfully."}
 
 @router.post("/{table_id}/apply")
 async def apply_puppack_option(table_id: int, req: ApplyOptionRequest):

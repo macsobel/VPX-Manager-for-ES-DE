@@ -3384,3 +3384,42 @@ input:checked + .slider:before {
     border-radius: 50%;
 }
 
+
+/* ── Range Sliders ─────────────────────────────────────────────── */
+.input-range {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    background: var(--bg-surface);
+    border-radius: 3px;
+    outline: none;
+    transition: background 0.2s;
+    border: 1px solid var(--border-color);
+}
+
+.input-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--accent-blue);
+    cursor: pointer;
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--accent-blue-glow);
+    border: 2px solid #fff;
+    transition: transform 0.1s ease;
+}
+
+.input-range::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.input-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--accent-blue);
+    cursor: pointer;
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--accent-blue-glow);
+    border: 2px solid #fff;
+}
