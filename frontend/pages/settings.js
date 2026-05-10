@@ -204,15 +204,11 @@ const SettingsPage = {
                             </div>
                         </div>
                         <div class="input-group">
-                            <label class="input-label">DMD / FullDMD Display</label>
+                            <label class="input-label">DMD Display</label>
                             <div id="select-container-DMD_FullDMD" style="display: flex; flex-direction: column; gap: var(--space-xs);">
                                 <select class="input-field display-role-select" data-role="DMD_FullDMD">
                                     ${renderDisplayOptions(getSavedUuid('DMD') || getSavedUuid('FullDMD'))}
                                 </select>
-                                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; color: var(--text-secondary);">
-                                    <input type="checkbox" id="setting-dmd-enabled" ${data.dmd_enabled !== false ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: var(--accent-blue);">
-                                    Enable DMD / FullDMD Display
-                                </label>
                             </div>
                         </div>
                     </div>
@@ -256,18 +252,11 @@ const SettingsPage = {
                         `;
                         
                         if (role === 'DMD_FullDMD') {
-                            // Don't overwrite the checkbox label
                             const select = container.querySelector('select');
                             if (select) {
                                 select.innerHTML = renderDisplayOptions(selectedUuid);
                             } else {
-                                // Fallback
-                                container.innerHTML = selectHtml + (container.innerHTML.includes('type="checkbox"') ? '' : `
-                                    <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; color: var(--text-secondary);">
-                                        <input type="checkbox" id="setting-dmd-enabled" ${data.dmd_enabled !== false ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: var(--accent-blue);">
-                                        Enable DMD / FullDMD Display
-                                    </label>
-                                `);
+                                container.innerHTML = selectHtml;
                             }
                         } else {
                             container.innerHTML = selectHtml;
@@ -283,16 +272,6 @@ const SettingsPage = {
                 await this.saveDisplays();
             };
 
-            // Auto-uncheck DMD enabled when monitor is set to "None Assigned"
-            const dmdSelect = document.querySelector('.display-role-select[data-role="DMD_FullDMD"]');
-            if (dmdSelect) {
-                dmdSelect.addEventListener('change', () => {
-                    const checkbox = document.getElementById('setting-dmd-enabled');
-                    if (checkbox && !dmdSelect.value) {
-                        checkbox.checked = false;
-                    }
-                });
-            }
 
             // Bind the Identify Displays button with proper event handling
             const identifyBtn = document.getElementById('btn-identify-displays');
@@ -348,7 +327,7 @@ const SettingsPage = {
                 body: JSON.stringify({ 
                     displays: displaysConfig,
                     master_orientation: document.getElementById('setting-master-orientation')?.value || '',
-                    dmd_enabled: document.getElementById('setting-dmd-enabled')?.checked
+                    dmd_enabled: !!(Array.from(selects).find(s => s.dataset.role === 'DMD_FullDMD')?.value)
                 }),
             });
             Toast.success('Display assignments saved');

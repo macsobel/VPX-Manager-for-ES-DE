@@ -1,4 +1,35 @@
 const PAD_PREFIX = { Backglass: 'bgpad', DMD: 'svpad' };
+const PUP_SCREEN_NAMES = {
+    "0": "Topper",
+    "1": "DMD",
+    "2": "Backglass",
+    "3": "Playfield",
+    "4": "Music",
+    "5": "FullDMD",
+    "6": "Select",
+    "7": "Audio",
+    "8": "Callouts",
+    "9": "GameInfo",
+    "10": "GameHelp",
+    "14": "Overlay",
+    "15": "Game"
+};
+
+const ROLE_TO_PUP_ID = {
+    "Topper": 0,
+    "DMD": 1,
+    "Backglass": 2,
+    "Playfield": 3,
+    "FullDMD": 5,
+    "Music": 4,
+    "Select": 6,
+    "Audio": 7,
+    "Callouts": 8,
+    "GameInfo": 9,
+    "GameHelp": 10,
+    "Overlay": 14,
+    "Game": 15
+};
 
 const PupPackManagerPage = {
     state: {
@@ -11,7 +42,7 @@ const PupPackManagerPage = {
         container.innerHTML = `
             <div class="page-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <h1 class="page-title">PUP Pack Manager (Beta)</h1>
+                    <h1 class="page-title">PUP Pack Manager</h1>
                     <p class="page-subtitle">Configure screen layouts and options for installed PUP Packs</p>
                 </div>
             </div>
@@ -173,22 +204,41 @@ const PupPackManagerPage = {
                     <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                         ${screens.map(s => {
                             const isActive = s.active && s.active !== '0' && s.active.toLowerCase() !== 'off';
+                            
+                            // Determine effective screen ID (CustomPos overrides ScreenNum)
+                            let effScreenNum = s.screen_num;
+                            if (s.custom_pos && s.custom_pos.includes(',')) {
+                                const parts = s.custom_pos.split(',');
+                                if (parts.length >= 1 && !isNaN(parseInt(parts[0]))) {
+                                    effScreenNum = parts[0].trim();
+                                }
+                            }
+                            
+                            const effScreenName = PUP_SCREEN_NAMES[effScreenNum] || `Screen ${effScreenNum}`;
+                            const physIdx = this.getPhysicalIndexFromPupId(effScreenNum);
+                            const screenLabel = `${effScreenName} (Monitor ${physIdx})`;
+                            
                             return `
-                                <div class="pup-element-row" style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-md); gap: 1rem;">
-                                    <div style="display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 0;">
+                                <div class="pup-element-row">
+                                    <div class="pup-element-info">
                                         <label class="switch" style="margin: 0; flex-shrink: 0;">
                                             <input type="checkbox" ${isActive ? 'checked' : ''} onchange="PupPackManagerPage.toggleScreen(${s.id}, this.checked)">
                                             <span class="slider round"></span>
                                         </label>
-                                        <div style="min-width: 0;">
-                                            <div style="display: flex; align-items: center; gap: 8px;">
-                                                <span class="badge" style="background: var(--accent-blue-subtle); color: var(--accent-blue); font-weight: 600; font-size: 0.7rem; padding: 2px 6px;">${this.escHtml(s.screen_name)}</span>
-                                                <span style="font-weight: 600; font-size: 0.9rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${this.escHtml(s.description || 'Unnamed Element')}</span>
+                                        <div style="min-width: 0; flex: 1;">
+                                            <div class="pup-element-labels">
+                                                <span class="badge" style="background: var(--accent-blue-subtle); color: var(--accent-blue); font-weight: 700; font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; white-space: nowrap;">${this.escHtml(s.description || 'Unnamed')}</span>
+                                                <span style="font-weight: 600; font-size: 0.9rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                                    ${this.escHtml(screenLabel)}
+                                                </span>
                                             </div>
-                                            <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                                Playlist: <span style="color: var(--text-secondary);">${this.escHtml(s.playlist || 'None')}</span> 
-                                                ${s.playfile ? `&bull; File: <span style="color: var(--text-secondary);">${this.escHtml(s.playfile)}</span>` : ''}
-                                            </div>
+                                            ${(s.playlist || s.playfile) ? `
+                                                <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                                    ${s.playlist ? `Playlist: <span style="color: var(--text-secondary);">${this.escHtml(s.playlist)}</span>` : ''}
+                                                    ${s.playlist && s.playfile ? ' &bull; ' : ''}
+                                                    ${s.playfile ? `File: <span style="color: var(--text-secondary);">${this.escHtml(s.playfile)}</span>` : ''}
+                                                </div>
+                                            ` : ''}
                                         </div>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
@@ -218,7 +268,7 @@ const PupPackManagerPage = {
             `;
         } else {
             optionsHtml = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
+                <div class="pup-options-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.25rem;">
                     ${options.map(opt => {
                         // Clean up the name
                         let cleanName = opt.name
@@ -260,12 +310,6 @@ const PupPackManagerPage = {
             `;
         }
 
-        headerControls += `
-            <button class="btn btn-secondary btn-sm" style="flex-shrink: 0; white-space: nowrap;" onclick="PupPackManagerPage.saveAllScreens()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                Save screens.pup
-            </button>
-        `;
 
         panel.innerHTML = `
             <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); background: var(--bg-tertiary); display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
@@ -395,11 +439,11 @@ PupPackManagerPage.toggleVbs = async function(enable) {
     }
 };
 
-PupPackManagerPage.toggleScreen = function(id, enabled) {
+PupPackManagerPage.toggleScreen = async function(id, enabled) {
     const screen = this.state.pupScreens.find(s => s.id === id);
     if (!screen) return;
     screen.active = enabled ? 'show' : 'off';
-    // No auto-save here, wait for manual save or save after mapping
+    await this.saveAllScreens();
 };
 
 PupPackManagerPage.saveAllScreens = async function() {
@@ -423,6 +467,43 @@ PupPackManagerPage.saveAllScreens = async function() {
     } catch (e) {
         Toast.error('Network error while saving.');
     }
+};
+
+PupPackManagerPage.getPhysicalIndexFromPupId = function(pupId) {
+    const role = PUP_SCREEN_NAMES[String(pupId)];
+    if (!role) return parseInt(pupId);
+    
+    // Find our assignment for this role in settings
+    const assignment = this.state.displayAssignments.find(a => a.role === role);
+    if (assignment) return parseInt(assignment.index);
+    
+    // Fallback: If no assignment, try to find a monitor that happens to have this index
+    // (though our indices might not match PUP's default indices)
+    return parseInt(pupId);
+};
+
+PupPackManagerPage.getPupIdFromPhysicalIndex = function(physIndex, originalPupId = null) {
+    // Get all roles assigned to this physical monitor
+    const assignments = this.state.displayAssignments.filter(a => parseInt(a.index) === parseInt(physIndex));
+    if (assignments.length === 0) return originalPupId !== null ? originalPupId : parseInt(physIndex);
+    
+    // If the element's original role is supported by this monitor, keep it
+    if (originalPupId !== null) {
+        const originalRole = PUP_SCREEN_NAMES[String(originalPupId)];
+        if (originalRole && assignments.some(a => a.role === originalRole)) {
+            return parseInt(originalPupId);
+        }
+    }
+    
+    // Otherwise, pick the "best" role for this monitor to determine the ID
+    // Prioritize Backglass/DMD/FullDMD
+    const priority = ["Backglass", "DMD", "FullDMD", "Topper", "Playfield"];
+    for (const p of priority) {
+        if (assignments.some(a => a.role === p)) return ROLE_TO_PUP_ID[p];
+    }
+    
+    // Last resort: pick the first one
+    return ROLE_TO_PUP_ID[assignments[0].role] ?? parseInt(physIndex);
 };
 
 PupPackManagerPage.openLayoutModal = async function(id) {
@@ -540,13 +621,17 @@ PupPackManagerPage.renderLayoutPanel = function() {
         } else {
             const parts = screen.custom_pos.split(',').map(p => p.trim());
             if (parts.length >= 5) {
-                s_val = parseInt(parts[0]) || 2;
+                const rawPupId = parts[0];
+                s_val = this.getPhysicalIndexFromPupId(rawPupId);
                 x_val = parseFloat(parts[1]) || 0;
                 y_val = parseFloat(parts[2]) || 0;
                 w_val = parseFloat(parts[3]) || 100;
                 h_val = parseFloat(parts[4]) || 100;
             }
         }
+    } else {
+        // Fallback: use screen_num if no custom_pos
+        s_val = this.getPhysicalIndexFromPupId(screen.screen_num);
     }
 
     // Convert percentages to pixels for the editor based on the target monitor
@@ -562,10 +647,6 @@ PupPackManagerPage.renderLayoutPanel = function() {
     let html = `
         <div style="margin-bottom: 1.5rem; background: var(--bg-secondary); padding: 1.25rem; border-radius: 10px; border: 1px solid var(--border-color); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);">
             <div style="display: flex; flex-direction: column; gap: 4px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary); font-weight: 700; width: 80px;">PUP Element</span>
-                    <span class="badge" style="background: var(--accent-blue-subtle); color: var(--accent-blue); font-weight: 700; font-size: 0.75rem; padding: 2px 8px;">${this.escHtml(screen.screen_name)}</span>
-                </div>
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <span style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary); font-weight: 700; width: 80px;">Description</span>
                     <span style="color: var(--text-primary); font-weight: 600; font-size: 0.95rem;">${this.escHtml(screen.description || 'No description provided')}</span>
@@ -592,11 +673,34 @@ PupPackManagerPage.renderLayoutPanel = function() {
                 <div style="margin-bottom: 1rem;">
                     <label class="input-label">Target Physical Monitor</label>
                     <select class="input-field" id="pup-monitor-select" onchange="PupPackManagerPage.updatePreview()">
-                        ${this.state.globalDisplays.map(d => {
-                            const role = d.role || 'Monitor';
-                            const label = `${role}: ${d.width}x${d.height} (Monitor ${d.index})`;
-                            return `<option value="${d.index}" ${d.index === s_val ? 'selected' : ''}>${this.escHtml(label)}</option>`;
-                        }).join('')}
+                        ${(() => {
+                            const grouped = [];
+                            this.state.globalDisplays.forEach(d => {
+                                let existing = grouped.find(g => g.index === d.index);
+                                if (existing) {
+                                    if (d.role && !existing.roles.includes(d.role)) {
+                                        existing.roles.push(d.role);
+                                    }
+                                } else {
+                                    grouped.push({
+                                        index: d.index,
+                                        width: d.width,
+                                        height: d.height,
+                                        roles: d.role ? [d.role] : []
+                                    });
+                                }
+                            });
+                            return grouped.map(m => {
+                                let w = m.width, h = m.height;
+                                if (m.roles.includes('Playfield') && (this.state.master_orientation === '90' || this.state.master_orientation === '270')) {
+                                    w = m.height; h = m.width;
+                                }
+                                let roleText = m.roles.length > 0 ? m.roles.join(' / ') : 'Monitor';
+                                if (m.roles.some(r => r.includes('DMD'))) roleText = 'DMD';
+                                const label = `${roleText}: ${w}x${h} (Monitor ${m.index})`;
+                                return `<option value="${m.index}" ${m.index === s_val ? 'selected' : ''}>${this.escHtml(label)}</option>`;
+                            }).join('');
+                        })()}
                     </select>
                 </div>
 
@@ -774,7 +878,8 @@ PupPackManagerPage.updatePreview = function() {
         const { w, h } = _getEffSize(d);
         const mx = ((d.x || 0) - minX) * scale;
         const my = ((d.y || 0) - minY) * scale;
-        const label = d.role ? `${d.role} (M${d.index})` : `Monitor ${d.index}`;
+        const roleName = d.role === 'FullDMD' ? 'DMD' : (d.role || `Monitor ${d.index}`);
+        const label = d.role ? `${roleName} (M${d.index})` : roleName;
         const orientLabel = (d.role === 'Playfield' && (this.state.master_orientation === '90' || this.state.master_orientation === '270')) ? ' (Portrait)' : '';
 
         workspace.insertAdjacentHTML('beforeend', `
@@ -852,14 +957,19 @@ PupPackManagerPage.updatePreview = function() {
     `);
 };
 
-PupPackManagerPage.saveLayout = function() {
+PupPackManagerPage.saveLayout = async function() {
     const id = this.state.editingScreenId;
     const screen = this.state.pupScreens.find(s => s.id === id);
     if (!screen) return;
 
-    const s = parseInt(document.getElementById('pup-monitor-select').value);
-    const monitor = this.state.globalDisplays.find(d => d.index === s);
-    if (!monitor) return;
+    const s_phys = parseInt(document.getElementById('pup-monitor-select').value);
+    
+    // Translate physical index back to PUP ID for the file
+    // We pass the screen.screen_num to help the helper decide if it's a shared monitor
+    const originalPupId = (screen.custom_pos && screen.custom_pos.includes(',')) 
+        ? screen.custom_pos.split(',')[0] 
+        : screen.screen_num;
+    const s_pup = this.getPupIdFromPhysicalIndex(s_phys, originalPupId);
 
     const x_pct = parseFloat(document.getElementById('pup-x-pct').value);
     const y_pct = parseFloat(document.getElementById('pup-y-pct').value);
@@ -867,7 +977,7 @@ PupPackManagerPage.saveLayout = function() {
     const h_pct = parseFloat(document.getElementById('pup-h-pct').value);
 
     // Format: S,X,Y,W,H
-    const customPos = `${s},${x_pct.toFixed(2)},${y_pct.toFixed(2)},${w_pct.toFixed(2)},${h_pct.toFixed(2)}`;
+    const customPos = `${s_pup},${Math.round(x_pct)},${Math.round(y_pct)},${Math.round(w_pct)},${Math.round(h_pct)}`;
 
     const preset = document.getElementById('pup-preset').value;
     
@@ -878,8 +988,8 @@ PupPackManagerPage.saveLayout = function() {
     }
 
     this.closeLayoutPanel();
-    Toast.info('Mapping updated. Click "Save screens.pup" to persist changes.');
     this.renderOptions(null, null, this.state.pupScreens); // partial refresh
+    await this.saveAllScreens();
 };
 
 

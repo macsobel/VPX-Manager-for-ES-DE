@@ -330,7 +330,7 @@ class PupPackManager:
                                     for i in range(1, 5):
                                         if parts[i]:
                                             val = float(parts[i])
-                                            parts[i] = str(round(val * scale_factor, 2)).rstrip('0').rstrip('.')
+                                            parts[i] = str(int(round(val * scale_factor)))
                                 except ValueError:
                                     pass
 
