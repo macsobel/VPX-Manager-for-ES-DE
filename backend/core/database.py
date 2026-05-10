@@ -24,6 +24,19 @@ def _expand_path(p: str | None) -> str:
     return os.path.expanduser(p)
 
 
+def _format_table_row(row: sqlite3.Row | dict | None) -> dict | None:
+    """Format a table row into a dictionary with expanded paths."""
+    if not row:
+        return None
+    res = dict(row)
+    if res.get("folder_path"):
+        res["folder_path"] = _expand_path(res["folder_path"])
+        res["vpx_path"] = str(Path(res["folder_path"]) / res["filename"])
+    else:
+        res["vpx_path"] = res.get("filename", "")
+    return res
+
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tables (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -372,15 +385,7 @@ async def get_tables(
 
         cursor = await db.execute(query, params)
         rows = await cursor.fetchall()
-        results = [dict(r) for r in rows]
-        for r in results:
-            if r.get("folder_path"):
-                r["folder_path"] = _expand_path(r["folder_path"])
-                # Add calculated full path for convenience
-                r["vpx_path"] = str(Path(r["folder_path"]) / r["filename"])
-            else:
-                r["vpx_path"] = r["filename"]
-        return results
+        return [_format_table_row(r) for r in rows if r]
     finally:
         await db.close()
 
@@ -390,15 +395,7 @@ async def get_table(table_id: int) -> dict | None:
     try:
         cursor = await db.execute("SELECT * FROM tables WHERE id = ?", (table_id,))
         row = await cursor.fetchone()
-        if not row:
-            return None
-        res = dict(row)
-        if res.get("folder_path"):
-            res["folder_path"] = _expand_path(res["folder_path"])
-            res["vpx_path"] = str(Path(res["folder_path"]) / res["filename"])
-        else:
-            res["vpx_path"] = res["filename"]
-        return res
+        return _format_table_row(row)
     finally:
         await db.close()
 
@@ -410,17 +407,10 @@ async def get_table_by_filename(filename: str) -> dict | None:
             "SELECT * FROM tables WHERE filename = ?", (filename,)
         )
         row = await cursor.fetchone()
-        if not row:
-            return None
-        res = dict(row)
-        if res.get("folder_path"):
-            res["folder_path"] = _expand_path(res["folder_path"])
-            res["vpx_path"] = str(Path(res["folder_path"]) / res["filename"])
-        else:
-            res["vpx_path"] = res["filename"]
-        return res
+        return _format_table_row(row)
     finally:
         await db.close()
+
 async def get_table_by_path(full_path: str) -> dict | None:
     """Find a table by its full absolute path."""
     p = Path(full_path).expanduser()
@@ -435,15 +425,7 @@ async def get_table_by_path(full_path: str) -> dict | None:
             (filename, folder_path),
         )
         row = await cursor.fetchone()
-        if not row:
-            return None
-        res = dict(row)
-        if res.get("folder_path"):
-            res["folder_path"] = _expand_path(res["folder_path"])
-            res["vpx_path"] = str(Path(res["folder_path"]) / res["filename"])
-        else:
-            res["vpx_path"] = res["filename"]
-        return res
+        return _format_table_row(row)
     finally:
         await db.close()
 
