@@ -315,6 +315,20 @@ class PupPackManager:
 
                     screen_num = str(row[screen_num_idx]).strip()
 
+                    # Translation logic: If we are on Screen 5, we want the CustomPos to target Screen 1
+                    # but we keep ScreenNum as 5 so PUP's internal indexing doesn't get confused.
+                    target_screen_override = None
+                    if screen_num == "5":
+                        target_screen_override = "1"
+                        
+                        # Update description to DMD for clarity if it's currently FullDMD
+                        try:
+                            desc_idx = clean_header.index("ScreenDes")
+                            if "FullDMD" in str(row[desc_idx]):
+                                row[desc_idx] = str(row[desc_idx]).replace("FullDMD", "DMD")
+                        except ValueError:
+                            pass
+
                     # CustomPos might spill into extra columns due to unquoted commas
                     custom_pos_parts = row[custom_pos_idx:]
                     custom_pos_str = ",".join(custom_pos_parts).strip()
@@ -322,6 +336,10 @@ class PupPackManager:
                     if custom_pos_str:
                         parts = [p.strip() for p in custom_pos_str.split(',')]
                         if len(parts) >= 5:
+                            # If we have an override (like 5 -> 1), apply it to the first part of CustomPos
+                            if target_screen_override and parts[0] == screen_num:
+                                parts[0] = target_screen_override
+                            
                             parts = parts[:5]
 
                             scale_factor = scale_map.get(screen_num, 1.0)
@@ -334,7 +352,9 @@ class PupPackManager:
                                 except ValueError:
                                     pass
 
-                            row = row[:custom_pos_idx] + parts
+                            # Join the parts back into a single string so the CSV writer 
+                            # treats it as a single quoted field.
+                            row = row[:custom_pos_idx] + [",".join(parts)]
 
                     writer.writerow(row)
 

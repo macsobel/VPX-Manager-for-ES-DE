@@ -81,16 +81,19 @@ const PupPackManagerPage = {
 
     async loadTables(selectId = null) {
         try {
-            const [pupRes, settingsRes] = await Promise.all([
+            const [pupRes, settingsRes, displaysRes] = await Promise.all([
                 fetch('/api/puppacks'),
-                fetch('/api/settings')
+                fetch('/api/settings'),
+                fetch('/api/displays')
             ]);
             const data = await pupRes.json();
             const settings = await settingsRes.json();
+            const displays = await displaysRes.json();
 
             this.state.tables = data.tables;
             this.state.master_orientation = settings.master_orientation || '';
             this.state.displayAssignments = settings.displays || [];
+            this.state.globalDisplays = displays.displays || [];
             this.renderTableList();
 
             if (selectId) {
@@ -216,7 +219,22 @@ const PupPackManagerPage = {
                             
                             const effScreenName = PUP_SCREEN_NAMES[effScreenNum] || `Screen ${effScreenNum}`;
                             const physIdx = this.getPhysicalIndexFromPupId(effScreenNum);
-                            const screenLabel = `${effScreenName} (Monitor ${physIdx})`;
+                            
+                            // Find the physical monitor to see its cabinet role
+                            const monitor = this.state.globalDisplays.find(d => parseInt(d.index) === physIdx);
+                            const cabRole = monitor ? monitor.role : null;
+                            
+                            let screenLabel = '';
+                            if (physIdx !== null) {
+                                if (cabRole && cabRole !== effScreenName) {
+                                    // It's a cross-mapping (e.g. FullDMD on a DMD-labeled monitor)
+                                    screenLabel = `${effScreenName} → Monitor ${physIdx} (${cabRole})`;
+                                } else {
+                                    screenLabel = `${effScreenName} (Monitor ${physIdx})`;
+                                }
+                            } else {
+                                screenLabel = `${effScreenName} — No Monitor Assigned`;
+                            }
                             
                             return `
                                 <div class="pup-element-row">
@@ -228,8 +246,8 @@ const PupPackManagerPage = {
                                         <div style="min-width: 0; flex: 1;">
                                             <div class="pup-element-labels">
                                                 <span class="badge" style="background: var(--accent-blue-subtle); color: var(--accent-blue); font-weight: 700; font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; white-space: nowrap;">${this.escHtml(s.description || 'Unnamed')}</span>
-                                                <span style="font-weight: 600; font-size: 0.9rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                                    ${this.escHtml(screenLabel)}
+                                                <span style="font-weight: 600; font-size: 0.9rem; color: ${physIdx !== null ? 'var(--text-primary)' : 'var(--accent-red)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                                    ${this.escHtml(physIdx !== null ? screenLabel : `${effScreenName} (Unassigned / No Monitor)`)}
                                                 </span>
                                             </div>
                                             ${(s.playlist || s.playfile) ? `
@@ -471,15 +489,13 @@ PupPackManagerPage.saveAllScreens = async function() {
 
 PupPackManagerPage.getPhysicalIndexFromPupId = function(pupId) {
     const role = PUP_SCREEN_NAMES[String(pupId)];
-    if (!role) return parseInt(pupId);
+    if (!role) return null;
     
     // Find our assignment for this role in settings
     const assignment = this.state.displayAssignments.find(a => a.role === role);
     if (assignment) return parseInt(assignment.index);
     
-    // Fallback: If no assignment, try to find a monitor that happens to have this index
-    // (though our indices might not match PUP's default indices)
-    return parseInt(pupId);
+    return null;
 };
 
 PupPackManagerPage.getPupIdFromPhysicalIndex = function(physIndex, originalPupId = null) {
@@ -622,7 +638,8 @@ PupPackManagerPage.renderLayoutPanel = function() {
             const parts = screen.custom_pos.split(',').map(p => p.trim());
             if (parts.length >= 5) {
                 const rawPupId = parts[0];
-                s_val = this.getPhysicalIndexFromPupId(rawPupId);
+                const foundIdx = this.getPhysicalIndexFromPupId(rawPupId);
+                s_val = foundIdx !== null ? foundIdx : (this.state.resolvedMonitor_Backglass?.index || 0);
                 x_val = parseFloat(parts[1]) || 0;
                 y_val = parseFloat(parts[2]) || 0;
                 w_val = parseFloat(parts[3]) || 100;
@@ -631,7 +648,8 @@ PupPackManagerPage.renderLayoutPanel = function() {
         }
     } else {
         // Fallback: use screen_num if no custom_pos
-        s_val = this.getPhysicalIndexFromPupId(screen.screen_num);
+        const foundIdx = this.getPhysicalIndexFromPupId(screen.screen_num);
+        s_val = foundIdx !== null ? foundIdx : (this.state.resolvedMonitor_Backglass?.index || 0);
     }
 
     // Convert percentages to pixels for the editor based on the target monitor
@@ -648,7 +666,7 @@ PupPackManagerPage.renderLayoutPanel = function() {
         <div style="margin-bottom: 1.5rem; background: var(--bg-secondary); padding: 1.25rem; border-radius: 10px; border: 1px solid var(--border-color); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);">
             <div style="display: flex; flex-direction: column; gap: 4px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary); font-weight: 700; width: 80px;">Description</span>
+                    <span style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary); font-weight: 700; width: 100px;">Description (ID ${screen.screen_num})</span>
                     <span style="color: var(--text-primary); font-weight: 600; font-size: 0.95rem;">${this.escHtml(screen.description || 'No description provided')}</span>
                 </div>
             </div>
