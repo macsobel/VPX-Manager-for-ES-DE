@@ -1,7 +1,7 @@
 class SetupWizard {
     static state = {
         currentStep: 1,
-        totalSteps: 7,
+        totalSteps: 8,
         config: null
     };
 
@@ -132,8 +132,8 @@ class SetupWizard {
                 .wizard-step-line {
                     position: absolute;
                     top: 50%;
-                    left: 60px;
-                    right: 60px;
+                    left: 40px;
+                    right: 40px;
                     height: 2px;
                     background: var(--glass-border);
                     transform: translateY(-50%);
@@ -154,7 +154,7 @@ class SetupWizard {
                     color: var(--text-tertiary);
                     z-index: 2;
                     position: relative;
-                    margin: 0 18px;
+                    margin: 0 8px;
                     cursor: pointer;
                     transition: all 0.2s ease;
                 }
@@ -204,7 +204,7 @@ class SetupWizard {
 
             let label = '';
             if (i === this.state.currentStep) {
-                const labels = ['', 'Welcome', 'VPX Dir', 'ES-DE Dir', 'Displays', 'Scraper', 'Database', 'Finish'];
+                const labels = ['', 'Welcome', 'VPX Dir', 'ES-DE Dir', 'Displays', 'NVRAM', 'Scraper', 'Database', 'Finish'];
                 label = `<div class="wizard-step-label">${labels[i]}</div>`;
             }
 
@@ -434,7 +434,7 @@ class SetupWizard {
             case 4: // Displays
                 html = `
                     <div class="wizard-content-step">
-                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 1rem; margin-top: 1rem;">
                             <h4 style="color: var(--text-primary); margin: 0;">
                                 <i class="fas fa-desktop" style="margin-right: 8px;"></i>Cabinet Display Profile
                             </h4>
@@ -508,7 +508,7 @@ class SetupWizard {
                         };
 
                         selectHtml += `
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-sm); margin-bottom: 1.5rem;">
+                            <div style="display: flex; flex-direction: column; gap: var(--space-md); margin-bottom: 1.5rem;">
                                 <div class="input-group">
                                     <label class="input-label">Playfield Display</label>
                                     <select id="wiz-pf-display" class="input-field" data-role="Playfield">${renderOptions(currentPlayfield)}</select>
@@ -613,10 +613,174 @@ class SetupWizard {
                 };
                 break;
 
-            case 5: // ScreenScraper Setup
+            case 5: // NVRAM Manager
                 html = `
                     <div class="wizard-content-step">
-                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 1.5rem; margin-top: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 1rem; margin-top: 1rem;">
+                            <h4 style="color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                                NVRAM Manager
+                            </h4>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">
+                            Upload pre-initialized NVRAM files to your master repository to prevent "Factory Settings Restored" errors during table boots.
+                        </p>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem;">
+                            <div style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 12px; border: 1px solid var(--glass-border); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                                <a href="https://www.vpforums.org/index.php?app=downloads&showfile=1362" target="_blank" style="color: var(--accent-blue); text-decoration: none; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 0.85rem;">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                        <polyline points="15 3 21 3 21 9"></polyline>
+                                        <line x1="10" y1="14" x2="21" y2="3"></line>
+                                    </svg>
+                                    Get NVRAM Pack
+                                </a>
+                            </div>
+                            <button class="btn btn-primary" id="wiz-btn-install-nvrams" style="flex-direction: column; height: auto; padding: 1rem; gap: 0.5rem; font-size: 0.85rem; border-radius: 12px;">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                                </svg>
+                                Install All NVRAMs
+                            </button>
+                        </div>
+
+                        <div id="wiz-nvram-dropzone" style="padding: 1.5rem 1rem; border: 2px dashed var(--accent-emerald); border-radius: 16px; text-align: center; cursor: pointer; transition: all 0.2s; background: rgba(16, 185, 129, 0.02); margin-bottom: 1.5rem;">
+                            <div style="width: 40px; height: 40px; background: rgba(16, 185, 129, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem; color: var(--accent-emerald);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17 8 12 3 7 8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                            </div>
+                            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">Drop .nv or .zip files here</div>
+                            <input type="file" id="wiz-nvram-file-input" accept=".nv,.zip" multiple style="display: none;">
+                        </div>
+
+                        <div id="wiz-nvram-upload-progress" style="display: none; margin-bottom: 1.5rem; text-align: center; padding: 1.5rem; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid var(--glass-border);">
+                            <div class="spinner" style="width: 24px; height: 24px; margin: 0 auto 0.75rem;"></div>
+                            <div id="wiz-nvram-progress-text" style="color: var(--text-primary); font-size: 0.85rem; font-weight: 500;">Processing files...</div>
+                        </div>
+
+                        <div id="wiz-nvram-status" style="display: none; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.9rem; text-align: center;"></div>
+                    </div>
+                `;
+
+                setTimeout(() => {
+                    const showStatus = (msg, type = 'success') => {
+                        const statusDiv = document.getElementById('wiz-nvram-status');
+                        if (!statusDiv) return;
+                        statusDiv.style.display = 'block';
+                        statusDiv.textContent = msg;
+                        statusDiv.style.backgroundColor = type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)';
+                        statusDiv.style.color = type === 'error' ? 'var(--accent-red)' : 'var(--accent-emerald)';
+                        statusDiv.style.border = `1px solid ${type === 'error' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`;
+                    };
+
+                    const btnInstall = document.getElementById('wiz-btn-install-nvrams');
+                    if (btnInstall) {
+                        btnInstall.onclick = async () => {
+                            const originalContent = btnInstall.innerHTML;
+                            btnInstall.disabled = true;
+                            btnInstall.innerHTML = '<div class="spinner" style="width: 16px; height: 16px; margin-bottom: 0.25rem;"></div> Installing...';
+                            const statusDiv = document.getElementById('wiz-nvram-status');
+                            if (statusDiv) statusDiv.style.display = 'none';
+
+                            try {
+                                const res = await fetch('/api/tools/nvram/install', { method: 'POST' });
+                                const data = await res.json();
+                                if (data.success) {
+                                    showStatus(`Successfully installed ${data.installed} NVRAM files.`);
+                                } else {
+                                    showStatus('Installation failed: ' + data.error, 'error');
+                                }
+                            } catch (e) {
+                                showStatus('Error during installation: ' + e.message, 'error');
+                            } finally {
+                                btnInstall.disabled = false;
+                                btnInstall.innerHTML = originalContent;
+                            }
+                        };
+                    }
+
+                    const dropzone = document.getElementById('wiz-nvram-dropzone');
+                    const input = document.getElementById('wiz-nvram-file-input');
+                    const progress = document.getElementById('wiz-nvram-upload-progress');
+                    const progressText = document.getElementById('wiz-nvram-progress-text');
+
+                    if (dropzone && input) {
+                        dropzone.addEventListener('click', () => input.click());
+                        dropzone.addEventListener('dragover', (e) => {
+                            e.preventDefault();
+                            dropzone.style.background = 'rgba(16, 185, 129, 0.1)';
+                        });
+                        dropzone.addEventListener('dragleave', (e) => {
+                            e.preventDefault();
+                            dropzone.style.background = 'transparent';
+                        });
+
+                        const handleFiles = async (files) => {
+                            if (!files || files.length === 0) return;
+                            progress.style.display = 'block';
+                            dropzone.style.display = 'none';
+                            const statusDiv = document.getElementById('wiz-nvram-status');
+                            if (statusDiv) statusDiv.style.display = 'none';
+
+                            try {
+                                let totalAdded = 0;
+                                let errors = [];
+                                for (let i = 0; i < files.length; i++) {
+                                    const file = files[i];
+                                    progressText.textContent = `Uploading ${i + 1}/${files.length}: ${file.name}...`;
+
+                                    const formData = new FormData();
+                                    formData.append('file', file);
+                                    const res = await fetch('/api/tools/nvram/upload', {
+                                        method: 'POST',
+                                        body: formData
+                                    });
+
+                                    const data = await res.json();
+                                    if (data.success) {
+                                        totalAdded += data.added || 1;
+                                    } else {
+                                        errors.push(`${file.name}: ${data.error}`);
+                                    }
+                                }
+
+                                if (errors.length > 0) {
+                                    showStatus('Some files failed: ' + errors.join(', '), 'error');
+                                } else if (totalAdded > 0) {
+                                    showStatus(`Successfully added ${totalAdded} NVRAM files to repository`);
+                                }
+                            } catch (e) {
+                                showStatus('Upload failed: ' + e.message, 'error');
+                            } finally {
+                                progress.style.display = 'none';
+                                dropzone.style.display = 'block';
+                                input.value = '';
+                            }
+                        };
+
+                        dropzone.addEventListener('drop', (e) => {
+                            e.preventDefault();
+                            dropzone.style.background = 'transparent';
+                            handleFiles(e.dataTransfer.files);
+                        });
+
+                        input.addEventListener('change', (e) => {
+                            handleFiles(e.target.files);
+                        });
+                    }
+                }, 100);
+
+                btnNext.onclick = () => this.next();
+                break;
+
+            case 6: // ScreenScraper Setup
+                html = `
+                    <div class="wizard-content-step">
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 1rem; margin-top: 1rem;">
                             <h4 style="color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                                 ScreenScraper Account
@@ -700,7 +864,7 @@ class SetupWizard {
                 };
                 break;
 
-            case 6: // Database Scan
+            case 7: // Database Scan
                 html = `
                     <div class="wizard-content-step" style="text-align: left;">
                         <div style="text-align: center; margin-bottom: 2rem;">
@@ -790,9 +954,9 @@ class SetupWizard {
                                         document.getElementById('wiz-scan-status-label').textContent = status.message || 'Scanning tables...';
 
                                         if (status.total > 0) {
-                                            const pct = Math.round((status.progress / status.total) * 100);
+                                            const pct = Math.round((status.current / status.total) * 100);
                                             document.getElementById('wiz-scan-progress-bar').style.width = `${pct}%`;
-                                            document.getElementById('wiz-scan-progress-text').textContent = `${status.progress} / ${status.total}`;
+                                            document.getElementById('wiz-scan-progress-text').textContent = `${status.current} / ${status.total}`;
                                         }
 
                                         if (status.status === 'completed' || status.status === 'failed') {
@@ -808,7 +972,6 @@ class SetupWizard {
                                                 document.getElementById('wiz-scan-status-label').textContent = 'Scan Complete!';
                                                 document.getElementById('wiz-scan-status-label').style.color = 'var(--accent-emerald)';
                                                 scanBtn.innerHTML = '<i class="fas fa-check"></i> Scan Complete';
-                                                setTimeout(() => this.next(), 1500);
                                             }
                                         }
                                     } catch (e) {
@@ -830,22 +993,38 @@ class SetupWizard {
                 }, 100);
                 break;
 
-            case 7: // Finish
+            case 8: // Finish
+                btnNext.style.display = 'none';
                 html = `
                     <div class="wizard-content-step" style="text-align: center; padding-top: 2rem;">
                         <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--accent-emerald); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem auto; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">
                             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
                         </div>
-                        <h2 style="margin-bottom: 1rem;">You're All Set!</h2>
-                        <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 2rem;">
-                            Your environment is configured and ready to go. You can always adjust these settings later from the Settings page.
+                        <h2 style="margin-bottom: 1rem;">Core Setup Complete!</h2>
+                        <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem;">
+                            Your environment is configured, directories are set, and your library has been scanned. However, your tables still need artwork, videos, and metadata.
                         </p>
-                        <button class="btn btn-secondary" onclick="window.location.hash = 'tables'; SetupWizard.hide();" style="padding: 10px 20px; font-size: 1rem;">
-                            Go to Tables
-                        </button>
+                        
+                        <div style="background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--glass-border); margin-bottom: 2rem; text-align: left;">
+                            <h4 style="color: var(--text-primary); margin-top: 0; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 8px;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                Final Step: Media Scraping
+                            </h4>
+                            <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; line-height: 1.5;">
+                                Scraping media for your entire library can take a significant amount of time (sometimes hours depending on the size). We recommend running this process from the dedicated Scraper tool so you can monitor progress properly.
+                            </p>
+                        </div>
+
+                        <div style="display: flex; gap: 1rem; justify-content: center;">
+                            <button class="btn btn-secondary" onclick="window.location.hash = 'tables'; SetupWizard.finish();" style="padding: 12px 24px; font-size: 1rem;">
+                                Browse My Tables
+                            </button>
+                            <button class="btn btn-primary" onclick="window.location.hash = 'tables/media'; SetupWizard.finish();" style="padding: 12px 24px; font-size: 1rem;">
+                                Go to Media Scraper
+                            </button>
+                        </div>
                     </div>
                 `;
-                btnNext.onclick = () => this.finish();
                 break;
         }
 
