@@ -5,6 +5,10 @@ class SetupWizard {
         config: null
     };
 
+    static _hashChangeListener = () => {
+        SetupWizard.hide();
+    };
+
     static async init() {
         if (!localStorage.getItem('vpx_setup_completed')) {
             await this.show();
@@ -21,7 +25,11 @@ class SetupWizard {
             requestAnimationFrame(() => {
                 const drawer = document.getElementById('setup-wizard-drawer');
                 if (drawer) drawer.classList.add('open');
+                const overlay = document.getElementById('setup-wizard-overlay');
+                if (overlay) overlay.style.opacity = '1';
             });
+
+            window.addEventListener('hashchange', SetupWizard._hashChangeListener, { once: true });
 
         } catch (e) {
             console.error('Failed to load config for setup wizard', e);
@@ -31,14 +39,21 @@ class SetupWizard {
 
     static hide() {
         const drawer = document.getElementById('setup-wizard-drawer');
+        const overlay = document.getElementById('setup-wizard-overlay');
+        
         if (drawer) {
+            drawer.removeAttribute('id');
             drawer.classList.remove('open');
-            setTimeout(() => {
-                if (drawer.parentNode) {
-                    drawer.parentNode.removeChild(drawer);
-                }
-            }, 300);
+            setTimeout(() => drawer.remove(), 300);
         }
+        
+        if (overlay) {
+            overlay.removeAttribute('id');
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 300);
+        }
+        
+        window.removeEventListener('hashchange', SetupWizard._hashChangeListener);
         localStorage.setItem('vpx_setup_completed', 'true');
     }
 
@@ -91,9 +106,12 @@ class SetupWizard {
         // Remove existing if any
         const existing = document.getElementById('setup-wizard-drawer');
         if (existing) existing.remove();
+        const existingOverlay = document.getElementById('setup-wizard-overlay');
+        if (existingOverlay) existingOverlay.remove();
 
         const html = `
-            <div id="setup-wizard-drawer" class="snapshot-drawer">
+            <div id="setup-wizard-overlay" onclick="SetupWizard.hide()" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 998; opacity: 0; transition: opacity 0.3s ease;"></div>
+            <div id="setup-wizard-drawer" class="snapshot-drawer" style="z-index: 999; box-shadow: -10px 0 30px rgba(0,0,0,0.5);">
                 <div class="snapshot-drawer-header">
                     <div>
                         <h2 style="margin:0; font-size: 1.1rem;">Initial Setup Guide</h2>
