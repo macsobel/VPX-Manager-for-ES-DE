@@ -1007,19 +1007,19 @@ class SetupWizard {
                         
                         <div style="background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--glass-border); margin-bottom: 2rem; text-align: left;">
                             <h4 style="color: var(--text-primary); margin-top: 0; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 8px;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                                Final Step: Media Scraping
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                Final Steps: Matching & Scraping
                             </h4>
                             <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; line-height: 1.5;">
-                                Scraping media for your entire library can take a significant amount of time (sometimes hours depending on the size). We recommend running this process from the dedicated Scraper tool so you can monitor progress properly.
+                                To get the most out of your library, you should first match your tables to their Virtual Pinball Spreadsheet (VPS) IDs, and then scrape them for media. Both processes can take significant time, so we recommend running them from their dedicated tools.
                             </p>
                         </div>
 
                         <div style="display: flex; gap: 1rem; justify-content: center;">
-                            <button class="btn btn-secondary" onclick="window.location.hash = 'tables'; SetupWizard.finish();" style="padding: 12px 24px; font-size: 1rem;">
-                                Browse My Tables
+                            <button class="btn btn-primary" onclick="window.location.hash = 'tables/list'; SetupWizard.finish();" style="padding: 12px 24px; font-size: 1rem;">
+                                Match Table VPS IDs
                             </button>
-                            <button class="btn btn-primary" onclick="window.location.hash = 'tables/media'; SetupWizard.finish();" style="padding: 12px 24px; font-size: 1rem;">
+                            <button class="btn btn-secondary" onclick="window.location.hash = 'tables/media'; SetupWizard.finish();" style="padding: 12px 24px; font-size: 1rem;">
                                 Go to Media Scraper
                             </button>
                         </div>
