@@ -1,7 +1,7 @@
 class SetupWizard {
     static state = {
         currentStep: 1,
-        totalSteps: 8,
+        totalSteps: 7,
         config: null
     };
 
@@ -13,7 +13,7 @@ class SetupWizard {
 
     static async show() {
         try {
-            this.state.config = await apiFetch('/api/config');
+            this.state.config = await apiFetch('/api/settings');
             this.state.currentStep = 1;
             this.render();
 
@@ -71,7 +71,7 @@ class SetupWizard {
 
     static async pickPath(inputId) {
         try {
-            const res = await apiFetch('/api/system/pick-folder', { method: 'POST' });
+            const res = await apiFetch('/api/settings/pick-path?prompt=Select%20Folder', { method: 'POST' });
             if (res.path) {
                 document.getElementById(inputId).value = res.path;
             }
@@ -190,7 +190,7 @@ class SetupWizard {
 
             let label = '';
             if (i === this.state.currentStep) {
-                const labels = ['', 'Welcome', 'VPX Dir', 'ES-DE Dir', 'ES-DE XML', 'Displays', 'Integration', 'Database', 'Finish'];
+                const labels = ['', 'Welcome', 'VPX Dir', 'ES-DE Dir', 'ES-DE XML', 'Displays', 'Database', 'Finish'];
                 label = `<div class="wizard-step-label">${labels[i]}</div>`;
             }
 
@@ -261,7 +261,7 @@ class SetupWizard {
                         <div class="form-group">
                             <label>VPX Standalone App Path</label>
                             <div style="display:flex; gap: 8px;">
-                                <input type="text" id="wiz-vpx-path" class="input-field" value="${this.state.config.paths.vpx_app_dir || ''}" style="flex:1;">
+                                <input type="text" id="wiz-vpx-path" class="input-field" value="${this.state.config.vpx_standalone_app_path || ''}" style="flex:1;">
                                 <button class="btn btn-secondary" onclick="SetupWizard.pickPath('wiz-vpx-path')"><i class="fas fa-folder"></i></button>
                             </div>
                         </div>
@@ -272,7 +272,7 @@ class SetupWizard {
                                 If your tables are stored outside the main VPX folder, specify that here.
                             </p>
                             <div style="display:flex; gap: 8px;">
-                                <input type="text" id="wiz-tables-path" class="input-field" value="${this.state.config.paths.tables_dir || ''}" style="flex:1;">
+                                <input type="text" id="wiz-tables-path" class="input-field" value="${this.state.config.tables_dir || ''}" style="flex:1;">
                                 <button class="btn btn-secondary" onclick="SetupWizard.pickPath('wiz-tables-path')"><i class="fas fa-folder"></i></button>
                             </div>
                         </div>
@@ -287,13 +287,13 @@ class SetupWizard {
                             const btn = btnNext;
                             const origText = btn.innerHTML;
                             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-                            await apiFetch('/api/config/paths', {
-                                method: 'POST',
+                            await apiFetch('/api/settings', {
+                                method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ vpx_app_dir: vpx, tables_dir: tables || null })
+                                body: JSON.stringify({ vpx_standalone_app_path: vpx, tables_dir: tables || null })
                             });
-                            this.state.config.paths.vpx_app_dir = vpx;
-                            this.state.config.paths.tables_dir = tables;
+                            this.state.config.vpx_standalone_app_path = vpx;
+                            this.state.config.tables_dir = tables;
                             btn.innerHTML = origText;
                             this.next();
                         } catch (e) {
@@ -327,7 +327,7 @@ class SetupWizard {
                         <div class="form-group">
                             <label>ES-DE Media Directory</label>
                             <div style="display:flex; gap: 8px;">
-                                <input type="text" id="wiz-esde-path" class="input-field" value="${this.state.config.paths.esde_media_dir || ''}" placeholder="e.g. /home/user/ES-DE/downloaded_media" style="flex:1;">
+                                <input type="text" id="wiz-esde-path" class="input-field" value="${this.state.config.esde_media_dir || ''}" placeholder="e.g. /home/user/ES-DE/downloaded_media" style="flex:1;">
                                 <button class="btn btn-secondary" onclick="SetupWizard.pickPath('wiz-esde-path')"><i class="fas fa-folder"></i></button>
                             </div>
                         </div>
@@ -344,12 +344,12 @@ class SetupWizard {
                         const btn = btnNext;
                         const origText = btn.innerHTML;
                         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-                        await apiFetch('/api/config/paths', {
-                            method: 'POST',
+                        await apiFetch('/api/settings', {
+                            method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ esde_media_dir: esde || null })
                         });
-                        this.state.config.paths.esde_media_dir = esde;
+                        this.state.config.esde_media_dir = esde;
                         btn.innerHTML = origText;
                         this.next();
                     } catch (e) {
@@ -370,7 +370,7 @@ class SetupWizard {
                         <div class="form-group">
                             <label>Gamelist XML Path</label>
                             <div style="display:flex; gap: 8px;">
-                                <input type="text" id="wiz-xml-path" class="input-field" value="${this.state.config.paths.gamelist_xml_path || ''}" placeholder="e.g. ~/.emulationstation/gamelists/vpinball/gamelist.xml" style="flex:1;">
+                                <input type="text" id="wiz-xml-path" class="input-field" value="${this.state.config.esde_gamelists_dir || ''}" placeholder="e.g. ~/.emulationstation/gamelists/vpinball/gamelist.xml" style="flex:1;">
                             </div>
                         </div>
                     </div>
@@ -381,12 +381,12 @@ class SetupWizard {
                         const btn = btnNext;
                         const origText = btn.innerHTML;
                         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-                        await apiFetch('/api/config/paths', {
-                            method: 'POST',
+                        await apiFetch('/api/settings', {
+                            method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ gamelist_xml_path: xml || null })
+                            body: JSON.stringify({ esde_gamelists_dir: xml || null })
                         });
-                        this.state.config.paths.gamelist_xml_path = xml;
+                        this.state.config.esde_gamelists_dir = xml;
                         btn.innerHTML = origText;
                         this.next();
                     } catch (e) {
@@ -411,7 +411,8 @@ class SetupWizard {
                 // Fetch displays asynchronously
                 setTimeout(async () => {
                     try {
-                        const displays = await apiFetch('/api/system/displays');
+                        const sysDisplays = await apiFetch('/api/displays');
+                        const displays = sysDisplays.displays || [];
                         const container = document.getElementById('wiz-displays-container');
                         if (!container) return;
 
@@ -470,10 +471,10 @@ class SetupWizard {
                             const btn = btnNext;
                             const origText = btn.innerHTML;
                             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-                            await apiFetch('/api/config/displays', {
-                                method: 'POST',
+                            await apiFetch('/api/settings', {
+                                method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(displays)
+                                body: JSON.stringify({ displays: displays, dmd_enabled: displays.some(d => d.role === 'DMD') })
                             });
                             btn.innerHTML = origText;
                             this.next();
@@ -487,56 +488,7 @@ class SetupWizard {
                 };
                 break;
 
-            case 6: // Features / Integration
-                const features = this.state.config.features || {};
-                html = `
-                    <div class="wizard-content-step">
-                        <h3 style="margin-top: 1rem;"><i class="fas fa-plug" style="color: var(--accent-emerald); margin-right: 10px;"></i>Features & Integration</h3>
-                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">
-                            Enable optional integrations.
-                        </p>
-
-                        <div class="form-checkbox-group" onclick="const cb = document.getElementById('wiz-vps'); cb.checked = !cb.checked; cb.dispatchEvent(new Event('change'));" style="width: 100%; max-width: none; box-sizing: border-box;">
-                            <input type="checkbox" id="wiz-vps" ${features.vps_integration !== false ? 'checked' : ''} onclick="event.stopPropagation()">
-                            <div class="form-checkbox-label">
-                                <span>Virtual Pinball Spreadsheet (VPS)</span>
-                                <span class="form-checkbox-sublabel">Automatically download table metadata and cover images from the community spreadsheet.</span>
-                            </div>
-                        </div>
-
-                        <div class="form-checkbox-group" onclick="const cb = document.getElementById('wiz-monitor'); cb.checked = !cb.checked; cb.dispatchEvent(new Event('change'));" style="width: 100%; max-width: none; box-sizing: border-box;">
-                            <input type="checkbox" id="wiz-monitor" ${features.monitor_service !== false ? 'checked' : ''} onclick="event.stopPropagation()">
-                            <div class="form-checkbox-label">
-                                <span>Background Monitor Service</span>
-                                <span class="form-checkbox-sublabel">Required to instantly show backglass images when navigating menus in Emulation Station.</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                btnNext.onclick = async () => {
-                    const vps = document.getElementById('wiz-vps').checked;
-                    const monitor = document.getElementById('wiz-monitor').checked;
-
-                    try {
-                        const btn = btnNext;
-                        const origText = btn.innerHTML;
-                        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-                        await apiFetch('/api/config/features', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ vps_integration: vps, monitor_service: monitor })
-                        });
-                        btn.innerHTML = origText;
-                        this.next();
-                    } catch (e) {
-                        Toast.show('Failed to save features', 'error');
-                        btnNext.innerHTML = 'Next';
-                    }
-                };
-                break;
-
-            case 7: // Database Scan
+            case 6: // Database Scan
                 html = `
                     <div class="wizard-content-step" style="text-align: center;">
                         <h3 style="margin-top: 1rem;"><i class="fas fa-database" style="color: var(--accent-purple); margin-right: 10px;"></i>Library Scan</h3>
@@ -587,7 +539,7 @@ class SetupWizard {
                 }, 100);
                 break;
 
-            case 8: // Finish
+            case 7: // Finish
                 html = `
                     <div class="wizard-content-step" style="text-align: center; padding-top: 2rem;">
                         <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(16, 185, 129, 0.1); border: 2px solid var(--accent-emerald); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: var(--accent-emerald); margin: 0 auto 1.5rem auto;">
