@@ -488,6 +488,11 @@ class VBSManagerService:
                 # Determine value type based on what was there or common conventions
                 is_boolean = current_value in ['true', 'false'] or setting_name.startswith('b') or setting_name.startswith('enable') or setting_name == "usepupdmd" or setting_name == "usedmdvideos"
                 
+                if setting_name == "pupevent" and current_value == "false":
+                    is_boolean = False
+                elif setting_name == "usepuppack" and current_value == "true":
+                    is_boolean = False
+
                 if is_boolean:
                     val = "True" if enable else "False"
                 else:

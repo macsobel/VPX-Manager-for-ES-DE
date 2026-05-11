@@ -64,7 +64,7 @@ const DocumentationPage = {
                                 <h4 style="color: var(--text-primary); margin-bottom: 4px;">Need to see the guide again?</h4>
                                 <p>You can restart the interactive setup checklist at any time.</p>
                             </div>
-                            <button class="btn btn-primary" onclick="Onboarding.restart()">
+                            <button class="btn btn-primary" onclick="SetupWizard.show()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
                                 Restart Setup Guide
                             </button>

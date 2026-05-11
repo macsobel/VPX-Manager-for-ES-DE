@@ -24,7 +24,7 @@ const App = {
 
     async init() {
         Nav.init();
-        if (window.Onboarding) Onboarding.init();
+        if (typeof SetupWizard !== 'undefined') SetupWizard.init();
         
         // Use a flag to prevent rapid-fire hash changes from UI interactions
         this.isNavigating = false;
