@@ -11,6 +11,18 @@ const SettingsPage = {
                 <p class="page-subtitle">Configure file paths and adjust system settings</p>
             </div>
 
+            <div class="card" style="margin-bottom: var(--space-xl); background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 style="margin: 0 0 0.5rem 0; color: var(--text-primary);">First Time Setup Wizard</h3>
+                        <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;">Need to configure your paths and displays? Use the wizard for a guided setup.</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="SetupWizard.show()">
+                        <i class="fas fa-magic" style="margin-right: 8px;"></i> Run Setup Wizard
+                    </button>
+                </div>
+            </div>
+
             <div class="settings-section">
                 <div class="settings-section-title">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
