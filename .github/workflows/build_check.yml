@@ -1,0 +1,83 @@
+name: Build Check
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.display_name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15-intel
+            arch: x86_64
+            display_name: macOS_Intel
+          - os: macos-14
+            arch: arm64
+            display_name: macOS_Apple_Silicon
+          - os: ubuntu-22.04
+            arch: x86_64
+            display_name: Linux_x64
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install Linux Dependencies
+      if: startsWith(matrix.os, 'ubuntu')
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libfuse2 binutils zip libegl1 libopengl0 libxcb-cursor0
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        
+    - name: Generate Obfuscated Config and Version
+      env:
+        SS_DEV_ID: ${{ secrets.SS_DEV_ID }}
+        SS_DEVPASS: ${{ secrets.SS_DEVPASS }}
+        SS_USER: ${{ secrets.SS_USER }}
+        SS_PASS: ${{ secrets.SS_PASS }}
+      run: |
+        python3 scripts/build/build_utils.py
+        
+    - name: Build App
+      env:
+        SS_DEV_ID: ${{ secrets.SS_DEV_ID }}
+        SS_DEVPASS: ${{ secrets.SS_DEVPASS }}
+        SS_USER: ${{ secrets.SS_USER }}
+        SS_PASS: ${{ secrets.SS_PASS }}
+      run: |
+        chmod +x scripts/build/build_app.sh
+        ./scripts/build/build_app.sh
+        cd dist
+        if [ "${{ runner.os }}" == "macOS" ]; then
+          zip -r "VPX_Manager_${{ matrix.display_name }}.zip" "VPX Manager for ES-DE.app"
+        else
+          zip -j "VPX_Manager_${{ matrix.display_name }}.zip" "VPX_Manager-x86_64.AppImage"
+        fi
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VPX_Manager_${{ matrix.display_name }}
+        path: dist/VPX_Manager_${{ matrix.display_name }}.zip
+        retention-days: 7
