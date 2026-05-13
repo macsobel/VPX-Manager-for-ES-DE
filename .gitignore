@@ -34,3 +34,6 @@ _research/
 scratch/
 tests/*.vpx
 *.log
+squashfs-root/
+dist/
+build/

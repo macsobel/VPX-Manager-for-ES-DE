@@ -108,7 +108,7 @@ async def update_settings(update: SettingsUpdate):
 @router.post("/settings/pick-path")
 async def pick_path(prompt: str = "Select a path", pick_files: bool = False):
     """
-    Open a native picker dialog. Uses osascript on macOS and tkinter on Linux.
+    Open a native picker dialog. Uses osascript on macOS and zenity or tkinter on Linux.
     Can pick folders or files (including .app bundles).
     """
     if sys.platform == "linux":
