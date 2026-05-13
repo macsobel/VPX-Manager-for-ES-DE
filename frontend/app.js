@@ -8,7 +8,6 @@ const App = {
         tables: TablesPage,
         upload: UploadPage,
         media: null, // Handled by TablesPage
-        documentation: DocumentationPage,
         resources: ResourcesPage,
         settings: SettingsPage,
         "media-preferences": MediaPreferencesPage,

@@ -257,7 +257,11 @@ const DashboardPage = {
             btn.disabled = true;
             Toast.info('Database sync started...');
             try {
+                // Sync VPS Database
                 await fetch('/api/vps/sync', { method: 'POST' });
+                // Sync Standalone Script Hashes
+                await fetch('/api/vbs-manager/refresh-patches', { method: 'POST' });
+
                 DashboardPage.pollTaskStatus('vps_sync', 'vps-progress-container');
             } catch (e) {
                 Toast.error('Database update failed: ' + e.message);

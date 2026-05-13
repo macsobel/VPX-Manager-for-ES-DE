@@ -79,11 +79,6 @@ class SetupWizard {
 
     static async prev() {
         if (this.state.currentStep > 1) {
-            try {
-                await this.saveCurrentStepData();
-            } catch (e) {
-                console.warn('Failed to auto-save step data:', e);
-            }
             this.state.currentStep--;
             this.renderContent();
         }
@@ -159,6 +154,7 @@ class SetupWizard {
                 const pfSelect = document.getElementById('wiz-pf-display');
                 const bgSelect = document.getElementById('wiz-bg-display');
                 const dmdSelect = document.getElementById('wiz-dmd-display');
+                const bgCompanion = document.getElementById('wiz-bg-companion-enabled');
                 const orientSelect = document.getElementById('wiz-master-orientation');
 
                 if (!container || !pfSelect) break;
@@ -203,11 +199,13 @@ class SetupWizard {
                     body: JSON.stringify({
                         displays: displaysConfig,
                         master_orientation: orientSelect?.value || '',
-                        dmd_enabled: !!(dmdSelect && dmdSelect.value)
+                        dmd_enabled: !!(dmdSelect && dmdSelect.value),
+                        backglass_enabled: bgCompanion?.checked
                     })
                 });
                 this.state.config.displays = displaysConfig;
                 this.state.config.master_orientation = orientSelect?.value || '';
+                this.state.config.backglass_enabled = bgCompanion?.checked;
                 break;
             }
             case 6: { // ScreenScraper
@@ -255,10 +253,11 @@ class SetupWizard {
                     <!-- Content injected here -->
                 </div>
 
-                <div class="snapshot-drawer-footer" style="justify-content: space-between;">
-                    <button class="btn btn-secondary" id="setup-btn-prev" onclick="SetupWizard.prev()" style="display:none;">Back</button>
+                <div class="snapshot-drawer-footer" style="justify-content: space-between; gap: 12px;">
+                    <button class="btn btn-secondary" id="setup-btn-prev" onclick="SetupWizard.prev()" style="display:none; min-width: 80px;">Back</button>
                     <div style="flex:1;"></div>
-                    <button class="btn btn-primary" id="setup-btn-next" onclick="SetupWizard.next()">Next</button>
+                    <button class="btn btn-secondary" id="setup-btn-skip" onclick="SetupWizard.next()" style="min-width: 80px; display: none;">Skip</button>
+                    <button class="btn btn-primary" id="setup-btn-next" onclick="SetupWizard.next()" style="min-width: 80px;">Next</button>
                 </div>
             </div>
 
@@ -347,7 +346,7 @@ class SetupWizard {
 
             let label = '';
             if (i === this.state.currentStep) {
-                const labels = ['', 'Welcome', 'VPX Dir', 'ES-DE Dir', 'Displays', 'NVRAM', 'Scraper', 'Database', 'Finish'];
+                const labels = ['', 'Welcome', 'VPX', 'ES-DE', 'Displays', 'NVRAM', 'Scraper', 'Database', 'Finish'];
                 label = `<div class="wizard-step-label">${labels[i]}</div>`;
             }
 
@@ -368,10 +367,14 @@ class SetupWizard {
         const body = document.getElementById('setup-wizard-body');
         const btnPrev = document.getElementById('setup-btn-prev');
         const btnNext = document.getElementById('setup-btn-next');
+        const btnSkip = document.getElementById('setup-btn-skip');
 
         btnPrev.style.display = this.state.currentStep > 1 ? 'flex' : 'none';
         btnNext.style.display = 'flex';
+        btnSkip.style.display = (this.state.currentStep > 1 && this.state.currentStep < this.state.totalSteps) ? 'flex' : 'none';
+
         btnNext.onclick = () => this.next();
+        if (btnSkip) btnSkip.onclick = () => this.next();
 
         let html = '';
 
@@ -388,10 +391,10 @@ class SetupWizard {
                         <div style="text-align: left; background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--glass-border);">
                             <h4 style="color: var(--accent-blue); margin-top: 0; margin-bottom: 1rem;">What we'll do:</h4>
                             <ul style="color: var(--text-secondary); line-height: 1.8; margin: 0; padding-left: 1.2rem;">
-                                <li>Set up VPX and Emulation Station paths</li>
-                                <li>Assign your monitors for Backglass and DMD</li>
-                                <li>Scan your existing tables</li>
-                                <li>Connect to the Virtual Pinball Spreadsheet</li>
+                                <li>Install Visual Pinball and Emulation Station: DE</li>
+                                <li>Scan and match your existing tables</li>
+                                <li>Login to ScreenScraper</li>
+                                <li>Preload NVRAM files</li>
                             </ul>
                         </div>
                     </div>
@@ -402,32 +405,39 @@ class SetupWizard {
                 html = `
                     <div class="wizard-content-step">
                         <h4 style="color: var(--text-primary); margin-top: 1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
-                            <i class="fas fa-layer-group" style="margin-right: 8px;"></i>Visual Pinball Standalone Settings
+                            <i class="fas fa-layer-group" style="margin-right: 8px;"></i>Install Visual Pinball Standalone
                         </h4>
 
                         <div style="background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--glass-border); margin-bottom: 1.5rem;">
-                            <h4 style="color: var(--text-primary); margin-top: 0; margin-bottom: 1rem;">Step 1: Install VPX macOS Build</h4>
-                            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">Follow the steps below to download the latest VPX build from the GitHub repository.</p>
+                            <h4 style="color: var(--text-primary); margin-top: 0; margin-bottom: 1rem;">Step 1: Download & Install Visual Pinball</h4>
+                            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.2rem;">
+                                Download a recent Visual Pinball X build for macOS.
+                            </p>
                             
-                            <div style="background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--accent-blue); padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px; font-size: 0.9rem;">
-                                <i class="fas fa-lightbulb" style="color: var(--accent-yellow); margin-right: 8px;"></i>
-                                <strong>Prefer BGFX builds</strong> over OpenGL builds for best compatibility and rendering.
+                            <div style="background: rgba(59, 130, 246, 0.08); border-left: 4px solid var(--accent-blue); padding: 1rem; margin-bottom: 1.5rem; border-radius: 6px; font-size: 0.9rem; color: var(--text-primary); line-height: 1.5;">
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 700; color: var(--accent-blue);">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                    BGFX Recommended
+                                </div>
+                                BGFX supports Metal and is more stable on macOS.
                             </div>
 
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                <p style="color: var(--text-secondary); font-size: 0.95rem; margin: 0;"><strong>From VPinball Github follow these steps:</strong></p>
-                                <a href="https://github.com/vpinball/vpinball" target="_blank" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;"><i class="fas fa-external-link-alt"></i> Open Github</a>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <p style="color: var(--text-primary); font-size: 0.95rem; margin: 0; font-weight: 600;">Download Instructions:</p>
+                                <a href="https://github.com/vpinball/vpinball/actions/workflows/vpinball.yml" target="_blank" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem; height: 32px; display: flex; align-items: center; gap: 6px;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                                    Download VPX Standalone
+                                </a>
                             </div>
 
-                            <ol style="color: var(--text-secondary); line-height: 1.8; margin: 0; padding-left: 1.2rem; font-size: 0.9rem;">
-                                <li>Open the <a href="https://github.com/vpinball/vpinball/actions" target="_blank" style="color: var(--accent-blue);">Actions tab</a></li>
-                                <li>Find the <a href="https://github.com/vpinball/vpinball/actions/workflows/build-vpinball.yml" target="_blank" style="color: var(--accent-blue);">workflow that builds VPinball</a></li>
-                                <li>Open a successful workflow run</li>
-                                <li>Scroll to Artifacts</li>
-                                <li>Download and install:
-                                    <ul style="margin: 0; padding-left: 1.2rem;">
-                                        <li><strong>VPinball_BGFX-macos-arm64</strong> (Apple Silicon, most modern Macs)</li>
-                                        <li><strong>OR VPinball_BGFX-macos-x64</strong> (Intel Mac)</li>
+                            <ol style="color: var(--text-secondary); line-height: 1.8; margin: 0; padding-left: 1.2rem; font-size: 0.9rem; display: flex; flex-direction: column; gap: 8px;">
+                                <li><a href="https://github.com/login/" target="_blank" style="color: var(--accent-blue); text-decoration: none;">Login</a> to Github.</li>    
+                                <li><a href="https://github.com/vpinball/vpinball/actions/workflows/vpinball.yml" target="_blank" style="color: var(--accent-blue); text-decoration: none;">Click here</a> and select the latest <strong>successful</strong> <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-top: -2px;"><circle cx="12" cy="12" r="10" fill="#22c55e"/><path d="M8 12.5L10.5 15L16 9" stroke="black" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg> workflow from the Actions page.</li>
+                                <li>Scroll down to the <strong>Artifacts</strong> section.</li>
+                                <li>Download the version for your Mac:
+                                    <ul style="margin: 4px 0 0 0; padding-left: 1.2rem; color: var(--text-primary);">
+                                        <li><strong>VPinball_BGFX-macos-arm64-Release.dmg</strong></li>
+                                        <li><strong>VPinball_BGFX-macos-x64-Release.dmg</strong></li>
                                     </ul>
                                 </li>
                             </ol>
@@ -436,25 +446,27 @@ class SetupWizard {
                         <div class="input-group" style="margin-bottom: 1.5rem;">
                             <label class="input-label">VPX Standalone App Path</label>
                             <div style="display:flex; gap: 8px;">
-                                <input type="text" id="wiz-vpx-path" class="input-field" value="${this.state.config.vpx_standalone_app_path || ''}" style="flex:1;">
-                                <button class="btn btn-secondary" onclick="SetupWizard.pickPath('wiz-vpx-path')"><i class="fas fa-folder"></i> Browse</button>
+                                <input type="text" id="wiz-vpx-path" class="input-field" value="${this.state.config.vpx_standalone_app_path || ''}" placeholder="/Applications/VPinballX.app" style="flex:1;">
+                                <button class="btn btn-secondary" onclick="SetupWizard.pickPath('wiz-vpx-path')" style="height: 42px; display: flex; align-items: center; gap: 6px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                    Browse
+                                </button>
                             </div>
-                            <p style="font-size: 0.8rem; color: var(--text-tertiary); margin-top: 4px;">Path to the VPinballX executable or .app bundle</p>
+                            <p style="font-size: 0.8rem; color: var(--text-tertiary); margin-top: 6px;">Select the VPinballX executable or the installed .app bundle</p>
                         </div>
 
                         <div class="input-group" style="margin-bottom: 1.5rem;">
-                            <label class="input-label">VPX Flavor</label>
-                            <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px;">
-                                <span id="label-wiz-flavor-bgfx" style="font-size: 0.85rem; color: ${this.state.config.vpx_use_flavor !== 'GL' ? 'var(--text-primary)' : 'var(--text-tertiary)'}; font-weight: 500;">BGFX</span>
+                            <label class="input-label">VPX Rendering Flavor</label>
+                            <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid var(--glass-border);">
+                                <span id="label-wiz-flavor-bgfx" style="font-size: 0.85rem; color: ${this.state.config.vpx_use_flavor !== 'GL' ? 'var(--text-primary)' : 'var(--text-tertiary)'}; font-weight: 600;">BGFX</span>
                                 <label class="switch">
                                     <input type="checkbox" id="wiz-vpx-flavor" ${this.state.config.vpx_use_flavor === 'GL' ? 'checked' : ''} onchange="document.getElementById('label-wiz-flavor-bgfx').style.color = this.checked ? 'var(--text-tertiary)' : 'var(--text-primary)'; document.getElementById('label-wiz-flavor-gl').style.color = this.checked ? 'var(--text-primary)' : 'var(--text-tertiary)';">
                                     <span class="slider round"></span>
                                 </label>
-                                <span id="label-wiz-flavor-gl" style="font-size: 0.85rem; color: ${this.state.config.vpx_use_flavor === 'GL' ? 'var(--text-primary)' : 'var(--text-tertiary)'}; font-weight: 500;">GL</span>
+                                <span id="label-wiz-flavor-gl" style="font-size: 0.85rem; color: ${this.state.config.vpx_use_flavor === 'GL' ? 'var(--text-primary)' : 'var(--text-tertiary)'}; font-weight: 600;">GL (Legacy)</span>
                             </div>
                         </div>
 
-                        </div>
                     </div>
                 `;
                 btnNext.onclick = async () => {
@@ -478,7 +490,7 @@ class SetupWizard {
                 html = `
                     <div class="wizard-content-step">
                         <h4 style="color: var(--text-primary); margin-top: 1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
-                            <i class="fas fa-desktop" style="margin-right: 8px;"></i>Emulation Station Desktop Edition Settings
+                            <i class="fas fa-desktop" style="margin-right: 8px;"></i>Install Emulation Station Desktop Edition
                         </h4>
 
                         <div style="background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--glass-border); margin-bottom: 1.5rem;">
@@ -599,7 +611,7 @@ class SetupWizard {
                             </button>
                         </div>
                         <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">
-                            Assign your physical monitors to their roles for Virtual Pinball rendering.
+                            Assign your monitors for Emulation Station and Pup Packs.
                         </p>
                         <div id="wiz-displays-container">
                             <div style="text-align:center; padding: 2rem;"><i class="fas fa-spinner fa-spin"></i> Loading displays...</div>
@@ -690,12 +702,48 @@ class SetupWizard {
                                     <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4px;">Sets default rotation in newly generated INI files. Auto-detects based on server primary monitor if left empty.</div>
                                 </div>
                             </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--glass-border);">
+                                <div>
+                                    <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">Enable Backglass Companion</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-tertiary);">Automatically start with Emulation Station</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="wiz-bg-companion-enabled" ${this.state.config.backglass_enabled ? 'checked' : ''}>
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
                         `;
 
                         container.innerHTML = selectHtml;
 
                         // Attach raw displays payload onto container for lookup on save
                         container.sysDisplays = displays;
+
+                        // Reactive logic for Backglass Companion toggle
+                        const bgSelect = document.getElementById('wiz-bg-display');
+                        const companionToggle = document.getElementById('wiz-bg-companion-enabled');
+
+                        if (bgSelect && companionToggle) {
+                            const updateToggle = () => {
+                                const hasSelection = bgSelect.value !== "";
+                                companionToggle.disabled = !hasSelection;
+                                if (!hasSelection) {
+                                    companionToggle.checked = false;
+                                } else if (bgSelect.dataset.lastValue === "") {
+                                    // Only auto-enable if we just switched from "None" to a selection
+                                    companionToggle.checked = true;
+                                }
+                                bgSelect.dataset.lastValue = bgSelect.value;
+                            };
+
+                            bgSelect.addEventListener('change', updateToggle);
+                            // Initial state check
+                            bgSelect.dataset.lastValue = bgSelect.value;
+                            if (bgSelect.value === "") {
+                                companionToggle.disabled = true;
+                                companionToggle.checked = false;
+                            }
+                        }
 
                     } catch (e) {
                         const container = document.getElementById('wiz-displays-container');
@@ -971,14 +1019,14 @@ class SetupWizard {
                         <div style="text-align: center; margin-bottom: 2rem;">
                             <h3 style="margin-top: 1rem; margin-bottom: 0.5rem;"><i class="fas fa-database" style="color: var(--accent-purple); margin-right: 10px;"></i>Library Sync</h3>
                             <p style="color: var(--text-secondary); font-size: 0.95rem; margin: 0;">
-                                Keep your library up to date by downloading the latest community databases and syncing your local tables.
+                                Download the latest databases and scan your local tables to build your library.
                             </p>
                         </div>
 
                         <div style="display: flex; flex-direction: column; gap: 1.5rem; max-width: 400px; margin: 0 auto;">
                             <div>
                                 <button id="wiz-btn-update-db" class="btn btn-primary" style="padding: 14px 24px; font-size: 1.05rem; width: 100%; justify-content: center; margin-bottom: 0.5rem;">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                                    <i class="fas fa-database" style="margin-right: 8px;"></i>
                                     Step 1: Update Databases
                                 </button>
                                 <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem; text-align: center;">Downloads latest VPS and standalone script hashes</p>
@@ -986,7 +1034,7 @@ class SetupWizard {
 
                             <div style="border-top: 1px solid var(--glass-border); padding-top: 1.5rem;">
                                 <button id="wiz-scan-btn" class="btn btn-primary" style="padding: 14px 24px; font-size: 1.05rem; width: 100%; justify-content: center; margin-bottom: 0.5rem;">
-                                    <i class="fas fa-sync-alt" id="wiz-scan-icon" style="margin-right: 8px;"></i> Step 2: Scan Tables
+                                    <i class="fas fa-binoculars" id="wiz-scan-icon" style="margin-right: 8px;"></i> Step 2: Scan Tables
                                 </button>
                                 <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem; text-align: center;">Scans your directories and builds your local library</p>
                             </div>
@@ -1043,7 +1091,10 @@ class SetupWizard {
                         scanBtn.onclick = async () => {
                             try {
                                 scanBtn.disabled = true;
-                                document.getElementById('wiz-scan-icon').classList.add('fa-spin');
+                                const scanIcon = document.getElementById('wiz-scan-icon');
+                                if (scanIcon) {
+                                    scanIcon.className = 'fas fa-sync-alt fa-spin';
+                                }
                                 document.getElementById('wiz-scan-status').style.display = 'block';
                                 document.getElementById('wiz-scan-spinner').style.display = 'block';
                                 document.getElementById('wiz-scan-status-label').textContent = 'Starting scan...';
@@ -1069,7 +1120,10 @@ class SetupWizard {
                                         if (status.status === 'completed' || status.status === 'failed') {
                                             clearInterval(SetupWizard._scanPolling);
                                             document.getElementById('wiz-scan-spinner').style.display = 'none';
-                                            document.getElementById('wiz-scan-icon').classList.remove('fa-spin');
+                                            const scanIcon = document.getElementById('wiz-scan-icon');
+                                            if (scanIcon) {
+                                                scanIcon.className = 'fas fa-binoculars';
+                                            }
 
                                             if (status.status === 'failed') {
                                                 document.getElementById('wiz-scan-status-label').textContent = 'Scan Failed: ' + (status.error || 'Unknown error');
@@ -1091,7 +1145,10 @@ class SetupWizard {
                                 poll();
                             } catch (e) {
                                 scanBtn.disabled = false;
-                                document.getElementById('wiz-scan-icon').classList.remove('fa-spin');
+                                const scanIcon = document.getElementById('wiz-scan-icon');
+                                if (scanIcon) {
+                                    scanIcon.className = 'fas fa-binoculars';
+                                }
                                 document.getElementById('wiz-scan-status-label').textContent = 'Scan failed: ' + e.message;
                                 document.getElementById('wiz-scan-status-label').style.color = 'var(--accent-red)';
                             }
@@ -1102,66 +1159,156 @@ class SetupWizard {
 
             case 8: // Finish
                 btnNext.style.display = 'none';
+
+                // Show a loading state first
                 html = `
-                    <div class="wizard-content-step" style="text-align: center; padding-top: 2rem;">
-                        <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--accent-emerald); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem auto; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">
-                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
-                        </div>
-                        <h2 style="margin-bottom: 1rem;">Core Setup Complete!</h2>
-                        <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem;">
-                            Your environment is configured, directories are set, and your library has been scanned. However, your tables still need artwork, videos, and metadata.
-                        </p>
-                        
-                        <div style="background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--glass-border); margin-bottom: 2rem; text-align: left;">
-                            <h4 style="color: var(--text-primary); margin-top: 0; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                                Final Steps: Matching & Scraping
-                            </h4>
-                            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.5;">
-                                To get the most out of your library, follow these two final steps using their dedicated tools:
-                            </p>
+                    <div class="wizard-content-step" id="wiz-finish-step" style="text-align: center; padding-top: 2rem;">
+                        <div class="spinner" style="width: 40px; height: 40px; margin: 0 auto 1.5rem;"></div>
+                        <p style="color: var(--text-secondary);">Finalizing setup...</p>
+                    </div>
+                `;
 
-                            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-                                <div style="display: flex; gap: 1rem; align-items: flex-start;">
-                                    <div style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 2px solid var(--accent-orange, #f59e0b); border-radius: 12px; background: rgba(245, 158, 11, 0.05); color: var(--accent-orange, #f59e0b); flex-shrink: 0; box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);">
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-                                    </div>
-                                    <div>
-                                        <h5 style="margin: 0 0 4px 0; color: var(--text-primary); font-size: 0.95rem;">1. Match Table VPS IDs</h5>
-                                        <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.4;">
-                                            First, match your existing tables to the Virtual Pinball Spreadsheet. In the Tables list, look for the orange link button to match any tables that haven't been automatically identified already.
-                                        </p>
-                                    </div>
+                // Fetch stats and update UI
+                setTimeout(async () => {
+                    try {
+                        const stats = await apiFetch('/api/tables/stats');
+                        const finishContainer = document.getElementById('wiz-finish-step');
+                        if (!finishContainer) return;
+
+                        if (stats.total_tables > 0) {
+                            // Tables found - Show Matching & Scraping instructions
+                            finishContainer.innerHTML = `
+                                <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--accent-emerald); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem auto; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">
+                                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
                                 </div>
+                                <h2 style="margin-bottom: 1rem;">Core Setup Complete!</h2>
+                                <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem;">
+                                    Your environment is configured, directories are set, and your library has been scanned (${stats.total_tables} tables found). However, your tables still need artwork, videos, and metadata.
+                                </p>
+                                
+                                <div style="background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--glass-border); margin-bottom: 2rem; text-align: left;">
+                                    <h4 style="color: var(--text-primary); margin-top: 0; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                        Final Steps: Matching & Scraping
+                                    </h4>
+                                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.5;">
+                                        To get the most out of your library, follow these two final steps using their dedicated tools:
+                                    </p>
 
-                                <div style="display: flex; gap: 1rem; align-items: flex-start;">
-                                    <div style="display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
-                                        <div style="display: flex; align-items: center; gap: 8px;">
-                                            <div style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 2px solid var(--accent-red, #ef4444); border-radius: 12px; background: rgba(239, 68, 68, 0.05); color: var(--text-secondary); box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);">
-                                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                                        <div style="display: flex; gap: 1rem; align-items: flex-start;">
+                                            <div style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 2px solid var(--accent-orange, #f59e0b); border-radius: 12px; background: rgba(245, 158, 11, 0.05); color: var(--accent-orange, #f59e0b); flex-shrink: 0; box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);">
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                                            </div>
+                                            <div>
+                                                <h5 style="margin: 0 0 4px 0; color: var(--text-primary); font-size: 0.95rem;">1. Match Table VPS IDs</h5>
+                                                <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.4;">
+                                                    First, match your existing tables to the Virtual Pinball Spreadsheet. In the Tables list, look for the orange link button to match any tables that haven't been automatically identified already.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div style="display: flex; gap: 1rem; align-items: flex-start;">
+                                            <div style="display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <div style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 2px solid var(--accent-red, #ef4444); border-radius: 12px; background: rgba(239, 68, 68, 0.05); color: var(--text-secondary); box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);">
+                                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <h5 style="margin: 0 0 4px 0; color: var(--text-primary); font-size: 0.95rem;">2. Scrape Media Files</h5>
+                                                <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.4;">
+                                                    Once matched, go to the Tables Media page. Use the <span style="background: var(--accent-blue, #3b82f6); color: white; padding: 3px 8px; border-radius: 6px; font-weight: 500; font-size: 0.8rem; white-space: nowrap; margin: 0 4px; display: inline-flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>Scrape All Missing</span> button to download artwork, videos, and metadata.
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
-                                    <div>
-                                        <h5 style="margin: 0 0 4px 0; color: var(--text-primary); font-size: 0.95rem;">2. Scrape Media Files</h5>
-                                        <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.4;">
-                                            Once matched, go to the Tables Media page. Use the <span style="background: var(--accent-blue, #3b82f6); color: white; padding: 3px 8px; border-radius: 6px; font-weight: 500; font-size: 0.8rem; white-space: nowrap; margin: 0 4px; display: inline-flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>Scrape All Missing</span> button to download artwork, videos, and metadata.
-                                        </p>
+                                </div>
+
+                                <div style="display: flex; gap: 1rem; justify-content: center;">
+                                    <button class="btn btn-primary" onclick="window.location.hash = 'tables/list'; SetupWizard.finish();" style="padding: 12px 24px; font-size: 1rem;">
+                                        Match Table VPS IDs
+                                    </button>
+                                    <button class="btn btn-secondary" onclick="window.location.hash = 'tables/media'; SetupWizard.finish();" style="padding: 12px 24px; font-size: 1rem;">
+                                        Go to Media Scraper
+                                    </button>
+                                </div>
+                            `;
+                        } else {
+                            // No tables found - Show Add First Table instructions
+                            finishContainer.innerHTML = `
+                                <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--accent-blue); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem auto; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);">
+                                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+                                </div>
+                                <h2 style="margin-bottom: 1rem;">Ready to Add Your First Table?</h2>
+                                <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem;">
+                                    Your environment is configured, but your library is currently empty. Let's get your first table installed!
+                                </p>
+                                
+                                <div style="background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--glass-border); margin-bottom: 2rem; text-align: left;">
+                                    <h4 style="color: var(--text-primary); margin-top: 0; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                                        Next Step: Automated Table Import
+                                    </h4>
+                                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.5;">
+                                        Adding a table in VPX Manager is a guided process that handles the heavy lifting for you:
+                                    </p>
+
+                                    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                                        <div style="display: flex; gap: 1rem; align-items: flex-start;">
+                                            <div style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 2px solid var(--accent-blue); border-radius: 12px; background: rgba(59, 130, 246, 0.05); color: var(--accent-blue); flex-shrink: 0; box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);">
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                            </div>
+                                            <div>
+                                                <h5 style="margin: 0 0 4px 0; color: var(--text-primary); font-size: 0.95rem;">1. Add New Table</h5>
+                                                <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.4;">
+                                                    Go to the <strong>Add New Table</strong> page. You can drag and drop a .vpx file or browse for one on your computer to start the import.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div style="display: flex; gap: 1rem; align-items: flex-start;">
+                                            <div style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 2px solid var(--accent-emerald); border-radius: 12px; background: rgba(16, 185, 129, 0.05); color: var(--accent-emerald); flex-shrink: 0; box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);">
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                            </div>
+                                            <div>
+                                                <h5 style="margin: 0 0 4px 0; color: var(--text-primary); font-size: 0.95rem;">2. Automated Setup</h5>
+                                                <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.4;">
+                                                    The wizard will help you match the table to the VPS, download the correct ROM, and patch the table script automatically for standalone compatibility.
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
 
-                        <div style="display: flex; gap: 1rem; justify-content: center;">
-                            <button class="btn btn-primary" onclick="window.location.hash = 'tables/list'; SetupWizard.finish();" style="padding: 12px 24px; font-size: 1rem;">
-                                Match Table VPS IDs
-                            </button>
-                            <button class="btn btn-secondary" onclick="window.location.hash = 'tables/media'; SetupWizard.finish();" style="padding: 12px 24px; font-size: 1rem;">
-                                Go to Media Scraper
-                            </button>
-                        </div>
-                    </div>
-                `;
+                                <div style="display: flex; gap: 1rem; justify-content: center;">
+                                    <button class="btn btn-primary" onclick="window.location.hash = 'upload'; SetupWizard.finish();" style="padding: 12px 24px; font-size: 1rem;">
+                                        Add Your First Table
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch stats for finish step:', e);
+                        // Fallback to original content if API fails
+                        const finishContainer = document.getElementById('wiz-finish-step');
+                        if (finishContainer) finishContainer.innerHTML = `
+                            <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--accent-emerald); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem auto; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+                            </div>
+                            <h2 style="margin-bottom: 1rem;">Core Setup Complete!</h2>
+                            <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem;">
+                                Your environment is configured. However, your tables still need artwork, videos, and metadata.
+                            </p>
+                            <div style="display: flex; gap: 1rem; justify-content: center;">
+                                <button class="btn btn-primary" onclick="window.location.hash = 'tables/list'; SetupWizard.finish();" style="padding: 12px 24px; font-size: 1rem;">
+                                    Go to Library
+                                </button>
+                            </div>
+                        `;
+                    }
+                }, 100);
                 break;
         }
 

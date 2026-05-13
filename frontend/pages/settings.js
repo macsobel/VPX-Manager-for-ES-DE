@@ -103,11 +103,15 @@ const SettingsPage = {
                     </button>
                     <button class="btn btn-secondary" id="btn-sync-vps">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
-                        Sync VPS Database
+                        Sync Databases
                     </button>
                     <button class="btn btn-secondary" id="btn-check-updates">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
                         Check for Updates
+                    </button>
+                    <button class="btn btn-danger" id="btn-delete-backups">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        Delete Backups
                     </button>
                 </div>
             </div>
@@ -727,9 +731,13 @@ const SettingsPage = {
             btn.innerHTML = '<div class="spinner" style="width: 14px; height: 14px;"></div> Syncing...';
 
             try {
-                Toast.info('Syncing VPS database...');
-                const res = await fetch('/api/vps/sync', { method: 'POST' });
-                const startData = await res.json();
+                Toast.info('Updating community databases...');
+                // Sync VPS Database
+                const resVps = await fetch('/api/vps/sync', { method: 'POST' });
+                // Sync Standalone Script Hashes
+                const resHashes = await fetch('/api/vbs-manager/refresh-patches', { method: 'POST' });
+
+                const startData = await resVps.json();
 
                 if (!startData.success) {
                     Toast.error(startData.message || 'Failed to start sync');
@@ -744,7 +752,7 @@ const SettingsPage = {
                     const statusData = await statusRes.json();
 
                     if (statusData.status === 'completed' || statusData.status === 'idle') {
-                        Toast.success(statusData.message || 'VPS Database sync complete');
+                        Toast.success('Databases updated successfully');
                         btn.disabled = false;
                         btn.innerHTML = originalHtml;
                     } else if (statusData.status === 'failed') {
@@ -795,6 +803,22 @@ const SettingsPage = {
                 btn.disabled = false;
                 btn.innerHTML = originalHtml;
             }
+        };
+        
+        document.getElementById('btn-delete-backups').onclick = () => {
+            Modal.confirm('Delete All Backups', 'Are you sure you want to delete all snapshots for all tables? This cannot be undone.', async () => {
+                try {
+                    const res = await fetch('/api/tables/all/delete', { method: 'DELETE' });
+                    if (res.ok) {
+                        Toast.success('All backups deleted');
+                        this.loadSystemStatus();
+                    } else {
+                        Toast.error('Failed to delete backups');
+                    }
+                } catch (e) {
+                    Toast.error('Failed to initiate deletion');
+                }
+            });
         };
     },
 };

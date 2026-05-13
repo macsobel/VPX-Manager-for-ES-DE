@@ -60,6 +60,7 @@ class SettingsUpdate(BaseModel):
     display_count: Optional[int] = None
     displays: Optional[list] = None
     dmd_enabled: Optional[bool] = None
+    backglass_enabled: Optional[bool] = None
 
 
 

@@ -111,6 +111,24 @@ async def delete_nvram(filename: str):
     return {"success": False, "error": "File not found"}
 
 
+@router.delete("/nvram/all/delete")
+async def delete_all_nvrams():
+    """Delete all files from the master repository."""
+    repo_dir = get_nvram_repo_dir()
+    if not repo_dir.exists():
+        return {"success": True, "count": 0}
+
+    try:
+        count = 0
+        for f in repo_dir.rglob("*.nv"):
+            if f.is_file():
+                f.unlink()
+                count += 1
+        return {"success": True, "count": count}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @router.post("/nvram/install")
 async def install_nvrams():
     """Bulk install NVRAMs from repo to matching table folders."""

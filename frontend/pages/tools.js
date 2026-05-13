@@ -183,6 +183,17 @@ const ToolsPage = {
                     </button>
                 </div>
                 <div class="detail-panel-body" id="nvram-manager-body"></div>
+                <div class="detail-panel-footer" id="nvram-manager-footer" style="padding: 1rem; border-top: 1px solid var(--glass-border); display: none; justify-content: flex-end;">
+                    <button class="btn btn-secondary" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.2);" onclick="ToolsPage.deleteAllNvramFiles()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                        </svg>
+                        Delete All Files
+                    </button>
+                </div>
             </div>
 
             <!-- Backglass Configuration Panel -->
@@ -355,6 +366,7 @@ const ToolsPage = {
         const list = document.getElementById('nvram-file-list');
         const count = document.getElementById('nvram-count');
         const btnInstall = document.getElementById('btn-install-nvrams');
+        const footer = document.getElementById('nvram-manager-footer');
 
         if (!list) return;
 
@@ -364,6 +376,10 @@ const ToolsPage = {
             btnInstall.disabled = this.nvramFiles.length === 0;
             // Optionally change style if disabled
             btnInstall.style.opacity = this.nvramFiles.length === 0 ? '0.5' : '1';
+        }
+
+        if (footer) {
+            footer.style.display = this.nvramFiles.length > 0 ? 'flex' : 'none';
         }
 
         if (this.nvramFiles.length === 0) {
@@ -404,6 +420,23 @@ const ToolsPage = {
                 }
             } catch (e) {
                 Toast.error('Error deleting file: ' + e.message);
+            }
+        });
+    },
+
+    async deleteAllNvramFiles() {
+        Modal.confirm('Delete All NVRAM Files', `Are you sure you want to delete <strong>all ${this.nvramFiles.length}</strong> files in the repository? This cannot be undone.`, async () => {
+            try {
+                const res = await fetch('/api/tools/nvram/all/delete', { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    Toast.success(`Deleted ${data.count} files`);
+                    this.loadNvramFiles();
+                } else {
+                    Toast.error('Failed to delete: ' + data.error);
+                }
+            } catch (e) {
+                Toast.error('Error deleting files: ' + e.message);
             }
         });
     },
@@ -507,7 +540,7 @@ const ToolsPage = {
                     <div class="settings-group" style="margin-bottom: 2rem; border: 1px solid var(--border-subtle); padding: var(--space-md); border-radius: var(--radius-md); background: rgba(255,255,255,0.02);">
                         <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: var(--space-xs); color: var(--text-secondary);">Backglass Assignment</div>
                         <div style="font-size: 0.85rem; color: var(--text-tertiary); line-height: 1.4;">
-                            The Backglass display is now managed centrally. You can assign which monitor should show the backglass in your 
+                            You can assign which monitor should show the backglass in your 
                             <a href="#settings" onclick="ToolsPage.closeBackglassPanel()" style="color: var(--accent-blue); text-decoration: none;">Cabinet Display Profile</a>.
                         </div>
                         <div style="margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
