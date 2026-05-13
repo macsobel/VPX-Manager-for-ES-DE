@@ -1129,7 +1129,7 @@ class SetupWizard {
                                     <div>
                                         <h5 style="margin: 0 0 4px 0; color: var(--text-primary); font-size: 0.95rem;">1. Match Table VPS IDs</h5>
                                         <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.4;">
-                                            First, link your tables to the Virtual Pinball Spreadsheet. In the Tables list, look for the orange link button to automatically find and assign VPS matches.
+                                            First, match your existing tables to the Virtual Pinball Spreadsheet. In the Tables list, look for the orange link button to match any tables that haven't been automatically identified already.
                                         </p>
                                     </div>
                                 </div>
