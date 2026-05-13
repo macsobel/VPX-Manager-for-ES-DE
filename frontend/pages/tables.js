@@ -524,12 +524,26 @@ const TablesPage = {
             const isSafari = /Apple/.test(navigator.vendor) && /Safari/.test(navigator.userAgent) && !isChrome;
             const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
+            // Check platform to hide AirDrop on Linux
+            let isLinux = false;
+            try {
+                const sysRes = await fetch('/api/system/status');
+                if (sysRes.ok) {
+                    const sysInfo = await sysRes.json();
+                    if (sysInfo.platform === 'linux') {
+                        isLinux = true;
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to fetch system status", e);
+            }
+
             const choices = [
                 { label: 'Cancel', class: 'btn-secondary', onClick: () => { Modal.hide(); } }
             ];
 
             // AirDrop only makes sense if we are local on a Mac
-            if (isLocal && (isSafari || (!isFirefox && !isChrome && navigator.canShare))) {
+            if (!isLinux && isLocal && (isSafari || (!isFirefox && !isChrome && navigator.canShare))) {
                 choices.push({
                     label: 'AirDrop',
                     class: 'btn-primary',
@@ -662,7 +676,7 @@ const TablesPage = {
                     ${(!isLocal && isChrome) ? `
                         <div style="margin-top: 10px; padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.75rem; color: var(--text-tertiary); max-width: 340px;">
                             <strong style="color: var(--text-secondary); display: block; margin-bottom: 4px;">Remote Chrome User:</strong>
-                            Chrome may rename this download to a random ID. The original file is stored on your <strong>Server Mac</strong> at:<br/>
+                            Chrome may rename this download to a random ID. The original file is stored on your <strong>Server</strong> at:<br/>
                             <code style="display: block; margin-top: 6px; color: var(--accent-emerald); word-break: break-all;">~/Library/Application Support/VPX Manager for ES-DE/Mobile Builds/</code>
                         </div>
                     ` : ''}
@@ -672,10 +686,12 @@ const TablesPage = {
                     <button class="btn btn-primary" id="btn-share-download-vpxz">
                         Download .vpxz
                     </button>
+                    ${!isLinux ? `
                     <button class="btn btn-primary" id="btn-share-trigger" style="${showWarning ? 'background: var(--accent-amber); border-color: var(--accent-amber); color: #000;' : ''}">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                         ${isSafari ? 'AirDrop' : 'Try AirDrop'}
                     </button>
+                    ` : ''}
                 </div>
             `;
 
@@ -692,9 +708,10 @@ const TablesPage = {
                 Modal.hide();
                 Toast.success('Download started');
             };
-            document.getElementById('btn-share-trigger').onclick = async () => {
-                const triggerBtn = document.getElementById('btn-share-trigger');
-                triggerBtn.disabled = true;
+            if (!isLinux) {
+                document.getElementById('btn-share-trigger').onclick = async () => {
+                    const triggerBtn = document.getElementById('btn-share-trigger');
+                    triggerBtn.disabled = true;
                 triggerBtn.innerHTML = '<div class="spinner-sm"></div> Preparing...';
                 
                 try {
@@ -718,10 +735,11 @@ const TablesPage = {
                     if (err.name !== 'AbortError') {
                         Toast.error('Sharing failed: ' + err.message);
                     }
-                    triggerBtn.disabled = false;
-                    triggerBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> Try AirDrop';
-                }
-            };
+                        triggerBtn.disabled = false;
+                        triggerBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> Try AirDrop';
+                    }
+                };
+            }
         } catch (e) {
             Modal.hide();
             Toast.error('Export error: ' + e.message);

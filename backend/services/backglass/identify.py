@@ -123,7 +123,7 @@ def identify_screen(display_index):
         # Ensure window is registered with the OS and focused
         pygame.event.pump()
         
-        # Force foreground on macOS
+        # Force foreground
         if sys.platform == "darwin":
             try:
                 # Use a more robust AppleScript that targets the current process
@@ -131,6 +131,19 @@ def identify_screen(display_index):
                 curr_pid = os.getpid()
                 script = f'tell application "System Events" to set frontmost of every process whose unix id is {curr_pid} to true'
                 subprocess.Popen(["osascript", "-e", script])
+            except:
+                pass
+        elif sys.platform == "linux":
+            try:
+                import sys
+                import pathlib
+                # Add backend to path to allow importing linux_focus if not already there
+                base_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent
+                if str(base_dir) not in sys.path:
+                    sys.path.append(str(base_dir))
+                from backend.services.linux_focus import focus_window
+                # Pygame window name defaults to "pygame window"
+                focus_window("pygame window")
             except:
                 pass
                 

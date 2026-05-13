@@ -614,7 +614,7 @@ async def launch_table(table_id: int):
                 exec_path = str(files[0])
 
     try:
-        if app_path.endswith(".app") and not os.path.exists(exec_path):
+        if sys.platform == "darwin" and app_path.endswith(".app") and not os.path.exists(exec_path):
             cmd = ["open", "-a", app_path, "--args", "-play", str(table_path)]
             if getattr(config, "vpx_display_mode", "Desktop") == "Desktop":
                 cmd.append("-EnableTrueFullscreen")
