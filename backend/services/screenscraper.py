@@ -426,7 +426,6 @@ async def download_media_for_table(
     esde_base = Path(cfg.esde_media_base)
     from backend.services.gamelist_manager import GamelistManager
 
-    # FIX: Use the actual gamelist.xml path, not the tables directory
     gm = GamelistManager(str(cfg.get_gamelist_xml_path()))
 
     # 1. Search ScreenScraper
