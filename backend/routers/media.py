@@ -8,11 +8,28 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 import backend.core.database as db
-from backend.services.media_manager import (delete_media_file, get_all_media_status,
-                                    get_media_file_path, get_media_status,
-                                    save_uploaded_media)
+from backend.services.media_manager import (ESDE_STATUS_TYPES,
+                                            delete_media_file,
+                                            get_all_media_status,
+                                            get_media_file_path,
+                                            get_media_status,
+                                            save_uploaded_media)
 
 router = APIRouter(prefix="/api/media", tags=["media"])
+
+
+async def validate_table_and_media(table_id: int, media_type: str):
+    """Validate that a table exists and the media type is valid."""
+    table = await db.get_table(table_id)
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    if media_type not in ESDE_STATUS_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid media type. Must be one of: {ESDE_STATUS_TYPES}",
+        )
+    return table
 
 
 @router.get("/missing")
@@ -68,17 +85,7 @@ async def get_table_media(table_id: int):
 @router.post("/{table_id}/upload")
 async def upload_media(table_id: int, media_type: str, file: UploadFile = File(...)):
     """Upload a media file for a table."""
-    table = await db.get_table(table_id)
-    if not table:
-        raise HTTPException(status_code=404, detail="Table not found")
-
-    from backend.services.media_manager import ESDE_STATUS_TYPES
-
-    valid_types = ESDE_STATUS_TYPES
-    if media_type not in valid_types:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid media type. Must be one of: {valid_types}"
-        )
+    await validate_table_and_media(table_id, media_type)
 
     content = await file.read()
     result = await save_uploaded_media(table_id, media_type, file.filename, content)
@@ -88,17 +95,7 @@ async def upload_media(table_id: int, media_type: str, file: UploadFile = File(.
 @router.delete("/{table_id}/{media_type}")
 async def delete_media(table_id: int, media_type: str):
     """Delete a specific media file for a table."""
-    table = await db.get_table(table_id)
-    if not table:
-        raise HTTPException(status_code=404, detail="Table not found")
-
-    from backend.services.media_manager import ESDE_STATUS_TYPES
-
-    valid_types = ESDE_STATUS_TYPES
-    if media_type not in valid_types:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid media type. Must be one of: {valid_types}"
-        )
+    await validate_table_and_media(table_id, media_type)
 
     result = await delete_media_file(table_id, media_type)
     if not result.get("success"):
