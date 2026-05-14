@@ -12,7 +12,8 @@ from pathlib import Path
 
 import aiosqlite
 
-from backend.core.config import config, relativize_path as _relativize_path
+from backend.core.config import config
+from backend.core.config import relativize_path as _relativize_path
 
 DB_PATH = config.db_path
 
@@ -411,6 +412,7 @@ async def get_table_by_filename(filename: str) -> dict | None:
     finally:
         await db.close()
 
+
 async def get_table_by_path(full_path: str) -> dict | None:
     """Find a table by its full absolute path."""
     p = Path(full_path).expanduser()
@@ -650,5 +652,29 @@ async def remove_table_from_collection(collection_id: int, table_id: int) -> boo
         )
         await db.commit()
         return cursor.rowcount > 0
+    finally:
+        await db.close()
+
+
+async def get_all_collection_tables() -> dict[int, list[dict]]:
+    """Fetch all tables for all collections in a single query."""
+    db = await get_db()
+    try:
+        query = """
+            SELECT ct.collection_id, t.*
+            FROM collection_tables ct
+            JOIN tables t ON ct.table_id = t.id
+        """
+        cursor = await db.execute(query)
+        rows = await cursor.fetchall()
+        result = {}
+        for row in rows:
+            col_id = row["collection_id"]
+            if col_id not in result:
+                result[col_id] = []
+            formatted = _format_table_row(row)
+            if formatted:
+                result[col_id].append(formatted)
+        return result
     finally:
         await db.close()

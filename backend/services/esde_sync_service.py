@@ -10,6 +10,7 @@ from backend.core.config import config
 
 logger = logging.getLogger(__name__)
 
+
 class ESDESyncService:
     def __init__(self):
         self.collections_dir = self._get_collections_dir()
@@ -23,7 +24,13 @@ class ESDESyncService:
         """Locate the ES-DE custom collections directory."""
         if platform.system() == "Darwin":
             # Check both standard and hidden locations for macOS
-            path = Path.home() / "Library" / "Application Support" / "ES-DE" / "collections"
+            path = (
+                Path.home()
+                / "Library"
+                / "Application Support"
+                / "ES-DE"
+                / "collections"
+            )
             if not path.exists():
                 path = Path.home() / ".emulationstation" / "collections"
             return path
@@ -34,17 +41,23 @@ class ESDESyncService:
     def _sanitize_filename(self, name: str) -> str:
         """Sanitize collection name for filesystem usage."""
         # Remove non-alphanumeric except spaces/dashes/underscores
-        name = re.sub(r'[^\w\s-]', '', name)
-        return name.strip().replace(' ', '_')
+        name = re.sub(r"[^\w\s-]", "", name)
+        return name.strip().replace(" ", "_")
 
-    async def export_to_esde(self, collection_id: int):
+    async def export_to_esde(
+        self, collection_id: int, collection: dict = None, tables: list = None
+    ):
         """Write a database collection to an ES-DE .cfg file."""
         try:
-            collection = await db.get_collection(collection_id)
+            collection = collection or await db.get_collection(collection_id)
             if not collection:
                 return
 
-            tables = await db.get_tables(collection_id=collection_id, limit=1000)
+            tables = (
+                tables
+                if tables is not None
+                else await db.get_tables(collection_id=collection_id, limit=1000)
+            )
             if not tables:
                 # If collection exists in ES-DE but is now empty in DB, remove the file
                 # unless we want to keep empty files. ES-DE usually ignores empty .cfg
@@ -67,7 +80,9 @@ class ESDESyncService:
 
             if paths:
                 file_path.write_text("\n".join(paths) + "\n")
-                logger.info(f"Exported collection '{collection['name']}' to {file_path}")
+                logger.info(
+                    f"Exported collection '{collection['name']}' to {file_path}"
+                )
             else:
                 if file_path.exists():
                     file_path.unlink()
@@ -84,7 +99,9 @@ class ESDESyncService:
                 file_path.unlink()
                 logger.info(f"Deleted ES-DE collection file: {file_path}")
         except Exception as e:
-            logger.error(f"Failed to delete ES-DE collection file for '{collection_name}': {e}")
+            logger.error(
+                f"Failed to delete ES-DE collection file for '{collection_name}': {e}"
+            )
 
     async def import_from_esde(self):
         """Scan ES-DE folder and update database collections."""
@@ -104,10 +121,12 @@ class ESDESyncService:
             for cfg in cfg_files:
                 # Extract name: custom-My_Collection.cfg -> My Collection
                 name = cfg.stem.replace("custom-", "").replace("_", " ")
-                
+
                 # 1. Ensure collection exists in DB
                 if name not in collection_map:
-                    collection_id = await db.create_collection(name=name, description="Imported from ES-DE")
+                    collection_id = await db.create_collection(
+                        name=name, description="Imported from ES-DE"
+                    )
                     collection_map[name] = collection_id
                     logger.info(f"Created new collection '{name}' from ES-DE import")
                 else:
@@ -116,7 +135,7 @@ class ESDESyncService:
                 # 2. Sync tables in collection
                 lines = cfg.read_text().splitlines()
                 paths_in_cfg = {line.strip() for line in lines if line.strip()}
-                
+
                 # Get current tables in DB collection
                 db_tables = await db.get_tables(collection_id=collection_id, limit=2000)
                 paths_in_db = {t["vpx_path"] for t in db_tables if t.get("vpx_path")}
@@ -128,7 +147,9 @@ class ESDESyncService:
                         table = await db.get_table_by_path(path)
                         if table:
                             await db.add_table_to_collection(collection_id, table["id"])
-                            logger.info(f"Added '{table['name']}' to collection '{name}' via ES-DE sync")
+                            logger.info(
+                                f"Added '{table['name']}' to collection '{name}' via ES-DE sync"
+                            )
 
                 # Remove tables NOT in CFG (True bi-directional sync)
                 # If we want VPX Manager to be the master, we might skip this.
@@ -136,7 +157,9 @@ class ESDESyncService:
                 for t in db_tables:
                     if t.get("vpx_path") not in paths_in_cfg:
                         await db.remove_table_from_collection(collection_id, t["id"])
-                        logger.info(f"Removed '{t['name']}' from collection '{name}' via ES-DE sync")
+                        logger.info(
+                            f"Removed '{t['name']}' from collection '{name}' via ES-DE sync"
+                        )
 
         except Exception as e:
             logger.error(f"Failed to import collections from ES-DE: {e}")
@@ -146,12 +169,16 @@ class ESDESyncService:
         logger.info("Starting bi-directional ES-DE collection sync...")
         # 1. Import from ES-DE first (it might have newer data if user edited files)
         await self.import_from_esde()
-        
+
         # 2. Export all back to ES-DE to ensure files are up to date
         collections = await db.get_collections()
+        all_tables = await db.get_all_collection_tables()
         for c in collections:
-            await self.export_to_esde(c["id"])
-        
+            await self.export_to_esde(
+                c["id"], collection=c, tables=all_tables.get(c["id"], [])
+            )
+
         logger.info("ES-DE collection sync complete.")
+
 
 esde_sync = ESDESyncService()
