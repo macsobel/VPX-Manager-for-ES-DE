@@ -100,7 +100,7 @@ def identify_screen(display_index):
     for _ in range(3):
         if pygame.display.get_num_displays() > display_index: break
         pygame.display.quit()
-        time.sleep(0.1)
+        pygame.time.wait(100)
         pygame.display.init()
 
     try:
@@ -169,11 +169,12 @@ def identify_screen(display_index):
         pygame.display.flip()
         
         start_time = time.time()
+        clock = pygame.time.Clock()
         while time.time() - start_time < 5:
             for event in pygame.event.get():
                 if time.time() - start_time < 3: continue
                 if event.type in [pygame.QUIT, pygame.KEYDOWN]: return
-            time.sleep(0.1)
+            clock.tick(60)
     finally:
         pygame.display.quit()
 
