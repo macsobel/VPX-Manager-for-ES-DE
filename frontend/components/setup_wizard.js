@@ -402,6 +402,7 @@ class SetupWizard {
                 break;
 
             case 2: // VPX Path
+                const isLinux = this.state.config.platform === 'linux';
                 html = `
                     <div class="wizard-content-step">
                         <h4 style="color: var(--text-primary); margin-top: 1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
@@ -411,7 +412,7 @@ class SetupWizard {
                         <div style="background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--glass-border); margin-bottom: 1.5rem;">
                             <h4 style="color: var(--text-primary); margin-top: 0; margin-bottom: 1rem;">Step 1: Download & Install Visual Pinball</h4>
                             <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.2rem;">
-                                Download a recent Visual Pinball X build for macOS.
+                                Download a recent Visual Pinball X build for ${isLinux ? 'Linux' : 'macOS'}.
                             </p>
                             
                             <div style="background: rgba(59, 130, 246, 0.08); border-left: 4px solid var(--accent-blue); padding: 1rem; margin-bottom: 1.5rem; border-radius: 6px; font-size: 0.9rem; color: var(--text-primary); line-height: 1.5;">
@@ -419,7 +420,7 @@ class SetupWizard {
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
                                     BGFX Recommended
                                 </div>
-                                BGFX supports Metal and is more stable on macOS.
+                                BGFX ${isLinux ? 'is recommended' : 'supports Metal and is more stable on macOS'}.
                             </div>
 
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -434,10 +435,15 @@ class SetupWizard {
                                 <li><a href="https://github.com/login/" target="_blank" style="color: var(--accent-blue); text-decoration: none;">Login</a> to Github.</li>    
                                 <li><a href="https://github.com/vpinball/vpinball/actions/workflows/vpinball.yml" target="_blank" style="color: var(--accent-blue); text-decoration: none;">Click here</a> and select the latest <strong>successful</strong> <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-top: -2px;"><circle cx="12" cy="12" r="10" fill="#22c55e"/><path d="M8 12.5L10.5 15L16 9" stroke="black" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg> workflow from the Actions page.</li>
                                 <li>Scroll down to the <strong>Artifacts</strong> section.</li>
-                                <li>Download the version for your Mac:
+                                <li>Download the version for your ${isLinux ? 'system' : 'Mac'}:
                                     <ul style="margin: 4px 0 0 0; padding-left: 1.2rem; color: var(--text-primary);">
+                                        ${isLinux ? `
+                                        <li><strong>VPinball_BGFX-linux-x64-Release.AppImage</strong></li>
+                                        <li><strong>VPinball_BGFX-linux-arm64-Release.AppImage</strong></li>
+                                        ` : `
                                         <li><strong>VPinball_BGFX-macos-arm64-Release.dmg</strong></li>
                                         <li><strong>VPinball_BGFX-macos-x64-Release.dmg</strong></li>
+                                        `}
                                     </ul>
                                 </li>
                             </ol>
