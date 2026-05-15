@@ -25,18 +25,45 @@ def _indent(elem, level=0):
 class GamelistManager:
     def __init__(self, xml_path: str):
         self.xml_path = Path(xml_path)
+        self._tree: Optional[ET.ElementTree] = None
+        self._root: Optional[ET.Element] = None
+        self._game_map: Dict[str, list[ET.Element]] = {}
+        self._folder_map: Dict[str, list[ET.Element]] = {}
 
     def _load_tree(self) -> tuple[ET.ElementTree, ET.Element]:
+        if self._tree is not None and self._root is not None:
+            return self._tree, self._root
+
         if self.xml_path.exists():
             try:
-                tree = ET.parse(self.xml_path)
-                return tree, tree.getroot()
+                self._tree = ET.parse(self.xml_path)
+                self._root = self._tree.getroot()
+                self._build_map()
+                return self._tree, self._root
             except Exception as e:
                 logger.error(f"Error parsing gamelist.xml: {e}")
 
-        root = ET.Element("gameList")
-        tree = ET.ElementTree(root)
-        return tree, root
+        self._root = ET.Element("gameList")
+        self._tree = ET.ElementTree(self._root)
+        self._build_map()
+        return self._tree, self._root
+
+    def _build_map(self):
+        """Build a mapping of normalized paths to elements for fast lookups."""
+        self._game_map = {}
+        self._folder_map = {}
+        if self._root is None:
+            return
+
+        for elem in self._root:
+            if elem.tag in ("game", "folder"):
+                path_elem = elem.find("path")
+                if path_elem is not None and path_elem.text:
+                    norm = self._normalize_path(path_elem.text)
+                    if elem.tag == "game":
+                        self._game_map.setdefault(norm, []).append(elem)
+                    elif elem.tag == "folder":
+                        self._folder_map.setdefault(norm, []).append(elem)
 
     def _normalize_path(self, p: str) -> str:
         """Standardize path for comparison: lowercase, forward slashes, strip whitespace, ensure ./ prefix."""
@@ -60,26 +87,25 @@ class GamelistManager:
         norm_rom_path = self._normalize_path(rom_path)
 
         # 1. Update/Create <game>
+        game_matches = self._game_map.get(norm_rom_path, [])
         game_elem = None
         duplicates_to_remove = []
-        for game in root.findall("game"):
-            path_elem = game.find("path")
-            if (
-                path_elem is not None
-                and self._normalize_path(path_elem.text) == norm_rom_path
-            ):
-                if game_elem is None:
-                    game_elem = game
-                else:
-                    duplicates_to_remove.append(game)
+
+        if game_matches:
+            game_elem = game_matches[0]
+            duplicates_to_remove = game_matches[1:]
 
         for dup in duplicates_to_remove:
             root.remove(dup)
+
+        if duplicates_to_remove:
+            self._game_map[norm_rom_path] = [game_elem]
 
         if game_elem is None:
             logger.info(f"Creating new <game> entry for {rom_path}")
             game_elem = ET.SubElement(root, "game")
             path_elem = ET.SubElement(game_elem, "path")
+            self._game_map.setdefault(norm_rom_path, []).append(game_elem)
         else:
             path_elem = game_elem.find("path")
 
@@ -132,16 +158,15 @@ class GamelistManager:
     def get_game(self, rom_path: str) -> Optional[Dict[str, str]]:
         _, root = self._load_tree()
         norm_path = self._normalize_path(rom_path)
-        for game in root.findall("game"):
-            path_elem = game.find("path")
-            if (
-                path_elem is not None
-                and self._normalize_path(path_elem.text) == norm_path
-            ):
-                res = {}
-                for child in game:
-                    res[child.tag] = child.text
-                return res
+
+        game_matches = self._game_map.get(norm_path, [])
+        if game_matches:
+            game = game_matches[0]
+            res = {}
+            for child in game:
+                res[child.tag] = child.text
+            return res
+
         return None
 
     def rename_game(self, old_rom_path: str, new_rom_path: str):
@@ -151,13 +176,9 @@ class GamelistManager:
         found = False
 
         # 1. Rename <game> entries
-        game_matches = []
-        for game in root.findall("game"):
-            path_elem = game.find("path")
-            if path_elem is not None:
-                p_norm = self._normalize_path(path_elem.text)
-                if p_norm == norm_old or p_norm == norm_new:
-                    game_matches.append(game)
+        game_matches = self._game_map.get(norm_old, []) + self._game_map.get(
+            norm_new, []
+        )
 
         if game_matches:
             # Keep the first match, update it, remove any others to prevent duplicates
@@ -174,18 +195,33 @@ class GamelistManager:
             old_stem = Path(old_rom_path).stem
             new_stem = Path(new_rom_path).stem
             if old_stem != new_stem:
-                for tag in ["image", "video", "marquee", "fanart", "thumbnail", "manual"]:
+                for tag in [
+                    "image",
+                    "video",
+                    "marquee",
+                    "fanart",
+                    "thumbnail",
+                    "manual",
+                ]:
                     elem = first_game.find(tag)
                     if elem is not None and elem.text:
                         p = Path(elem.text.replace("\\", "/"))
                         if p.name.startswith(old_stem):
                             new_name = p.name.replace(old_stem, new_stem, 1)
                             new_text = str(p.parent / new_name).replace("\\", "/")
-                            if elem.text.startswith("./") and not new_text.startswith("./"):
+                            if elem.text.startswith("./") and not new_text.startswith(
+                                "./"
+                            ):
                                 new_text = f"./{new_text}"
-                            elif not elem.text.startswith("./") and new_text.startswith("./"):
+                            elif not elem.text.startswith("./") and new_text.startswith(
+                                "./"
+                            ):
                                 new_text = new_text[2:]
                             elem.text = new_text
+
+            # Update cache map
+            self._game_map.pop(norm_old, None)
+            self._game_map[norm_new] = [first_game]
 
             for dup in game_matches[1:]:
                 root.remove(dup)
@@ -201,13 +237,9 @@ class GamelistManager:
             norm_old_folder = self._normalize_path(old_folder)
             norm_new_folder = self._normalize_path(new_folder)
 
-            folder_matches = []
-            for fol in root.findall("folder"):
-                fpath_elem = fol.find("path")
-                if fpath_elem is not None:
-                    p_norm = self._normalize_path(fpath_elem.text)
-                    if p_norm == norm_old_folder or p_norm == norm_new_folder:
-                        folder_matches.append(fol)
+            folder_matches = self._folder_map.get(
+                norm_old_folder, []
+            ) + self._folder_map.get(norm_new_folder, [])
 
             if folder_matches:
                 first_fol = folder_matches[0]
@@ -219,11 +251,17 @@ class GamelistManager:
                 )
                 found = True
 
+                # Update cache map
+                self._folder_map.pop(norm_old_folder, None)
+                self._folder_map[norm_new_folder] = [first_fol]
+
                 for dup in folder_matches[1:]:
                     root.remove(dup)
 
         if found:
             _indent(root)
+            # Rebuild map entirely since many entries were removed
+            self._build_map()
             try:
                 self.xml_path.parent.mkdir(parents=True, exist_ok=True)
                 tree.write(self.xml_path, encoding="utf-8", xml_declaration=True)
@@ -265,7 +303,7 @@ class GamelistManager:
             full_path = tables_path / rel_str
             # Handle case where XML paths redundantly include the Tables folder name
             if not full_path.exists() and rel_str.startswith(f"{tables_path.name}/"):
-                alt_path = tables_path / rel_str[len(tables_path.name)+1:]
+                alt_path = tables_path / rel_str[len(tables_path.name) + 1 :]
                 if alt_path.exists():
                     full_path = alt_path
 
@@ -292,18 +330,14 @@ class GamelistManager:
         found = False
 
         # 1. Remove <game> entries
-        game_matches = []
-        for game in root.findall("game"):
-            path_elem = game.find("path")
-            if (
-                path_elem is not None
-                and self._normalize_path(path_elem.text) == norm_path
-            ):
-                game_matches.append(game)
+        game_matches = self._game_map.get(norm_path, [])
 
         for m in game_matches:
             root.remove(m)
             found = True
+
+        if found:
+            self._game_map.pop(norm_path, None)
 
         # 2. Remove <folder> entry if this was a nested path
         rel_path = rom_path.replace("./", "").replace("\\", "/")
@@ -311,18 +345,14 @@ class GamelistManager:
             folder_path = str(Path(rel_path).parent).replace("\\", "/")
             norm_folder_path = self._normalize_path(folder_path)
 
-            folder_matches = []
-            for fol in root.findall("folder"):
-                fpath_elem = fol.find("path")
-                if (
-                    fpath_elem is not None
-                    and self._normalize_path(fpath_elem.text) == norm_folder_path
-                ):
-                    folder_matches.append(fol)
+            folder_matches = self._folder_map.get(norm_folder_path, [])
 
             for m in folder_matches:
                 root.remove(m)
                 found = True
+
+            if folder_matches:
+                self._folder_map.pop(norm_folder_path, None)
 
         if found:
             _indent(root)
