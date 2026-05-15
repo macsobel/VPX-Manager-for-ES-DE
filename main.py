@@ -699,7 +699,7 @@ if __name__ == "__main__":
                     item("Check for Updates...", on_check_updates),
                     item("Settings...", on_open_settings),
                     pystray.Menu.SEPARATOR,
-                    item("Open Web Interface", on_open_web, default=True),
+                    item("Open Web Interface", on_open_web),
                     item("Open Emulation Station", on_open_es),
                     pystray.Menu.SEPARATOR,
                     item("Restart", on_restart),
