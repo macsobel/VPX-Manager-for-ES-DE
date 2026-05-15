@@ -96,14 +96,15 @@ class SetupWizard {
         }
     }
 
-    static async pickPath(inputId) {
+    static async pickPath(inputId, pickFiles = false) {
         try {
-            const res = await apiFetch('/api/settings/pick-path?prompt=Select%20Folder', { method: 'POST' });
+            const prompt = pickFiles ? 'Select%20File' : 'Select%20Folder';
+            const res = await apiFetch(`/api/settings/pick-path?prompt=${prompt}&pick_files=${pickFiles}`, { method: 'POST' });
             if (res.path) {
                 document.getElementById(inputId).value = res.path;
             }
         } catch (e) {
-            Toast.show('Folder selection not supported on this platform', 'warning');
+            Toast.show(pickFiles ? 'File selection not supported on this platform' : 'Folder selection not supported on this platform', 'warning');
         }
     }
 
@@ -458,7 +459,7 @@ class SetupWizard {
                             <label class="input-label">VPX Standalone App Path</label>
                             <div style="display:flex; gap: 8px;">
                                 <input type="text" id="wiz-vpx-path" class="input-field" value="${this.state.config.vpx_standalone_app_path || ''}" placeholder="${isLinux ? '/home/user/vpinball/VPinballX_BGFX' : '/Applications/VPinballX.app'}" style="flex:1;">
-                                <button class="btn btn-secondary" onclick="SetupWizard.pickPath('wiz-vpx-path')" style="height: 42px; display: flex; align-items: center; gap: 6px;">
+                                <button class="btn btn-secondary" onclick="SetupWizard.pickPath('wiz-vpx-path', true)" style="height: 42px; display: flex; align-items: center; gap: 6px;">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
                                     Browse
                                 </button>
@@ -515,8 +516,8 @@ class SetupWizard {
                         <div class="input-group" style="margin-bottom: 1.5rem;">
                             <label class="input-label">Emulation Station Desktop Edition App Path</label>
                             <div style="display:flex; gap: 8px;">
-                                <input type="text" id="wiz-esde-app-path" class="input-field" value="${this.state.config.esde_app_path || ''}" style="flex:1;">
-                                <button class="btn btn-secondary" onclick="SetupWizard.pickPath('wiz-esde-app-path')"><i class="fas fa-folder"></i> Browse</button>
+                                <input type="text" id="wiz-esde-app-path" class="input-field" value="${this.state.config.esde_app_path || ''}" placeholder="${isLinux ? '/usr/bin/es-de' : '/Applications/ES-DE.app'}" style="flex:1;">
+                                <button class="btn btn-secondary" onclick="SetupWizard.pickPath('wiz-esde-app-path', true)"><i class="fas fa-folder"></i> Browse</button>
                             </div>
                             <p style="font-size: 0.8rem; color: var(--text-tertiary); margin-top: 4px;">Path to the ES-DE executable or .app bundle</p>
                         </div>
