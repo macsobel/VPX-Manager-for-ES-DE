@@ -216,15 +216,18 @@ const PupPackManagerPage = {
                                 }
                             }
                             
+                            const isAudioOnly = ["4", "7", "8"].includes(String(effScreenNum));
                             const effScreenName = PUP_SCREEN_NAMES[effScreenNum] || `Screen ${effScreenNum}`;
-                            const physIdx = this.getPhysicalIndexFromPupId(effScreenNum);
+                            const physIdx = isAudioOnly ? null : this.getPhysicalIndexFromPupId(effScreenNum);
                             
                             // Find the physical monitor to see its cabinet role
-                            const monitor = this.state.globalDisplays.find(d => parseInt(d.index) === physIdx);
+                            const monitor = !isAudioOnly ? this.state.globalDisplays.find(d => parseInt(d.index) === physIdx) : null;
                             const cabRole = monitor ? monitor.role : null;
                             
                             let screenLabel = '';
-                            if (physIdx !== null) {
+                            if (isAudioOnly) {
+                                screenLabel = `${effScreenName} (Audio Output)`;
+                            } else if (physIdx !== null) {
                                 if (cabRole && cabRole !== effScreenName) {
                                     // It's a cross-mapping (e.g. FullDMD on a DMD-labeled monitor)
                                     screenLabel = `${effScreenName} → Monitor ${physIdx} (${cabRole})`;
@@ -245,8 +248,8 @@ const PupPackManagerPage = {
                                         <div style="min-width: 0; flex: 1;">
                                             <div class="pup-element-labels">
                                                 <span class="badge" style="background: var(--accent-blue-subtle); color: var(--accent-blue); font-weight: 700; font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; white-space: nowrap;">${this.escHtml(s.description || 'Unnamed')}</span>
-                                                <span style="font-weight: 600; font-size: 0.9rem; color: ${physIdx !== null ? 'var(--text-primary)' : 'var(--accent-red)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                                    ${this.escHtml(physIdx !== null ? screenLabel : `${effScreenName} (Unassigned / No Monitor)`)}
+                                                <span style="font-weight: 600; font-size: 0.9rem; color: ${(isAudioOnly || physIdx !== null) ? 'var(--text-primary)' : 'var(--accent-red)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                                    ${this.escHtml(physIdx !== null || isAudioOnly ? screenLabel : `${effScreenName} (Unassigned / No Monitor)`)}
                                                 </span>
                                             </div>
                                             ${(s.playlist || s.playfile) ? `
@@ -259,10 +262,12 @@ const PupPackManagerPage = {
                                         </div>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
-                                        <button class="btn btn-secondary btn-sm" style="padding: 4px 10px; font-size: 0.75rem;" onclick="PupPackManagerPage.openLayoutModal(${s.id})">
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                            Edit Screens
-                                        </button>
+                                        ${!isAudioOnly ? `
+                                            <button class="btn btn-secondary btn-sm" style="padding: 4px 10px; font-size: 0.75rem;" onclick="PupPackManagerPage.openLayoutModal(${s.id})">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                Edit Screens
+                                            </button>
+                                        ` : ''}
                                     </div>
                                 </div>
                             `;
