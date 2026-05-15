@@ -5,7 +5,7 @@ const PUP_SCREEN_NAMES = {
     "2": "Backglass",
     "3": "Playfield",
     "4": "Music",
-    "5": "FullDMD",
+    "5": "DMD",
     "6": "Select",
     "7": "Audio",
     "8": "Callouts",
@@ -17,10 +17,9 @@ const PUP_SCREEN_NAMES = {
 
 const ROLE_TO_PUP_ID = {
     "Topper": 0,
-    "DMD": 1,
+    "DMD": 5,
     "Backglass": 2,
     "Playfield": 3,
-    "FullDMD": 5,
     "Music": 4,
     "Select": 6,
     "Audio": 7,
@@ -503,7 +502,7 @@ PupPackManagerPage.getPupIdFromPhysicalIndex = function(physIndex, originalPupId
     const assignments = this.state.displayAssignments.filter(a => parseInt(a.index) === parseInt(physIndex));
     if (assignments.length === 0) return originalPupId !== null ? originalPupId : parseInt(physIndex);
     
-    // If the element's original role is supported by this monitor, keep it
+    // 1. If the element's original role is supported by this monitor, KEEP IT (Preserves 5 as 5, 1 as 1)
     if (originalPupId !== null) {
         const originalRole = PUP_SCREEN_NAMES[String(originalPupId)];
         if (originalRole && assignments.some(a => a.role === originalRole)) {
@@ -511,9 +510,17 @@ PupPackManagerPage.getPupIdFromPhysicalIndex = function(physIndex, originalPupId
         }
     }
     
-    // Otherwise, pick the "best" role for this monitor to determine the ID
-    // Prioritize Backglass/DMD/FullDMD
-    const priority = ["Backglass", "DMD", "FullDMD", "Topper", "Playfield"];
+    // 2. If moving to a DMD monitor, check the pack's convention (1 vs 5)
+    if (assignments.some(a => a.role === "DMD")) {
+        const has5 = this.state.pupScreens.some(s => s.screen_num === "5");
+        const has1 = this.state.pupScreens.some(s => s.screen_num === "1");
+        if (has5) return 5;
+        if (has1) return 1;
+        return 5; // Default for new DMD elements
+    }
+    
+    // 3. Otherwise, pick the "best" role for this monitor based on priority
+    const priority = ["Backglass", "DMD", "Topper", "Playfield"];
     for (const p of priority) {
         if (assignments.some(a => a.role === p)) return ROLE_TO_PUP_ID[p];
     }

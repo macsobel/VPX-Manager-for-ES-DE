@@ -14,7 +14,7 @@ SCREEN_NAME_MAP = {
     "2": "Backglass",
     "3": "Playfield",
     "4": "Music",
-    "5": "FullDMD",
+    "5": "DMD",
     "6": "Select",
     "7": "Audio",
     "8": "Callouts",
@@ -246,7 +246,7 @@ class PupPackManager:
             "1": "DMD",
             "2": "Backglass",
             "3": "Playfield",
-            "5": "FullDMD",
+            "5": "DMD",
             "7": "Backglass", # Backglass 2
             "8": "Topper",    # Topper 2
         }
@@ -315,19 +315,8 @@ class PupPackManager:
 
                     screen_num = str(row[screen_num_idx]).strip()
 
-                    # Translation logic: If we are on Screen 5, we want the CustomPos to target Screen 1
-                    # but we keep ScreenNum as 5 so PUP's internal indexing doesn't get confused.
+                    # Translation logic removed - keeping Screen 5 as 5 per user request.
                     target_screen_override = None
-                    if screen_num == "5":
-                        target_screen_override = "1"
-                        
-                        # Update description to DMD for clarity if it's currently FullDMD
-                        try:
-                            desc_idx = clean_header.index("ScreenDes")
-                            if "FullDMD" in str(row[desc_idx]):
-                                row[desc_idx] = str(row[desc_idx]).replace("FullDMD", "DMD")
-                        except ValueError:
-                            pass
 
                     # CustomPos might spill into extra columns due to unquoted commas
                     custom_pos_parts = row[custom_pos_idx:]
