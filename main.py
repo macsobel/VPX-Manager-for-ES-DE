@@ -2,15 +2,21 @@
 VPX Manager for ES-DE — FastAPI Application Entry Point
 A web-based table management app for Visual Pinball X on macOS.
 """
+# pyrefly: ignore [missing-import]
 import uvicorn
+# pyrefly: ignore [missing-import]
 import uvicorn.config
 from contextlib import asynccontextmanager
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI
+# pyrefly: ignore [missing-import]
 from fastapi.staticfiles import StaticFiles
+# pyrefly: ignore [missing-import]
 from fastapi.responses import FileResponse
 import os
 import sys
 from pathlib import Path
+# pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
 
 # Load environment variables from .env file for local development
@@ -298,6 +304,7 @@ if __name__ == "__main__":
     # Launch System Tray / Menu Bar based on OS
     if platform.system() == "Darwin":
         try:
+            # pyrefly: ignore [missing-import]
             import rumps
 
             class VPXMenuBarApp(rumps.App):
@@ -468,170 +475,236 @@ if __name__ == "__main__":
                 sys.exit(0)
 
     elif platform.system() == "Linux":
-        # Strategy: Prefer GTK (gi) for the full 'menubar' experience (menu on left-click),
-        # but fall back to pystray if gi is not available in the bundle.
+        # Strategy: 
+        # 1. Try AyatanaAppIndicator3 (Modern Wayland/GNOME standard)
+        # 2. Try AppIndicator3 (Legacy Ubuntu standard)
+        # 3. Try Gtk.StatusIcon (X11 only fallback)
+        # 4. Try pystray (Final fallback)
+        
         tray_started = False
 
-        # --- Attempt 1: GTK (gi) ---
-        try:
-            import gi  # type: ignore
-            gi.require_version('Gtk', '3.0')
-            from gi.repository import Gtk, GLib  # type: ignore
-            import threading
-
-            # Resolve icon path
+        # Helper to resolve icon path
+        def get_linux_icon():
             icon_filename = "icon.png"
             if getattr(sys, "frozen", False):
-                icon_path = os.path.join(getattr(sys, "_MEIPASS", ""), "resources", icon_filename)
-            else:
-                icon_path = os.path.join(os.path.dirname(__file__), "resources", icon_filename)
+                return os.path.join(getattr(sys, "_MEIPASS", ""), "resources", icon_filename)
+            return os.path.join(os.path.dirname(__file__), "resources", icon_filename)
 
-            if not os.path.exists(icon_path):
-                icon_filename = "MenuBarIconColor.png"
-                if getattr(sys, "frozen", False):
-                    icon_path = os.path.join(getattr(sys, "_MEIPASS", ""), "resources", icon_filename)
-                else:
-                    icon_path = os.path.join(os.path.dirname(__file__), "resources", icon_filename)
+        # --- Attempt 1 & 2: AppIndicator (Wayland Compatible) ---
+        try:
+            import gi
+            gi.require_version('Gtk', '3.0')
+            from gi.repository import Gtk, GLib
 
-            tray_icon = Gtk.StatusIcon()
-            if os.path.exists(icon_path):
-                tray_icon.set_from_file(icon_path)
-            else:
-                tray_icon.set_from_icon_name("application-x-executable")
-            
-            tray_icon.set_tooltip_text("VPX Manager for ES-DE")
-            tray_icon.set_visible(True)
-
-            def build_gtk_menu():
-                menu = Gtk.Menu()
+            indicator_ns = None
+            for ns in ['AyatanaAppIndicator3', 'AppIndicator3']:
                 try:
-                    count = asyncio.run(db.get_table_count())
-                except Exception:
-                    count = 0
-                status_item = Gtk.MenuItem(label=f"Managing {count} Tables")
+                    gi.require_version(ns, '0.1')
+                    indicator_ns = ns
+                    break
+                except (ValueError, ImportError):
+                    continue
+
+            if indicator_ns:
+                indicator_mod = __import__(f'gi.repository.{indicator_ns}', fromlist=[indicator_ns])
+                AppIndicator = indicator_mod
+                
+                status_item = Gtk.MenuItem(label="Managing 0 Tables")
                 status_item.set_sensitive(False)
-                menu.append(status_item)
-                menu.append(Gtk.SeparatorMenuItem())
 
-                about_item = Gtk.MenuItem(label="About VPX Manager")
-                def on_about(w):
-                    from backend.services.linux_dialogs import show_info
-                    threading.Thread(target=show_info, args=(
-                        "About VPX Manager for ES-DE",
-                        f"Version {VERSION}\n\nA Visual Pinball file management system for macOS and Linux.\n\nDeveloped by Aaron Sobel"
-                    ), daemon=True).start()
-                about_item.connect("activate", on_about)
-                menu.append(about_item)
+                def update_table_count():
+                    try:
+                        # Fetch count from database using asyncio.run since we're in a synchronous GTK loop
+                        count = asyncio.run(db.get_table_count())
+                        status_item.set_label(f"Managing {count} Tables")
+                    except Exception as e:
+                        logger.error(f"Error updating Linux tray table count: {e}")
+                    return True  # Return True to keep the GLib timeout active
 
-                updates_item = Gtk.MenuItem(label="Check for Updates...")
-                def on_check_updates(w):
-                    from backend.services.update_service import update_service
-                    from backend.services.linux_dialogs import show_info, ask_yes_no
-                    def _check():
+                def build_menu():
+                    menu = Gtk.Menu()
+                    menu.append(status_item)
+                    menu.append(Gtk.SeparatorMenuItem())
+
+                    about_item = Gtk.MenuItem(label="About VPX Manager")
+                    def on_about(w):
+                        from backend.services.linux_dialogs import show_info
+                        threading.Thread(target=show_info, args=(
+                            "About VPX Manager for ES-DE",
+                            f"Version {VERSION}\n\nA Visual Pinball file management system for macOS and Linux.\n\nDeveloped by Aaron Sobel"
+                        ), daemon=True).start()
+                    about_item.connect("activate", on_about)
+                    menu.append(about_item)
+
+                    updates_item = Gtk.MenuItem(label="Check for Updates...")
+                    def on_check_updates(w):
+                        from backend.services.update_service import update_service
+                        from backend.services.linux_dialogs import show_info, ask_yes_no
+                        def _check():
+                            try:
+                                result = asyncio.run(update_service.check_for_updates())
+                                if result.get("update_available"):
+                                    if ask_yes_no("Update Available", f"A new version ({result['latest_version']}) is available.\n\nOpen download page?"):
+                                        import webbrowser
+                                        webbrowser.open(result["download_url"])
+                                elif result.get("error"):
+                                    show_info("Update Check Failed", result["error"])
+                                else:
+                                    show_info("Up to Date", f"You are running the latest version ({VERSION}).")
+                            except Exception as e:
+                                logger.error(f"Error checking for updates: {e}")
+                                show_info("Update Check Failed", str(e))
+                        threading.Thread(target=_check, daemon=True).start()
+                    updates_item.connect("activate", on_check_updates)
+                    menu.append(updates_item)
+
+                    def open_url(url):
+                        import subprocess
+                        def _open():
+                            try:
+                                subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            except Exception as e:
+                                logger.error(f"Failed to open URL {url}: {e}")
+                        threading.Thread(target=_open, daemon=True).start()
+
+                    settings_item = Gtk.MenuItem(label="Settings...")
+                    settings_item.connect("activate", lambda w: open_url("http://localhost:8746/#settings"))
+                    menu.append(settings_item)
+                    menu.append(Gtk.SeparatorMenuItem())
+
+                    web_item = Gtk.MenuItem(label="Open Web Interface")
+                    web_item.connect("activate", lambda w: open_url("http://localhost:8746"))
+                    menu.append(web_item)
+
+                    es_item = Gtk.MenuItem(label="Open Emulation Station")
+                    def on_open_es(w):
+                        from backend.core.config import config
                         try:
-                            result = asyncio.run(update_service.check_for_updates())
-                            if result.get("update_available"):
-                                if ask_yes_no("Update Available", f"A new version ({result['latest_version']}) is available.\n\nOpen download page?"):
-                                    import webbrowser
-                                    webbrowser.open(result["download_url"])
-                            elif result.get("error"):
-                                show_info("Update Check Failed", result["error"])
-                            else:
-                                show_info("Up to Date", f"You are running the latest version ({VERSION}).")
+                            import subprocess
+                            subprocess.Popen([config.esde_app_path])
                         except Exception as e:
-                            logger.error(f"Error checking for updates: {e}")
-                            show_info("Update Check Failed", str(e))
-                    threading.Thread(target=_check, daemon=True).start()
-                updates_item.connect("activate", on_check_updates)
-                menu.append(updates_item)
+                            logger.error(f"Failed to open Emulation Station: {e}")
+                    es_item.connect("activate", on_open_es)
+                    menu.append(es_item)
+                    menu.append(Gtk.SeparatorMenuItem())
 
-                settings_item = Gtk.MenuItem(label="Settings...")
-                import webbrowser
-                settings_item.connect("activate", lambda w: webbrowser.open("http://localhost:8746/#settings"))
-                menu.append(settings_item)
-                menu.append(Gtk.SeparatorMenuItem())
+                    restart_item = Gtk.MenuItem(label="Restart")
+                    def on_restart(w):
+                        try:
+                            import subprocess
+                            appimage = os.environ.get("APPIMAGE")
+                            if appimage:
+                                subprocess.Popen([appimage])
+                            elif getattr(sys, "frozen", False):
+                                subprocess.Popen([sys.executable])
+                            else:
+                                subprocess.Popen([sys.executable, *sys.argv])
+                        except Exception as e:
+                            logger.error(f"Failed to restart: {e}")
+                        finally:
+                            _shutdown_server()
+                            GLib.idle_add(Gtk.main_quit)
+                    restart_item.connect("activate", on_restart)
+                    menu.append(restart_item)
 
-                web_item = Gtk.MenuItem(label="Open Web Interface")
-                web_item.connect("activate", lambda w: webbrowser.open("http://localhost:8746"))
-                menu.append(web_item)
-
-                es_item = Gtk.MenuItem(label="Open Emulation Station")
-                def on_open_es(w):
-                    from backend.core.config import config
-                    try:
-                        import subprocess
-                        subprocess.Popen([config.esde_app_path])
-                    except Exception as e:
-                        logger.error(f"Failed to open Emulation Station: {e}")
-                es_item.connect("activate", on_open_es)
-                menu.append(es_item)
-                menu.append(Gtk.SeparatorMenuItem())
-
-                restart_item = Gtk.MenuItem(label="Restart")
-                def on_restart(w):
-                    try:
-                        import subprocess
-                        appimage = os.environ.get("APPIMAGE")
-                        if appimage:
-                            subprocess.Popen([appimage])
-                        elif getattr(sys, "frozen", False):
-                            subprocess.Popen([sys.executable])
-                        else:
-                            subprocess.Popen([sys.executable, *sys.argv])
-                    except Exception as e:
-                        logger.error(f"Failed to restart: {e}")
-                    finally:
+                    quit_item = Gtk.MenuItem(label="Quit")
+                    def on_quit(w):
                         _shutdown_server()
                         GLib.idle_add(Gtk.main_quit)
-                restart_item.connect("activate", on_restart)
-                menu.append(restart_item)
+                    quit_item.connect("activate", on_quit)
+                    menu.append(quit_item)
 
-                quit_item = Gtk.MenuItem(label="Quit")
-                def on_quit(w):
-                    _shutdown_server()
-                    GLib.idle_add(Gtk.main_quit)
-                quit_item.connect("activate", on_quit)
-                menu.append(quit_item)
+                    menu.show_all()
+                    return menu
 
-                menu.show_all()
-                return menu
+                indicator = AppIndicator.Indicator.new(
+                    "vpx-manager",
+                    get_linux_icon(),
+                    AppIndicator.IndicatorCategory.APPLICATION_STATUS
+                )
+                indicator.set_status(AppIndicator.IndicatorStatus.ACTIVE)
+                indicator.set_menu(build_menu())
+                
+                # Start periodic table count updates
+                GLib.timeout_add_seconds(5, update_table_count)
+                # Initial update
+                GLib.idle_add(update_table_count)
+                
+                logger.info(f"Started {indicator_ns} tray icon.")
+                tray_started = True
+                Gtk.main()
 
-            def on_gtk_popup(icon, button, time):
-                menu = build_gtk_menu()
-                menu.popup(None, None, Gtk.StatusIcon.position_menu, icon, button, time)
+        except Exception as e:
+            logger.error(f"AppIndicator attempt failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
-            tray_icon.connect("popup-menu", on_gtk_popup)
-            tray_icon.connect("activate", lambda i: on_gtk_popup(i, 0, Gtk.get_current_event_time()))
+        # --- Attempt 3: GTK StatusIcon (X11 Fallback) ---
+        if not tray_started and os.environ.get("XDG_SESSION_TYPE") != "wayland":
+            try:
+                import gi
+                gi.require_version('Gtk', '3.0')
+                from gi.repository import Gtk, GLib
+                
+                tray_icon = Gtk.StatusIcon()
+                tray_icon.set_from_file(get_linux_icon())
+                tray_icon.set_tooltip_text("VPX Manager for ES-DE")
+                tray_icon.set_visible(True)
 
-            logger.info("Started GTK tray icon.")
-            tray_started = True
-            Gtk.main()
+                status_item_fallback = Gtk.MenuItem(label="Managing 0 Tables")
+                status_item_fallback.set_sensitive(False)
 
-        except (ImportError, ValueError, Exception) as e:
-            logger.warning(f"GTK tray icon unavailable: {e}. Falling back to pystray.")
+                def update_table_count_fallback():
+                    try:
+                        count = asyncio.run(db.get_table_count())
+                        status_item_fallback.set_label(f"Managing {count} Tables")
+                    except Exception as e:
+                        logger.error(f"Error updating Linux fallback tray table count: {e}")
+                    return True
 
-        # --- Attempt 2: pystray (Fallback) ---
+                def build_gtk_menu():
+                    menu = Gtk.Menu()
+                    menu.append(status_item_fallback)
+                    menu.append(Gtk.SeparatorMenuItem())
+                    
+                    quit_item = Gtk.MenuItem(label="Quit")
+                    quit_item.connect("activate", lambda w: Gtk.main_quit())
+                    menu.append(quit_item)
+                    menu.show_all()
+                    return menu
+
+                # Start periodic table count updates
+                GLib.timeout_add_seconds(5, update_table_count_fallback)
+                # Initial update
+                GLib.idle_add(update_table_count_fallback)
+
+                def on_gtk_popup(icon, button, time):
+                    menu = build_gtk_menu()
+                    menu.popup(None, None, Gtk.StatusIcon.position_menu, icon, button, time)
+
+                tray_icon.connect("popup-menu", on_gtk_popup)
+                tray_icon.connect("activate", lambda i: on_gtk_popup(i, 0, Gtk.get_current_event_time()))
+                
+                logger.info("Started GTK StatusIcon tray icon.")
+                tray_started = True
+                Gtk.main()
+                
+            except Exception as e:
+                logger.debug(f"StatusIcon attempt failed: {e}")
+
+        # --- Attempt 4: pystray (Final Fallback) ---
         if not tray_started:
             try:
-                import subprocess
+                from PIL import Image
+                # pyrefly: ignore [missing-import]
+                import pystray
+                # pyrefly: ignore [missing-import]
+                from pystray import MenuItem as item
                 import webbrowser
-                import threading
-                from PIL import Image  # type: ignore
-                import pystray  # type: ignore
-                from pystray import MenuItem as item  # type: ignore
-
-                # Resolve icon path
-                icon_filename = "icon.png"
-                if getattr(sys, "frozen", False):
-                    icon_path = os.path.join(getattr(sys, "_MEIPASS", ""), "resources", icon_filename)
-                else:
-                    icon_path = os.path.join(os.path.dirname(__file__), "resources", icon_filename)
+                import subprocess
 
                 def on_open_web(icon, item):
                     webbrowser.open("http://localhost:8746")
-
-                def on_open_settings(icon, item):
-                    webbrowser.open("http://localhost:8746/#settings")
 
                 def on_about(icon, item):
                     from backend.services.linux_dialogs import show_info
@@ -639,46 +712,6 @@ if __name__ == "__main__":
                         "About VPX Manager for ES-DE",
                         f"Version {VERSION}\n\nA Visual Pinball file management system for macOS and Linux.\n\nDeveloped by Aaron Sobel"
                     ), daemon=True).start()
-
-                def on_check_updates(icon, item):
-                    from backend.services.update_service import update_service
-                    from backend.services.linux_dialogs import show_info, ask_yes_no
-                    def _check():
-                        try:
-                            result = asyncio.run(update_service.check_for_updates())
-                            if result.get("update_available"):
-                                if ask_yes_no("Update Available", f"A new version ({result['latest_version']}) is available.\n\nOpen download page?"):
-                                    webbrowser.open(result["download_url"])
-                            elif result.get("error"):
-                                show_info("Update Check Failed", result["error"])
-                            else:
-                                show_info("Up to Date", f"You are running the latest version ({VERSION}).")
-                        except Exception as e:
-                            logger.error(f"Error checking for updates: {e}")
-                            show_info("Update Check Failed", str(e))
-                    threading.Thread(target=_check, daemon=True).start()
-
-                def on_open_es(icon, item):
-                    from backend.core.config import config
-                    try:
-                        subprocess.Popen([config.esde_app_path])
-                    except Exception as e:
-                        logger.error(f"Failed to open Emulation Station: {e}")
-
-                def on_restart(icon, item):
-                    try:
-                        appimage = os.environ.get("APPIMAGE")
-                        if appimage:
-                            subprocess.Popen([appimage])
-                        elif getattr(sys, "frozen", False):
-                            subprocess.Popen([sys.executable])
-                        else:
-                            subprocess.Popen([sys.executable, *sys.argv])
-                    except Exception as e:
-                        logger.error(f"Failed to restart: {e}")
-                    finally:
-                        _shutdown_server()
-                        icon.stop()
 
                 def on_quit(icon, item):
                     _shutdown_server()
@@ -691,43 +724,34 @@ if __name__ == "__main__":
                     except Exception:
                         return "Managing 0 Tables"
 
-                # Create the menu
-                menu = pystray.Menu(
-                    item(get_table_count_text, lambda: None, enabled=False),
-                    pystray.Menu.SEPARATOR,
-                    item("About VPX Manager", on_about),
-                    item("Check for Updates...", on_check_updates),
-                    item("Settings...", on_open_settings),
-                    pystray.Menu.SEPARATOR,
-                    item("Open Web Interface", on_open_web),
-                    item("Open Emulation Station", on_open_es),
-                    pystray.Menu.SEPARATOR,
-                    item("Restart", on_restart),
-                    item("Quit", on_quit)
-                )
-
+                icon_path = get_linux_icon()
                 if os.path.exists(icon_path):
                     image = Image.open(icon_path)
                     image.thumbnail((128, 128), Image.Resampling.LANCZOS)
                 else:
                     image = Image.new('RGB', (64, 64), color='red')
+
+                menu = pystray.Menu(
+                    item(get_table_count_text, lambda: None, enabled=False),
+                    pystray.Menu.SEPARATOR,
+                    item("About VPX Manager", on_about),
+                    item("Open Web Interface", on_open_web),
+                    pystray.Menu.SEPARATOR,
+                    item("Quit", on_quit)
+                )
                 
-                icon = pystray.Icon("vpx_manager", image, "VPX Manager for ES-DE", menu)
-                logger.info("Started pystray tray icon.")
+                icon = pystray.Icon("vpx_manager", image, "VPX Manager", menu)
+                logger.info("Started pystray tray icon fallback.")
                 tray_started = True
                 icon.run()
-
             except Exception as e:
-                logger.error(f"Failed to start fallback tray icon: {e}")
+                logger.error(f"All tray backends failed: {e}")
 
-        # --- Final Fallback: Keep Server Alive ---
         if not tray_started:
-            try:
-                while True:
-                    import time
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                sys.exit(0)
+            # Final hold to keep server thread alive if all tray icons fail
+            while True:
+                import time
+                time.sleep(1)
 
     else:
         # Fallback for other platforms

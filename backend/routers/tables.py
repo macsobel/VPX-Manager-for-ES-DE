@@ -1,4 +1,5 @@
 import os
+import sys
 
 """
 Tables API router — CRUD, scanning, filtering.
