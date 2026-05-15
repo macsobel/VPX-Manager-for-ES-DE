@@ -20,6 +20,7 @@ const App = {
     },
 
     currentPage: null,
+    lastValidHash: 'dashboard',
 
     async init() {
         Nav.init();
@@ -71,30 +72,38 @@ const App = {
     route() {
         const hash = window.location.hash.replace('#', '') || 'dashboard';
 
-        // Clean up current page if needed
-        if (this.currentPage) {
-            const oldPage = this.pages[this.currentPage];
-            if (oldPage && typeof oldPage.unmount === 'function') {
-                oldPage.unmount();
+        const unmountCurrent = () => {
+            if (this.currentPage) {
+                const oldPage = this.pages[this.currentPage];
+                if (oldPage && typeof oldPage.unmount === 'function') {
+                    oldPage.unmount();
+                }
             }
-        }
+            // Close any injected slide-in panels that belong to specific pages
+            const layoutPanel = document.getElementById('puppack-layout-panel');
+            if (layoutPanel) {
+                layoutPanel.classList.remove('open');
+                layoutPanel.remove();
+            }
+        };
 
-        // Close any injected slide-in panels that belong to specific pages
-        const layoutPanel = document.getElementById('puppack-layout-panel');
-        if (layoutPanel) {
-            layoutPanel.classList.remove('open');
-            layoutPanel.remove();
-        }
+        const reanimate = () => {
+            const container = document.getElementById('page-container');
+            if (container) {
+                container.style.animation = 'none';
+                container.offsetHeight; // trigger reflow
+                container.style.animation = '';
+            }
+        };
 
         // Handle tables/{tableId} route
         const tablesMatch = hash.match(/^tables\/(\d+)$/);
         if (tablesMatch) {
+            unmountCurrent();
             this.currentPage = 'tables';
+            this.lastValidHash = hash;
             Nav.setActive('tables');
-            const container = document.getElementById('page-container');
-            container.style.animation = 'none';
-            container.offsetHeight;
-            container.style.animation = '';
+            reanimate();
             
             // Render tables page then show detail
             TablesPage.render().then(() => {
@@ -106,12 +115,11 @@ const App = {
         // Handle media/{tableId} route
         const mediaMatch = hash.match(/^media\/(\d+)$/);
         if (mediaMatch) {
+            unmountCurrent();
             this.currentPage = 'tables';
+            this.lastValidHash = hash;
             Nav.setActive('tables');
-            const container = document.getElementById('page-container');
-            container.style.animation = 'none';
-            container.offsetHeight;
-            container.style.animation = '';
+            reanimate();
             
             // Render tables page then show media detail
             TablesPage.state.view = 'media';
@@ -124,12 +132,11 @@ const App = {
         // Handle upload-to/{tableId} route
         const uploadMatch = hash.match(/^upload-to\/(\d+)$/);
         if (uploadMatch) {
+            unmountCurrent();
             this.currentPage = 'upload';
+            this.lastValidHash = hash;
             Nav.setActive('upload');
-            const container = document.getElementById('page-container');
-            container.style.animation = 'none';
-            container.offsetHeight;
-            container.style.animation = '';
+            reanimate();
             
             UploadPage.renderAddFiles(parseInt(uploadMatch[1]));
             return;
@@ -138,12 +145,11 @@ const App = {
         // Handle vbs-manager/{tableId} route
         const vbsMatch = hash.match(/^vbs-manager\/(\d+)$/);
         if (vbsMatch) {
+            unmountCurrent();
             this.currentPage = 'vbs-manager';
+            this.lastValidHash = hash;
             Nav.setActive('vbs-manager');
-            const container = document.getElementById('page-container');
-            container.style.animation = 'none';
-            container.offsetHeight;
-            container.style.animation = '';
+            reanimate();
             VbsManagerPage.render(parseInt(vbsMatch[1]));
             return;
         }
@@ -151,16 +157,14 @@ const App = {
         // Handle tables sub-views (deep linking)
         const tablesViewMatch = hash.match(/^tables\/(list|grid|media)$/);
         if (tablesViewMatch) {
+            unmountCurrent();
             const view = tablesViewMatch[1];
             const viewMap = { 'list': 'table', 'grid': 'card', 'media': 'media' };
             TablesPage.state.view = viewMap[view];
             this.currentPage = 'tables';
+            this.lastValidHash = hash;
             Nav.setActive('tables');
-            
-            const container = document.getElementById('page-container');
-            container.style.animation = 'none';
-            container.offsetHeight;
-            container.style.animation = '';
+            reanimate();
             
             TablesPage.render();
             return;
@@ -169,12 +173,11 @@ const App = {
         // Handle ini-manager/{tableId} route
         const iniMatch = hash.match(/^ini-manager\/(\d+)$/);
         if (iniMatch) {
+            unmountCurrent();
             this.currentPage = 'ini-manager';
+            this.lastValidHash = hash;
             Nav.setActive('ini-manager');
-            const container = document.getElementById('page-container');
-            container.style.animation = 'none';
-            container.offsetHeight;
-            container.style.animation = '';
+            reanimate();
             IniManagerPage.render(parseInt(iniMatch[1]));
             return;
         }
@@ -182,12 +185,11 @@ const App = {
         // Handle puppack-manager/{tableId} route
         const puppackMatch = hash.match(/^puppack-manager\/(\d+)$/);
         if (puppackMatch) {
+            unmountCurrent();
             this.currentPage = 'puppack-manager';
+            this.lastValidHash = hash;
             Nav.setActive('puppack-manager');
-            const container = document.getElementById('page-container');
-            container.style.animation = 'none';
-            container.offsetHeight;
-            container.style.animation = '';
+            reanimate();
             if (typeof PupPackManagerPage !== 'undefined') {
                 PupPackManagerPage.render(parseInt(puppackMatch[1]));
             }
@@ -196,7 +198,9 @@ const App = {
 
         // Handle simple media route
         if (hash === 'media') {
+            unmountCurrent();
             this.currentPage = 'tables';
+            this.lastValidHash = hash;
             Nav.setActive('tables');
             TablesPage.state.view = 'media';
             TablesPage.render();
@@ -205,24 +209,23 @@ const App = {
 
         const page = this.pages[hash];
         if (page) {
+            unmountCurrent();
             this.currentPage = hash;
+            this.lastValidHash = hash;
             Nav.setActive(hash);
-            // Re-animate the page container
-            const container = document.getElementById('page-container');
-            container.style.animation = 'none';
-            container.offsetHeight; // trigger reflow
-            container.style.animation = '';
+            reanimate();
             page.render();
         } else {
             // CRITICAL FIX: If we have a current page and the hash goes weird, STAY ON THE PAGE.
             if (this.currentPage) {
-                console.log(`Hash went to "${hash}", but we are sticking with "${this.currentPage}" to prevent accidental dashboard jump.`);
+                console.log(`Hash went to "${hash}", but we are sticking with "${this.lastValidHash}" to prevent accidental dashboard jump.`);
                 this.ignoreNextHashChange = true;
-                window.location.hash = this.currentPage;
+                window.location.hash = this.lastValidHash;
                 return;
             }
 
             // Fallback for initial load or total failure
+            this.lastValidHash = 'dashboard';
             window.location.hash = 'dashboard';
         }
     },
