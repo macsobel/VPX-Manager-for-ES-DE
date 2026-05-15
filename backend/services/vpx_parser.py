@@ -53,6 +53,48 @@ class VPXParser:
         return metadata
 
     @staticmethod
+    def _extract_script_from_stream(stream, chunk_size=1024 * 1024) -> bytes:
+        """
+        Safely reads an OLE stream in chunks to extract the VBScript.
+        Avoids loading large GameData streams entirely into memory.
+        """
+        overlap = 8  # Need at least 8 to catch b"CODE" + 4-byte length spanning chunks
+        buffer = b""
+
+        while True:
+            chunk = stream.read(chunk_size)
+            if not chunk:
+                break
+
+            search_data = buffer + chunk
+            idx = search_data.find(b"CODE")
+
+            if idx != -1:
+                # Check if we have enough bytes for the 4-byte length
+                if idx + 8 > len(search_data):
+                    # We need more bytes to read the length.
+                    next_chunk = stream.read(chunk_size)
+                    if not next_chunk:
+                        return b""
+                    search_data += next_chunk
+
+                script_len = struct.unpack("<I", search_data[idx + 4 : idx + 8])[0]
+
+                if idx + 8 + script_len <= len(search_data):
+                    # The entire script is already in memory
+                    return search_data[idx + 8 : idx + 8 + script_len]
+                else:
+                    # We have a partial script, read the remainder
+                    script_part1 = search_data[idx + 8 :]
+                    bytes_to_read = script_len - len(script_part1)
+                    script_part2 = stream.read(bytes_to_read)
+                    return script_part1 + script_part2
+
+            buffer = chunk[-overlap:] if len(chunk) >= overlap else chunk
+
+        return b""
+
+    @staticmethod
     def get_vbs_hash(vpx_path: str | Path) -> str:
         """
         Extract the VBScript and calculate its SHA256 hash.
@@ -66,13 +108,11 @@ class VPXParser:
                 if not ole.exists("GameData"):
                     return ""
 
-                data = ole.openstream("GameData").read()
-                idx = data.find(b"CODE")
-                if idx == -1:
+                script_bytes = VPXParser._extract_script_from_stream(
+                    ole.openstream("GameData")
+                )
+                if not script_bytes:
                     return ""
-
-                script_len = struct.unpack("<I", data[idx + 4 : idx + 8])[0]
-                script_bytes = data[idx + 8 : idx + 8 + script_len]
 
                 # VPinFE logic:
                 script_text = script_bytes.decode("utf-8", errors="ignore")
@@ -118,13 +158,11 @@ class VPXParser:
                 if not ole.exists("GameData"):
                     return ""
 
-                data = ole.openstream("GameData").read()
-                idx = data.find(b"CODE")
-                if idx == -1:
+                script_bytes = VPXParser._extract_script_from_stream(
+                    ole.openstream("GameData")
+                )
+                if not script_bytes:
                     return ""
-
-                script_len = struct.unpack("<I", data[idx + 4 : idx + 8])[0]
-                script_bytes = data[idx + 8 : idx + 8 + script_len]
 
                 # Decode error-tolerant
                 for encoding in ["utf-8", "windows-1252", "latin-1"]:
@@ -209,11 +247,11 @@ class VPXParser:
 
                     # Special handling for GameData/CODE marker search
                     if not raw_bytes and ole.exists("GameData"):
-                        data = ole.openstream("GameData").read()
-                        idx = data.find(b"CODE")
-                        if idx != -1:
-                            script_len = struct.unpack("<I", data[idx + 4 : idx + 8])[0]
-                            raw_bytes = data[idx + 8 : idx + 8 + script_len]
+                        script_bytes = VPXParser._extract_script_from_stream(
+                            ole.openstream("GameData")
+                        )
+                        if script_bytes:
+                            raw_bytes = script_bytes
                             logger.info(f"Found script in GameData/CODE marker")
 
                     # If still not found, iterate all streams
