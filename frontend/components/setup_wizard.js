@@ -378,6 +378,7 @@ class SetupWizard {
         if (btnSkip) btnSkip.onclick = () => this.next();
 
         let html = '';
+        const isLinux = this.state.config.platform === 'linux';
 
         switch (this.state.currentStep) {
             case 1: // Welcome
@@ -403,7 +404,6 @@ class SetupWizard {
                 break;
 
             case 2: // VPX Path
-                const isLinux = this.state.config.platform === 'linux';
                 html = `
                     <div class="wizard-content-step">
                         <h4 style="color: var(--text-primary); margin-top: 1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
