@@ -440,7 +440,7 @@ class SetupWizard {
                             <ol style="color: var(--text-secondary); line-height: 1.8; margin: 0; padding-left: 1.2rem; font-size: 0.9rem; display: flex; flex-direction: column; gap: 8px;">
                                 ${isLinux ? `
                                 <li>Install required dependencies (Ubuntu/Debian):
-                                    <code style="display: block; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; margin: 6px 0; font-size: 0.8rem; border: 1px solid var(--border-subtle); color: var(--text-primary); font-family: monospace;">sudo apt install libsdl2-2.0-0 libsdl2-ttf-2.0-0 libsdl2-image-2.0-0 libopenal1 wmctrl</code>
+                                    <code style="display: block; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; margin: 6px 0; font-size: 0.8rem; border: 1px solid var(--border-subtle); color: var(--text-primary); font-family: monospace;">sudo apt install libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-mixer-dev libportmidi-dev libfreetype6-dev libjpeg-dev libpng-dev libsdl2-2.0-0 libopenal1 wmctrl</code>
                                 </li>
                                 ` : ''}
                                 <li><a href="https://github.com/login/" target="_blank" style="color: var(--accent-blue); text-decoration: none;">Login</a> to Github.</li>    
