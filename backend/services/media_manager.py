@@ -32,35 +32,10 @@ async def get_media_status(table_id: int) -> dict:
     return await get_esde_media_status(table_id)
 
 
-async def get_all_media_status() -> list[dict]:
-    """Get ES-DE media status for all tables by scanning the file system."""
-    # We query all tables first
-    tables = await db.get_tables(limit=2000)
-    results = []
-    for t in tables:
-        status = await get_esde_media_status(t["id"])
-        status["display_name"] = t["display_name"]
-        status["filename"] = t["filename"]
-        status["vps_id"] = t.get("vps_id", "")
-        results.append(status)
-    return results
-
-
-async def get_esde_media_status(table_id: int) -> dict:
+def _check_media_status_for_table(table: dict, esde_base: Path) -> dict:
     """
-    Check ES-DE downloaded_media for existing assets using direct filename mapping.
-    Source of truth for all media indicators.
+    Synchronous helper to check ES-DE media for a given table dict.
     """
-    esde_base = config.esde_media_base
-
-    table = await db.get_table(table_id)
-    if not table:
-        return {
-            "id": table_id,
-            "existing_types": [],
-            "missing_types": list(ESDE_STATUS_TYPES),
-        }
-
     filename = table.get("filename", "")
     stem = Path(filename).stem if filename else ""
 
@@ -100,17 +75,60 @@ async def get_esde_media_status(table_id: int) -> dict:
                 missing.append(status_type)
 
     return {
-        "id": table_id,
+        "id": table.get("id"),
         "existing_types": existing,
         "missing_types": missing,
     }
 
 
-async def get_all_esde_media_status(table_ids: List[int]) -> List[dict]:
+async def get_all_media_status() -> list[dict]:
+    """Get ES-DE media status for all tables by scanning the file system."""
+    esde_base = config.esde_media_base
+    tables = await db.get_tables(limit=2000)
+    results = []
+    for t in tables:
+        status = _check_media_status_for_table(t, esde_base)
+        status["display_name"] = t["display_name"]
+        status["filename"] = t["filename"]
+        status["vps_id"] = t.get("vps_id", "")
+        results.append(status)
+    return results
+
+
+async def get_esde_media_status(table_id: int) -> dict:
+    """
+    Check ES-DE downloaded_media for existing assets using direct filename mapping.
+    Source of truth for all media indicators.
+    """
+    esde_base = config.esde_media_base
+
+    table = await db.get_table(table_id)
+    if not table:
+        return {
+            "id": table_id,
+            "existing_types": [],
+            "missing_types": list(ESDE_STATUS_TYPES),
+        }
+
+    return _check_media_status_for_table(table, esde_base)
+
+
+async def get_all_esde_media_status(table_ids: list[int]) -> list[dict]:
     """Get ES-DE media status for multiple tables at once."""
+    esde_base = config.esde_media_base
     results = []
     for tid in table_ids:
-        results.append(await get_esde_media_status(tid))
+        table = await db.get_table(tid)
+        if not table:
+            results.append(
+                {
+                    "id": tid,
+                    "existing_types": [],
+                    "missing_types": list(ESDE_STATUS_TYPES),
+                }
+            )
+            continue
+        results.append(_check_media_status_for_table(table, esde_base))
     return results
 
 
@@ -181,12 +199,15 @@ async def delete_media_file(table_id: int, media_type: str) -> dict:
         await conn.commit()
     except Exception as db_err:
         import logging
-        logging.getLogger(__name__).error(f"Failed to delete DB record for media: {db_err}")
+
+        logging.getLogger(__name__).error(
+            f"Failed to delete DB record for media: {db_err}"
+        )
 
     # 2. Delete from physical storage (All potential paths)
     esde_base = config.esde_media_base
     folder_path = esde_base / media_type
-    
+
     deleted_paths = []
     if stem and folder_path.exists():
         if media_type == "videos":
@@ -202,7 +223,7 @@ async def delete_media_file(table_id: int, media_type: str) -> dict:
             if p1.exists():
                 p1.unlink()
                 deleted_paths.append(str(p1))
-            
+
             # Nested path
             if folder_name:
                 p2 = folder_path / folder_name / f"{stem}{ext}"
@@ -219,9 +240,12 @@ async def delete_media_file(table_id: int, media_type: str) -> dict:
                     if not any(nested_dir.iterdir()):
                         nested_dir.rmdir()
                         import logging
-                        logging.getLogger(__name__).info(f"Deleted empty nested media folder: {nested_dir}")
+
+                        logging.getLogger(__name__).info(
+                            f"Deleted empty nested media folder: {nested_dir}"
+                        )
                 except Exception:
-                    pass # Directory not empty or permission error
+                    pass  # Directory not empty or permission error
 
     return {
         "success": True,
@@ -246,7 +270,8 @@ async def rotate_media(table_id: int, media_type: str, angle: int) -> dict:
     try:
         # Rotate the primary file
         if media_type == "videos" or str(file_path).lower().endswith(".mp4"):
-            from backend.services.media_processor import rotate_video_metadata_manual
+            from backend.services.media_processor import \
+                rotate_video_metadata_manual
 
             rotate_video_metadata_manual(str(file_path), angle)
         else:
@@ -272,7 +297,9 @@ async def rotate_media(table_id: int, media_type: str, angle: int) -> dict:
         return {"success": False, "error": str(e)}
 
 
-async def delete_all_media_for_table(table_filename: str, folder_path: str = None) -> None:
+async def delete_all_media_for_table(
+    table_filename: str, folder_path: str = None
+) -> None:
     """
     Deletes all global ES-DE media associated with a table filename.
     Ensures both root files and nested folders are removed.
@@ -315,7 +342,9 @@ async def delete_all_media_for_table(table_filename: str, folder_path: str = Non
                     shutil.rmtree(nested_dir)
                     logger.info(f"Deleted global media (nested folder): {nested_dir}")
                 except Exception as e:
-                    logger.error(f"Failed to delete nested media folder {nested_dir}: {e}")
+                    logger.error(
+                        f"Failed to delete nested media folder {nested_dir}: {e}"
+                    )
 
 
 async def delete_all_media_by_id(table_id: int) -> dict:
@@ -580,13 +609,17 @@ async def migrate_media_strategy(target_mode: str):
                     found_file = None
                     for ext in [".png", ".jpg", ".mp4", ".pdf"]:
                         # Check root portable location first
-                        check_path_root = portable_base_root / media_type / f"{stem}{ext}"
+                        check_path_root = (
+                            portable_base_root / media_type / f"{stem}{ext}"
+                        )
                         if check_path_root.exists():
                             found_file = check_path_root
                             break
-                        
+
                         # Fallback to nested/buggy location
-                        check_path_nested = portable_base_nested / media_type / f"{stem}{ext}"
+                        check_path_nested = (
+                            portable_base_nested / media_type / f"{stem}{ext}"
+                        )
                         if check_path_nested.exists():
                             found_file = check_path_nested
                             break
