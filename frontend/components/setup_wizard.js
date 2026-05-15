@@ -432,19 +432,24 @@ class SetupWizard {
                             </div>
 
                             <ol style="color: var(--text-secondary); line-height: 1.8; margin: 0; padding-left: 1.2rem; font-size: 0.9rem; display: flex; flex-direction: column; gap: 8px;">
+                                ${isLinux ? `
+                                <li>Install required dependencies (Ubuntu/Debian):
+                                    <code style="display: block; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; margin: 6px 0; font-size: 0.8rem; border: 1px solid var(--border-subtle); color: var(--text-primary); font-family: monospace;">sudo apt install libsdl2-2.0-0 libsdl2-ttf-2.0-0 libsdl2-image-2.0-0 libopenal1 wmctrl</code>
+                                </li>
+                                ` : ''}
                                 <li><a href="https://github.com/login/" target="_blank" style="color: var(--accent-blue); text-decoration: none;">Login</a> to Github.</li>    
                                 <li><a href="https://github.com/vpinball/vpinball/actions/workflows/vpinball.yml" target="_blank" style="color: var(--accent-blue); text-decoration: none;">Click here</a> and select the latest <strong>successful</strong> <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-top: -2px;"><circle cx="12" cy="12" r="10" fill="#22c55e"/><path d="M8 12.5L10.5 15L16 9" stroke="black" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg> workflow from the Actions page.</li>
                                 <li>Scroll down to the <strong>Artifacts</strong> section.</li>
                                 <li>Download the version for your ${isLinux ? 'system' : 'Mac'}:
                                     <ul style="margin: 4px 0 0 0; padding-left: 1.2rem; color: var(--text-primary);">
                                         ${isLinux ? `
-                                        <li><strong>VPinball_BGFX-linux-x64-Release.AppImage</strong></li>
-                                        <li><strong>VPinball_BGFX-linux-arm64-Release.AppImage</strong></li>
+                                        <li><strong>VPinball_BGFX-linux-x64-Release.tar.gz</strong></li>
                                         ` : `
                                         <li><strong>VPinball_BGFX-macos-arm64-Release.dmg</strong></li>
                                         <li><strong>VPinball_BGFX-macos-x64-Release.dmg</strong></li>
                                         `}
                                     </ul>
+                                    ${isLinux ? '<p style="margin-top: 8px; font-size: 0.85rem; font-style: italic; color: var(--accent-amber);">Note: Extract the archive and select the <strong>VPinballX_BGFX</strong> binary below.</p>' : ''}
                                 </li>
                             </ol>
                         </div>
@@ -452,13 +457,13 @@ class SetupWizard {
                         <div class="input-group" style="margin-bottom: 1.5rem;">
                             <label class="input-label">VPX Standalone App Path</label>
                             <div style="display:flex; gap: 8px;">
-                                <input type="text" id="wiz-vpx-path" class="input-field" value="${this.state.config.vpx_standalone_app_path || ''}" placeholder="/Applications/VPinballX.app" style="flex:1;">
+                                <input type="text" id="wiz-vpx-path" class="input-field" value="${this.state.config.vpx_standalone_app_path || ''}" placeholder="${isLinux ? '/home/user/vpinball/VPinballX_BGFX' : '/Applications/VPinballX.app'}" style="flex:1;">
                                 <button class="btn btn-secondary" onclick="SetupWizard.pickPath('wiz-vpx-path')" style="height: 42px; display: flex; align-items: center; gap: 6px;">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
                                     Browse
                                 </button>
                             </div>
-                            <p style="font-size: 0.8rem; color: var(--text-tertiary); margin-top: 6px;">Select the VPinballX executable or the installed .app bundle</p>
+                            <p style="font-size: 0.8rem; color: var(--text-tertiary); margin-top: 6px;">Select the VPinballX executable${isLinux ? '' : ' or the installed .app bundle'}</p>
                         </div>
 
                         <div class="input-group" style="margin-bottom: 1.5rem;">

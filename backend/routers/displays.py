@@ -88,18 +88,52 @@ def _get_macos_displays() -> List[Dict]:
     return displays
 
 def _get_linux_displays() -> List[Dict]:
-    """Uses pygame fallback for Linux since we don't have SPDisplaysDataType."""
+    """Uses xrandr (primary) or pygame (fallback) for Linux display detection."""
     displays = []
+
+    # 1. Try xrandr first (it's often available and doesn't require extra python packages)
+    try:
+        result = subprocess.run(["xrandr", "--query"], capture_output=True, text=True)
+        if result.returncode == 0:
+            import re
+            # Match: "DP-1 connected primary 2560x1440+0+0 ..." or "HDMI-1 connected 1920x1080+2560+0 ..."
+            pattern = re.compile(r"(\S+) connected (?:primary )?(\d+)x(\d+)\+(\d+)\+(\d+)")
+            idx = 0
+            for line in result.stdout.splitlines():
+                match = pattern.search(line)
+                if match:
+                    name, w, h, x, y = match.groups()
+                    displays.append({
+                        "index": idx,
+                        "name": name,
+                        "uuid": f"linux-{idx}",
+                        "width": int(w),
+                        "height": int(h),
+                        "x": int(x),
+                        "y": int(y),
+                        "scale_factor": 1.0,
+                    })
+                    idx += 1
+            
+            if displays:
+                return displays
+    except Exception as e:
+        print(f"Error getting Linux displays via xrandr: {e}")
+
+    # 2. Fallback to pygame method if xrandr failed or found nothing
     try:
         # We need to run this in a subprocess to avoid SDL initializing in the main Uvicorn thread
         # because importing pygame in the main thread can crash Uvicorn on some platforms.
         script = """
-import pygame
-pygame.init()
-sizes = pygame.display.get_desktop_sizes()
-for i, size in enumerate(sizes):
-    print(f"{i}|Display {i}|{size[0]}|{size[1]}")
-pygame.quit()
+try:
+    import pygame
+    pygame.init()
+    sizes = pygame.display.get_desktop_sizes()
+    for i, size in enumerate(sizes):
+        print(f"{i}|Display {i}|{size[0]}|{size[1]}")
+    pygame.quit()
+except ImportError:
+    pass
         """
         result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
         if result.returncode == 0:
@@ -122,7 +156,7 @@ pygame.quit()
                         })
                         x_offset += w
     except Exception as e:
-        print(f"Error getting Linux displays: {e}")
+        print(f"Error getting Linux displays via pygame: {e}")
 
     return displays
 

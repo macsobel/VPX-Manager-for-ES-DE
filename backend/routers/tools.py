@@ -325,8 +325,15 @@ echo "Script completed successfully."
                 check=False,
             )
 
-        # 2. Remove legacy systeminfo.txt if it exists to prevent system overrides
+        # 2. Ensure tables directory exists
         tables_dir = Path(config.expanded_tables_dir)
+        if not tables_dir.exists():
+            try:
+                tables_dir.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Created missing tables directory: {tables_dir}")
+            except Exception as e:
+                logger.warning(f"Could not create tables directory {tables_dir}: {e}")
+
         legacy_systeminfo = tables_dir / "systeminfo.txt"
         if legacy_systeminfo.exists():
             try:

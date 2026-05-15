@@ -667,7 +667,7 @@ const SettingsPage = {
                             <span style="color: var(--text-muted);">Media files</span>
                         </div>
                         <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: var(--space-md); padding-top: var(--space-sm); border-top: 1px solid var(--border-subtle);">
-                            Version <strong style="color: var(--text-secondary);">${info.version || '—'}</strong> · ${info.platform === 'darwin' ? 'macOS' : info.platform}
+                            Version <strong style="color: var(--text-secondary);">${info.version || '—'}</strong> · ${info.platform === 'darwin' ? 'macOS' : (info.platform === 'linux' ? 'Linux' : info.platform)}
                         </div>
                     </div>
                 </div>

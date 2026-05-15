@@ -75,6 +75,7 @@ async def get_settings(request: Request):
             "vps_db_path": config.vps_db_path,
             "db_path": config.db_path,
             "is_local": check_is_local(request),
+            "platform": sys.platform,
         }
     )
     return data
