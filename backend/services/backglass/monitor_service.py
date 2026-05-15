@@ -5,6 +5,7 @@ import subprocess
 import signal
 import logging
 import platform
+import psutil
 from pathlib import Path
 from backend.core.config import config
 
@@ -18,39 +19,34 @@ class BackglassMonitor:
         self._is_monitoring = False
 
     def get_esde_pid(self):
-        """Find the REAL ES-DE process, checking multiple possible names."""
+        """Find the REAL ES-DE process using psutil."""
         my_pid = os.getpid()
-        # Common macOS process names for ES-DE
         patterns = ["ES-DE", "es-de", "EmulationStation"]
         
-        for pattern in patterns:
-            try:
-                output = subprocess.check_output(["pgrep", "-f", pattern]).decode().strip()
-                if not output:
-                    continue
-                
-                pids = output.split('\n')
-                for p in pids:
-                    try:
-                        pid_int = int(p)
-                        if pid_int == my_pid:
-                            continue
-                            
-                        # Get command line to verify it's not our own manager or script
-                        cmd_line = subprocess.check_output(["ps", "-p", p, "-o", "command="]).decode().strip()
-                        
-                        # EXCLUSION FILTER: Must not contain our manager's signature
-                        if any(sig in cmd_line for sig in ["VPX Manager", "backglass_companion", "antigravity"]):
-                            continue
-                            
-                        # INCLUSION FILTER: If it contains ES-DE or EmulationStation and isn't us, it's likely ES-DE
-                        if any(sig in cmd_line for sig in ["ES-DE", "es-de", "EmulationStation"]):
-                            return p
-                    except:
+        try:
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    if proc.pid == my_pid:
                         continue
-            except:
-                pass
-        
+                        
+                    cmd_line_list = proc.info.get('cmdline', [])
+                    if not cmd_line_list:
+                        continue
+
+                    cmd_line = " ".join(cmd_line_list)
+
+                    # EXCLUSION FILTER: Must not contain our manager's signature
+                    if any(sig in cmd_line for sig in ["VPX Manager", "backglass_companion", "antigravity"]):
+                        continue
+
+                    # INCLUSION FILTER: If it contains ES-DE or EmulationStation and isn't us, it's likely ES-DE
+                    if any(sig in cmd_line for sig in patterns):
+                        return proc.pid
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    continue
+        except Exception as e:
+            logger.debug(f"Error checking processes: {e}")
+
         # If we got here, we didn't find anything
         logger.debug("ES-DE process not found in any common pattern.")
         return None
@@ -157,6 +153,7 @@ class BackglassMonitor:
     def _monitor_loop(self):
         logger.info("Backglass Auto-Monitor started.")
         last_game = None
+        cached_esde_pid = None
         
         while not self._stop_event.is_set():
             # Check if companion has died on its own
@@ -167,7 +164,15 @@ class BackglassMonitor:
 
             # Only do something if the feature is enabled in settings
             if config.backglass_enabled:
-                esde_pid = self.get_esde_pid()
+                if cached_esde_pid is not None:
+                    # Very fast check if the process is still alive
+                    if not psutil.pid_exists(cached_esde_pid):
+                        cached_esde_pid = None
+
+                if cached_esde_pid is None:
+                    cached_esde_pid = self.get_esde_pid()
+
+                esde_pid = cached_esde_pid
                 
                 if esde_pid and not self._companion_process:
                     # ES-DE started!
