@@ -249,8 +249,22 @@ async def apply_autofit_ini(table_id: int):
 
 def apply_flexdmd_patch(ini_path: Path, table_dir: Path, vpx_filename: str) -> None:
     """Helper to detect FlexDMD folder and patch the INI configuration."""
-    flexdmd_dir = table_dir / Path(vpx_filename).stem
-    if not (flexdmd_dir.exists() and flexdmd_dir.is_dir()):
+    # Look for any folder ending in .flexDMD or .UltraDMD (case-insensitive)
+    found = False
+    for item in table_dir.iterdir():
+        if item.is_dir():
+            suffix = item.suffix.lower()
+            if suffix in ['.flexdmd', '.ultradmd']:
+                found = True
+                break
+    
+    # Fallback: check for a folder named exactly like the table stem
+    if not found:
+        legacy_dir = table_dir / Path(vpx_filename).stem
+        if legacy_dir.exists() and legacy_dir.is_dir():
+            found = True
+
+    if not found:
         return
 
     saved_displays = getattr(config, "displays", [])

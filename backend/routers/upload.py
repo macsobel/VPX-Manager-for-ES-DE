@@ -297,7 +297,7 @@ async def import_table(
         results.append(result)
 
     if flexdmd_file:
-        flexdmd_dest = table_dir / Path(new_vpx_filename).stem
+        flexdmd_dest = table_dir
         result = await _process_slot_media(flexdmd_file, flexdmd_dest, "FlexDMD")
         results.append(result)
 
@@ -599,7 +599,7 @@ async def upload_file_to_table(
             }
 
     elif file_type == "flexdmd":
-        dest = table_dir / table_dir.name
+        dest = table_dir
         if ext in [".zip", ".rar", ".7z"]:
             return await _extract_archive_safely(content, filename, dest, "FlexDMD", wipe=True)
         else:
@@ -793,7 +793,16 @@ async def _extract_archive_safely(
 ) -> dict:
     """Extract a zip, 7z, or rar file to the destination, optional wiping first."""
     if wipe and dest.exists():
-        shutil.rmtree(dest)
+        # SAFETY: Never wipe the root table directory!
+        # Only wipe if it's a recognized subfolder or if it's not the table root itself.
+        # We check if the destination is a known sub-directory name to be safe.
+        is_subfolder = dest.name.lower() in [
+            "music", "pupvideos", "medias", "roms", "altcolor", "altsound", "nvram", "cfg"
+        ]
+        if is_subfolder:
+            shutil.rmtree(dest)
+        else:
+            logger.warning(f"VPIN-MANAGER: Skipping wipe for {label} at {dest} because it appears to be a root-level directory.")
 
     dest.mkdir(parents=True, exist_ok=True)
     suffix = Path(filename).suffix.lower()

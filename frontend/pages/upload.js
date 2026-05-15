@@ -7,10 +7,11 @@ const UploadPage = {
         vpxFile: null,
         b2sFile: null,
         romFiles: [],
-        puppackFile: null,
-        musicFile: null,
-        altsoundFile: null,
-        altcolorFile: null,
+        puppackFile: [],
+        flexdmdFile: [],
+        musicFile: [],
+        altsoundFile: [],
+        altcolorFile: [],
         nvramFiles: [],
         vbsFile: null,
         iniFile: null,
@@ -188,12 +189,12 @@ const UploadPage = {
     _resetState() {
         this._state = {
             vpxFile: null, b2sFile: null, romFiles: [],
-            puppackFile: null, musicFile: null, altsoundFile: null, altcolorFile: null, nvramFiles: [],
+            puppackFile: [], flexdmdFile: [], musicFile: [], altsoundFile: [], altcolorFile: [], nvramFiles: [],
             vbsFile: null, iniFile: null,
             vpsId: '', vpsType: '', vpsVersion: '', vpsTableUrl: '', ipdbId: '',
             deletedFiles: [],
         };
-        ['vpx', 'b2s', 'rom', 'puppack', 'music', 'altsound', 'altcolor', 'nvram', 'vbs', 'ini'].forEach(id => {
+        ['vpx', 'b2s', 'rom', 'puppack', 'flexdmd', 'music', 'altsound', 'altcolor', 'nvram', 'vbs', 'ini'].forEach(id => {
             const status = document.getElementById(`status-${id}`);
             const slot = document.getElementById(`slot-${id}`);
             const hint = document.getElementById(`drop-hint-${id}`);
@@ -447,7 +448,7 @@ const UploadPage = {
         if (fileOrList) {
             if (clearBtn) clearBtn.style.display = 'flex';
 
-            const isMultipleSlot = ['rom', 'nvram', 'puppack', 'music', 'altsound', 'altcolor'].includes(slotId);
+            const isMultipleSlot = ['rom', 'nvram', 'puppack', 'flexdmd', 'music', 'altsound', 'altcolor'].includes(slotId);
 
             if (isMultipleSlot) {
                 // Handle multiple files
@@ -483,7 +484,7 @@ const UploadPage = {
             }
         } else {
             if (clearBtn) clearBtn.style.display = 'none';
-            if (['rom', 'nvram', 'puppack', 'music', 'altsound', 'altcolor'].includes(slotId)) {
+            if (['rom', 'nvram', 'puppack', 'flexdmd', 'music', 'altsound', 'altcolor'].includes(slotId)) {
                 this._state[stateKey] = [];
             } else {
                 this._state[stateKey] = null;
@@ -900,6 +901,14 @@ const UploadPage = {
             }
 
             if (!input) return;
+
+            // Enable folder selection for relevant slots
+            if (['puppack', 'flexdmd', 'music', 'altsound', 'altcolor'].includes(slotId)) {
+                input.setAttribute('webkitdirectory', '');
+                input.setAttribute('directory', '');
+                input.setAttribute('multiple', '');
+            }
+
             input.addEventListener('change', async (e) => {
                 await this._setSlotFile(slotId, e.target.files);
             });
@@ -1320,13 +1329,13 @@ const UploadPage = {
                 }).catch(err => console.error('Failed to analyze existing table:', err));
 
             // Bind events for slots
-            const slotIds = ['vpx', 'b2s', 'rom', 'puppack', 'flexdmd', 'music', 'altsound', 'vbs', 'ini'];
+            const slotIds = ['vpx', 'b2s', 'rom', 'puppack', 'flexdmd', 'music', 'altsound', 'altcolor', 'vbs', 'ini'];
             slotIds.forEach(slotId => {
                 const input = document.getElementById(`file-${slotId}`);
                 if (!input) return;
 
-                // Set allow folder attributes for puppack and flexdmd
-                if (slotId === 'puppack' || slotId === 'flexdmd') {
+                // Set allow folder attributes for relevant slots
+                if (['puppack', 'flexdmd', 'music', 'altsound', 'altcolor'].includes(slotId)) {
                     input.setAttribute('webkitdirectory', '');
                     input.setAttribute('directory', '');
                     input.setAttribute('multiple', '');
@@ -1501,8 +1510,8 @@ const UploadPage = {
     _updateAddFilesButton() {
         const btn = document.getElementById('btn-upload-files');
         if (!btn) return;
-        const hasAnyStaged = this._state.b2sFile || (this._state.romFiles && this._state.romFiles.length > 0) || this._state.puppackFile || this._state.flexdmdFile ||
-            this._state.musicFile || this._state.altsoundFile || this._state.altcolorFile || this._state.vpxFile || this._state.vbsFile || this._state.iniFile;
+        const hasAnyStaged = this._state.b2sFile || (this._state.romFiles?.length > 0) || (this._state.puppackFile?.length > 0) || (this._state.flexdmdFile?.length > 0) ||
+            (this._state.musicFile?.length > 0) || (this._state.altsoundFile?.length > 0) || (this._state.altcolorFile?.length > 0) || this._state.vpxFile || this._state.vbsFile || this._state.iniFile;
         const hasAnyDeleted = this._state.deletedFiles && this._state.deletedFiles.length > 0;
         btn.disabled = !(hasAnyStaged || hasAnyDeleted);
     },
