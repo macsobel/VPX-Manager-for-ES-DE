@@ -3,7 +3,9 @@ import logging
 import os
 from pathlib import Path
 
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, HTTPException
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 
 import backend.core.database as db
@@ -44,7 +46,7 @@ async def _run_bulk_generate(tables: list):
                         f.write("")
 
                 completed += 1
-            except Exception:
+            except Exception as e:
                 logger.error(f"Bulk INI error for {t['display_name']}: {e}")
                 errors += 1
 
@@ -167,7 +169,7 @@ async def save_ini(table_id: int, req: EditorSaveRequest):
         with open(ini_path, "w", encoding="utf-8") as f:
             f.write(req.ini_content)
         return {"success": True}
-    except Exception:
+    except Exception as e:
         logger.error(f"Failed to save INI for table {table_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -373,6 +375,6 @@ async def delete_ini(table_id: int):
     try:
         os.remove(ini_path)
         return {"success": True}
-    except Exception:
+    except Exception as e:
         logger.error(f"Failed to delete INI for table {table_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
