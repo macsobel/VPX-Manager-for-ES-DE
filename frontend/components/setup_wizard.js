@@ -374,6 +374,11 @@ class SetupWizard {
         btnNext.style.display = 'flex';
         btnSkip.style.display = (this.state.currentStep > 1 && this.state.currentStep < this.state.totalSteps) ? 'flex' : 'none';
 
+        // Reset button state
+        btnNext.innerHTML = this.state.currentStep === this.state.totalSteps ? 'Finish' : 'Next';
+        btnNext.disabled = false;
+        btnNext.style.opacity = '1';
+
         btnNext.onclick = () => this.next();
         if (btnSkip) btnSkip.onclick = () => this.next();
 
@@ -482,14 +487,19 @@ class SetupWizard {
                     </div>
                 `;
                 btnNext.onclick = async () => {
+                    if (btnNext.disabled) return;
                     const vpx = document.getElementById('wiz-vpx-path')?.value;
                     if (vpx) {
                         try {
+                            btnNext.disabled = true;
+                            btnNext.style.opacity = '0.7';
                             btnNext.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
                             await this.saveCurrentStepData();
                             this.next();
                         } catch (e) {
                             Toast.show(e.message, 'error');
+                            btnNext.disabled = false;
+                            btnNext.style.opacity = '1';
                             btnNext.innerHTML = 'Next';
                         }
                     } else {
@@ -599,12 +609,17 @@ class SetupWizard {
                 }, 100);
 
                 btnNext.onclick = async () => {
+                    if (btnNext.disabled) return;
                     try {
+                        btnNext.disabled = true;
+                        btnNext.style.opacity = '0.7';
                         btnNext.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
                         await this.saveCurrentStepData();
                         this.next();
                     } catch (e) {
                         Toast.show(e.message, 'error');
+                        btnNext.disabled = false;
+                        btnNext.style.opacity = '1';
                         btnNext.innerHTML = 'Next';
                     }
                 };
