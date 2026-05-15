@@ -4,14 +4,17 @@ import time
 import platform
 import ctypes
 import ctypes.util
+import pathlib
+import subprocess
+
+# pyrefly: ignore [missing-import]
+import pygame
 
 # Disable SDL's HID/joystick layer to prevent IOHIDManager corruption
-# This must happen before pygame is imported!
+# This must happen before pygame is initialized!
 os.environ["SDL_JOYSTICK_DISABLED"] = "1"
 os.environ["SDL_HINT_JOYSTICK_HIDAPI"] = "0"
 os.environ["SDL_HINT_NO_SIGNAL_HANDLERS"] = "1"
-
-import pygame
 
 def hide_dock_icon_macos():
     """Hide the app icon from the macOS Dock at runtime."""
@@ -92,16 +95,27 @@ def draw_elite_digit(screen, digit, x, y, size, color):
         draw_tapered_segment(screen, pts[i][0], pts[i][1], t, color)
 
 def identify_screen(display_index):
+    # Standard library imports inside function to assist IDE resolution
+    import os
+    import sys
+    import pathlib
+    import subprocess
+    import time
+    
     # Hide from Dock on macOS immediately
     hide_dock_icon_macos()
     
     # Attempt to wake up display driver
-    pygame.display.init()
-    for _ in range(3):
-        if pygame.display.get_num_displays() > display_index: break
-        pygame.display.quit()
-        time.sleep(0.1)
+    try:
         pygame.display.init()
+        for i in range(3):
+            if pygame.display.get_num_displays() > display_index: 
+                break
+            pygame.display.quit()
+            time.sleep(0.2)
+            pygame.display.init()
+    except Exception:
+        return
 
     try:
         # Get target display resolution for responsive scaling
@@ -127,16 +141,13 @@ def identify_screen(display_index):
         if sys.platform == "darwin":
             try:
                 # Use a more robust AppleScript that targets the current process
-                import subprocess
                 curr_pid = os.getpid()
                 script = f'tell application "System Events" to set frontmost of every process whose unix id is {curr_pid} to true'
                 subprocess.Popen(["osascript", "-e", script])
-            except:
+            except Exception:
                 pass
         elif sys.platform == "linux":
             try:
-                import sys
-                import pathlib
                 # Add backend to path to allow importing linux_focus if not already there
                 base_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent
                 if str(base_dir) not in sys.path:
@@ -144,7 +155,7 @@ def identify_screen(display_index):
                 from backend.services.linux_focus import focus_window
                 # Pygame window name defaults to "pygame window"
                 focus_window("pygame window")
-            except:
+            except Exception:
                 pass
                 
         screen.fill((10, 12, 20))
@@ -184,9 +195,11 @@ def identify_screen(display_index):
         start_time = time.time()
         while time.time() - start_time < 5:
             for event in pygame.event.get():
-                if time.time() - start_time < 3: continue
-                if event.type in [pygame.QUIT, pygame.KEYDOWN]: return
+                if event.type in [pygame.QUIT, pygame.KEYDOWN]: 
+                    return
             time.sleep(0.1)
+    except Exception:
+        pass
     finally:
         pygame.display.quit()
 

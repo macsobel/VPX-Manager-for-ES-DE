@@ -26,9 +26,13 @@ if len(sys.argv) > 1:
         sys.exit(0)
     
     if "--identify" in sys.argv:
-        from backend.services.backglass.identify import identify_screen
-        s_idx = int(sys.argv[2]) if len(sys.argv) > 2 else 0
-        identify_screen(s_idx)
+        try:
+            from backend.services.backglass.identify import identify_screen
+            idx_arg = sys.argv.index("--identify") + 1
+            s_idx = int(sys.argv[idx_arg]) if len(sys.argv) > idx_arg else 0
+            identify_screen(s_idx)
+        except Exception as e:
+            print(f"Identification crash: {e}")
         sys.exit(0)
 
 import backend.core.database as db
