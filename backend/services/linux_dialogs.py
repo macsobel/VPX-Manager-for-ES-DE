@@ -68,8 +68,11 @@ def pick_folder(prompt):
     result = _run_zenity(["--file-selection", "--directory", "--title", prompt])
     if result and result.returncode == 0:
         return result.stdout.strip()
-    # Zenity might have failed to run or the user cancelled. If Zenity was absent (res was None), try tkinter.
-    if result is None:
+    
+    # If zenity was absent (result is None) or failed with an error (returncode != 1 which is cancel)
+    # then we try the tkinter fallback.
+    if result is None or (result and result.returncode != 1):
+        logger.info(f"Zenity failed or missing (code {result.returncode if result else 'N/A'}), trying tkinter fallback.")
         return _run_tkinter_fallback("folder", prompt)
     return None
 
@@ -78,6 +81,8 @@ def pick_file(prompt):
     result = _run_zenity(["--file-selection", "--title", prompt])
     if result and result.returncode == 0:
         return result.stdout.strip()
-    if result is None:
+    
+    if result is None or (result and result.returncode != 1):
+        logger.info(f"Zenity failed or missing (code {result.returncode if result else 'N/A'}), trying tkinter fallback.")
         return _run_tkinter_fallback("file", prompt)
     return None

@@ -6,7 +6,10 @@ from typing import List, Dict
 
 # pyrefly: ignore [missing-import]
 from fastapi import APIRouter
-from pathlib import Path
+from backend.core.config import config, LOG_FILE
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/displays", tags=["displays"])
 
@@ -199,12 +202,13 @@ async def identify_displays():
                     cmd.append(main_script)
                 cmd.extend(["--identify", str(idx)])
                 
+                logger.info(f"Launching identify overlay: {cmd}")
                 subprocess.Popen(cmd, start_new_session=True)
                 # Small delay to prevent SDL collisions
                 time.sleep(0.3)
 
         except Exception as e:
-            print(f"Error launching identify: {e}")
+            logger.error(f"Error launching identify: {e}")
 
     threading.Thread(target=run_identify, daemon=True).start()
     return {"success": True, "message": "Identification overlays launched"}

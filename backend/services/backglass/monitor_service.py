@@ -19,28 +19,40 @@ class BackglassMonitor:
         self._is_monitoring = False
 
     def get_esde_pid(self):
-        """Find the REAL ES-DE process using psutil."""
-        my_pid = os.getpid()
-        patterns = ["ES-DE", "es-de", "EmulationStation"]
+        """Find the REAL ES-DE process using psutil with strict filtering."""
+        try:
+            me = psutil.Process()
+            my_pids = {me.pid}
+            for child in me.children(recursive=True):
+                my_pids.add(child.pid)
+        except Exception:
+            my_pids = {os.getpid()}
+
+        # Strict patterns for the executable name itself
+        strict_names = ["es-de", "EmulationStation", "EmulationStation-DE"]
         
         try:
             for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
                 try:
-                    if proc.pid == my_pid:
+                    if proc.pid in my_pids:
                         continue
                         
+                    pname = proc.info.get('name') or ""
                     cmd_line_list = proc.info.get('cmdline', [])
-                    if not cmd_line_list:
-                        continue
-
                     cmd_line = " ".join(cmd_line_list)
 
-                    # EXCLUSION FILTER: Must not contain our manager's signature
-                    if any(sig in cmd_line for sig in ["VPX Manager", "backglass_companion", "antigravity"]):
-                        continue
+                    # 1. Check strict process names first (most reliable)
+                    if any(sn.lower() == pname.lower() for sn in strict_names):
+                        # Double check it's not us by path
+                        if any(sig in cmd_line for sig in ["VPX-Manager", "antigravity", "backglass_companion"]):
+                            continue
+                        return proc.pid
 
-                    # INCLUSION FILTER: If it contains ES-DE or EmulationStation and isn't us, it's likely ES-DE
-                    if any(sig in cmd_line for sig in patterns):
+                    # 2. Fallback to cmdline check but with VERY strict exclusions
+                    if any(sig in cmd_line for sig in ["ES-DE", "EmulationStation"]):
+                        # If it contains our manager's signature, it's definitely not the target
+                        if any(sig in cmd_line for sig in ["VPX Manager", "VPX-Manager-for-ES-DE", "backglass_companion", "antigravity", "python", "main.py"]):
+                            continue
                         return proc.pid
                 except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                     continue

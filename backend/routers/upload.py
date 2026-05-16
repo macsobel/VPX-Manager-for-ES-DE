@@ -638,7 +638,13 @@ async def upload_file_to_table(
         if ext == ".zip":
             return await _extract_archive_safely(content, filename, dest, "AltSound", wipe=True)
         else:
-            target = dest / filename
+            from urllib.parse import unquote
+            rel_path = unquote(request.headers.get("x-webkit-relative-path", "")) or filename
+            parts = Path(rel_path).parts
+            if len(parts) > 0 and parts[0] == dest.name:
+                parts = parts[1:]
+            
+            target = dest / Path(*parts) if len(parts) > 0 else dest / filename
             target.parent.mkdir(parents=True, exist_ok=True)
 
     elif file_type == "altcolor":
@@ -646,12 +652,20 @@ async def upload_file_to_table(
         if ext == ".zip":
             return await _extract_archive_safely(content, filename, dest, "AltColor", wipe=True)
         else:
-            # Isolated per-table architecture: place in rom-specific folder
-            # For now, use the filename stem as the rom name if not provided
-            rom_name = Path(filename).stem
-            dest = dest / rom_name
-            dest.mkdir(parents=True, exist_ok=True)
-            target = dest / filename
+            from urllib.parse import unquote
+            rel_path = unquote(request.headers.get("x-webkit-relative-path", "")) or filename
+            parts = Path(rel_path).parts
+            
+            # If the folder name was included in the path, try to handle it.
+            # But for AltColor, we often WANT the folder name (the ROM name).
+            if len(parts) > 1:
+                # If it's a folder upload, parts might be ['romname', 'file.cRZ']
+                target = dest / Path(*parts)
+            else:
+                # Single file upload via Choose File - wrap in stem folder for Serum compatibility
+                rom_name = Path(filename).stem
+                target = dest / rom_name / filename
+                
             target.parent.mkdir(parents=True, exist_ok=True)
 
     elif file_type == "vbs":

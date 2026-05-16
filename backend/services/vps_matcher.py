@@ -383,17 +383,12 @@ class VPSMatcher:
         """
         Identify if an AltColor file is in a supported format.
         Supported: .cromc, .pal, .vni, .crz, or Serum (implies .crz/.cromc).
-        Explicitly rejects .pac files.
         """
         # We search across filename, type, comment, and folder fields
         text_to_search = f"{ac.get('fileName', '')} {ac.get('type', '')} {ac.get('comment', '')} {ac.get('folder', '')}".lower()
-
-        # Explicitly reject .pac (often used for real DMDs, not supported by ZeDMD/browser)
-        if "pac" in text_to_search or ".pac" in text_to_search:
-            return False
-
+        
         # Look for supported extensions or keywords
-        supported_tokens = [".cromc", ".pal", ".vni", ".crz", "serum", "pin2dmd"]
+        supported_tokens = [".cromc", ".pal", ".vni", ".crz", ".pac", ".vpp", ".serum", "serum", "pin2dmd"]
         if any(token in text_to_search for token in supported_tokens):
             return True
 

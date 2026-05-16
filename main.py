@@ -36,6 +36,7 @@ if len(sys.argv) > 1:
             from backend.services.backglass.identify import identify_screen
             idx_arg = sys.argv.index("--identify") + 1
             s_idx = int(sys.argv[idx_arg]) if len(sys.argv) > idx_arg else 0
+            print(f"DEBUG: identify subprocess starting for screen {s_idx}")
             identify_screen(s_idx)
         except Exception as e:
             print(f"Identification crash: {e}")
@@ -506,6 +507,8 @@ if __name__ == "__main__":
                     continue
 
             if indicator_ns:
+                Gtk.init(None)
+                print(f"DEBUG: Initializing Linux tray with {indicator_ns}")
                 indicator_mod = __import__(f'gi.repository.{indicator_ns}', fromlist=[indicator_ns])
                 AppIndicator = indicator_mod
                 
@@ -645,6 +648,8 @@ if __name__ == "__main__":
                 import gi
                 gi.require_version('Gtk', '3.0')
                 from gi.repository import Gtk, GLib
+                Gtk.init(None)
+                print("DEBUG: Falling back to GTK StatusIcon")
                 
                 tray_icon = Gtk.StatusIcon()
                 tray_icon.set_from_file(get_linux_icon())
@@ -695,6 +700,7 @@ if __name__ == "__main__":
         # --- Attempt 4: pystray (Final Fallback) ---
         if not tray_started:
             try:
+                print("DEBUG: Falling back to pystray")
                 from PIL import Image
                 # pyrefly: ignore [missing-import]
                 import pystray

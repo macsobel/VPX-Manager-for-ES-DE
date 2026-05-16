@@ -114,7 +114,8 @@ def identify_screen(display_index):
             pygame.display.quit()
             time.sleep(0.2)
             pygame.display.init()
-    except Exception:
+    except Exception as e:
+        print(f"DEBUG: Pygame display init failed: {e}")
         return
 
     try:

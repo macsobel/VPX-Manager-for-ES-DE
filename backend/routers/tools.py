@@ -8,6 +8,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 import platform
+import sys
 
 from fastapi import APIRouter, File, UploadFile
 from pydantic import BaseModel
@@ -192,18 +193,43 @@ class ESDEIntegrationResponse(BaseModel):
     message: str
 
 
-@router.post("/esde-integration", response_model=ESDEIntegrationResponse)
-async def apply_esde_integration():
-    try:
-        is_linux = platform.system() == "Linux"
+def get_esde_dir() -> Path:
+    """Detects the active ES-DE data directory on Linux and macOS."""
+    if sys.platform == "darwin":
+        return Path.home() / ".emulationstation"
+    
+    # On Linux, check common locations in order of preference
+    # 1. ~/ES-DE (Portable/Modern style)
+    # 2. ~/.emulationstation (Legacy style)
+    portable_dir = Path.home() / "ES-DE"
+    legacy_dir = Path.home() / ".emulationstation"
+    
+    # If settings file exists in ES-DE, it's definitely the one
+    if (portable_dir / "settings" / "es_settings.xml").exists():
+        return portable_dir
+    if legacy_dir.exists():
+        return legacy_dir
+    
+    # Fallback to portable if it exists at all
+    if portable_dir.exists():
+        return portable_dir
         
-        if is_linux:
-            esde_dir = Path.home() / ".emulationstation"
-        else:
-            esde_dir = Path.home() / "ES-DE"
-            
+    return legacy_dir
+
+
+@router.post("/esde-integration")
+async def apply_esde_integration():
+    """Configures ES-DE to work with VPX-Manager for both launch and backglass support."""
+    try:
+        is_linux = sys.platform != "darwin"
+        esde_dir = get_esde_dir()
+        
+        logger.info(f"Applying ES-DE integration in: {esde_dir}")
+        
+        # Ensure directories exist
         esde_scripts_dir = esde_dir / "scripts"
         esde_scripts_dir.mkdir(parents=True, exist_ok=True)
+        (esde_dir / "custom_systems").mkdir(parents=True, exist_ok=True)
         script_path = esde_scripts_dir / "launch_vpinball.sh"
 
         # Create game-select script for backglass companion
@@ -284,6 +310,21 @@ else
 fi
 
 VP_BIN="{vpx_bin}"
+
+# Linux-specific binary search fallback
+if [ "$(uname)" != "Darwin" ]; then
+    if ! command -v "$VP_BIN" >/dev/null 2>&1 && [ ! -f "$VP_BIN" ]; then
+        echo "Searching for Visual Pinball binary..."
+        # Try some common locations/names
+        for fallback in "vpinballx" "VPinballX_Standalone" "$HOME/VPinballX_Standalone" "$HOME/vpinballx"; do
+            if command -v "$fallback" >/dev/null 2>&1 || [ -f "$fallback" ]; then
+                VP_BIN="$fallback"
+                break
+            fi
+        done
+    fi
+fi
+
 VP_DIR="$(dirname "$VP_BIN")"
 TABLES_DIR="{config.expanded_tables_dir}"
 
@@ -301,7 +342,10 @@ fi
 echo "Launching Visual Pinball with table: $(basename "$TABLE_PATH")"
 
 # cd into the binary directory so it can find its relative dependencies
-cd "$VP_DIR" || exit 1
+# Only if it's a path, otherwise stay here
+if [ -d "$VP_DIR" ]; then
+    cd "$VP_DIR" || exit 1
+fi
 
 # Call binary directly — bash waits for it to exit before continuing
 "$VP_BIN" -play "$TABLE_PATH"
@@ -407,10 +451,44 @@ echo "Script completed successfully."
             command_elem.set("label", "Visual Pinball X (Script)")
             command_elem.text = "%EMULATOR_VISUAL-PINBALL% %ROM%"
 
-            # Remove old emulators block since we're using root command fallback now
-            emulators = vpinball_system.find("emulators")
-            if emulators is not None:
-                vpinball_system.remove(emulators)
+            # For Linux, we ensure the emulators block is present and correct
+            if is_linux:
+                emulators = vpinball_system.find("emulators")
+                if emulators is None:
+                    emulators = ET.SubElement(vpinball_system, "emulators")
+                
+                # Check if VISUAL-PINBALL emulator exists
+                vp_emu = None
+                for emu in emulators.findall("emulator"):
+                    if emu.get("name") == "VISUAL-PINBALL":
+                        vp_emu = emu
+                        break
+                
+                if vp_emu is None:
+                    vp_emu = ET.SubElement(emulators, "emulator", name="VISUAL-PINBALL")
+                
+                # Ensure rules block exists
+                rules = vp_emu.find("rules")
+                if rules is None:
+                    rules = ET.SubElement(vp_emu, "rules")
+                
+                # Check if staticpath rule exists
+                rule_exists = False
+                for rule in rules.findall("rule"):
+                    if rule.get("type") == "staticpath":
+                        for entry in rule.findall("entry"):
+                            if entry.text == str(script_path):
+                                rule_exists = True
+                                break
+                
+                if not rule_exists:
+                    new_rule = ET.SubElement(rules, "rule", type="staticpath")
+                    ET.SubElement(new_rule, "entry").text = str(script_path)
+            else:
+                # macOS logic: Remove old emulators block to use root command fallback
+                emulators = vpinball_system.find("emulators")
+                if emulators is not None:
+                    vpinball_system.remove(emulators)
         else:
             # Create new system
             new_system = ET.SubElement(root, "system")
@@ -422,45 +500,67 @@ echo "Script completed successfully."
             cmd.set("label", "Visual Pinball X (Script)")
             cmd.text = "%EMULATOR_VISUAL-PINBALL% %ROM%"
 
+            if is_linux:
+                emulators = ET.SubElement(new_system, "emulators")
+                vp_emu = ET.SubElement(emulators, "emulator", name="VISUAL-PINBALL")
+                rules = ET.SubElement(vp_emu, "rules")
+                new_rule = ET.SubElement(rules, "rule", type="staticpath")
+                ET.SubElement(new_rule, "entry").text = str(script_path)
+
             ET.SubElement(new_system, "platform").text = "vpinball"
             ET.SubElement(new_system, "theme").text = "vpinball"
 
         tree.write(xml_file, encoding="utf-8", xml_declaration=True)
 
         # 5. Pre-set the preferred emulator without UI by modifying es_settings.xml
+        # Check both the root and the settings/ subfolder (used in ~/ES-DE)
         for settings_path in [
-            Path.home() / ".emulationstation" / "es_settings.xml",
-            Path.home() / "ES-DE" / "settings" / "es_settings.xml",
+            esde_dir / "es_settings.xml",
+            esde_dir / "settings" / "es_settings.xml",
         ]:
             if settings_path.exists():
                 try:
-                    lines = []
+                    with open(settings_path, "r", encoding="utf-8") as f:
+                        lines = f.readlines()
+
+                    new_lines = []
                     found_scripts = False
                     found_browsing = False
                     found_emu = False
 
-                    with open(settings_path, "r", encoding="utf-8") as f:
-                        for line in f:
-                            if 'name="CustomEventScripts"' in line:
-                                line = '<bool name="CustomEventScripts" value="true" />\n'
-                                found_scripts = True
-                            elif 'name="CustomEventScriptsBrowsing"' in line:
-                                line = '<bool name="CustomEventScriptsBrowsing" value="true" />\n'
-                                found_browsing = True
-                            elif 'name="AlternativeEmulator_vpinball"' in line:
-                                line = '<string name="AlternativeEmulator_vpinball" value="Visual Pinball X (Script)" />\n'
-                                found_emu = True
-                            lines.append(line)
+                    for line in lines:
+                        if 'name="CustomEventScripts"' in line:
+                            new_lines.append('    <bool name="CustomEventScripts" value="true" />\n')
+                            found_scripts = True
+                        elif 'name="CustomEventScriptsBrowsing"' in line:
+                            new_lines.append('    <bool name="CustomEventScriptsBrowsing" value="true" />\n')
+                            found_browsing = True
+                        elif 'name="AlternativeEmulator_vpinball"' in line:
+                            new_lines.append('    <string name="AlternativeEmulator_vpinball" value="Visual Pinball X (Script)" />\n')
+                            found_emu = True
+                        elif '</settings>' in line:
+                            # Insert missing settings before closing tag
+                            if not found_scripts:
+                                new_lines.append('    <bool name="CustomEventScripts" value="true" />\n')
+                            if not found_browsing:
+                                new_lines.append('    <bool name="CustomEventScriptsBrowsing" value="true" />\n')
+                            if not found_emu:
+                                new_lines.append('    <string name="AlternativeEmulator_vpinball" value="Visual Pinball X (Script)" />\n')
+                            new_lines.append(line)
+                        else:
+                            new_lines.append(line)
 
-                    if not found_scripts:
-                        lines.append('<bool name="CustomEventScripts" value="true" />\n')
-                    if not found_browsing:
-                        lines.append('<bool name="CustomEventScriptsBrowsing" value="true" />\n')
-                    if not found_emu:
-                        lines.append('<string name="AlternativeEmulator_vpinball" value="Visual Pinball X (Script)" />\n')
+                    # If </settings> was never found (rare), just append
+                    if not any('</settings>' in l for l in new_lines):
+                        if not found_scripts:
+                            new_lines.append('<bool name="CustomEventScripts" value="true" />\n')
+                        if not found_browsing:
+                            new_lines.append('<bool name="CustomEventScriptsBrowsing" value="true" />\n')
+                        if not found_emu:
+                            new_lines.append('<string name="AlternativeEmulator_vpinball" value="Visual Pinball X (Script)" />\n')
 
                     with open(settings_path, "w", encoding="utf-8") as f:
-                        f.writelines(lines)
+                        f.writelines(new_lines)
                 except Exception as e:
                     logger.warning(f"Could not update {settings_path}: {e}")
 
