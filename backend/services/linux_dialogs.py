@@ -1,3 +1,4 @@
+import os
 import subprocess
 import shutil
 import logging
@@ -7,7 +8,17 @@ logger = logging.getLogger("vpx_manager.linux_dialogs")
 
 def _run_zenity(args):
     """Internal helper to run zenity commands."""
-    zenity_path = shutil.which("zenity")
+    clean_env = get_clean_env()
+    
+    # Search for zenity using the clean env's PATH (not the AppImage's internal PATH)
+    zenity_path = shutil.which("zenity", path=clean_env.get("PATH", ""))
+    if not zenity_path:
+        # Explicit fallback to common system paths
+        for candidate in ["/usr/bin/zenity", "/usr/local/bin/zenity"]:
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                zenity_path = candidate
+                break
+    
     if not zenity_path:
         logger.error("zenity not found. Native dialogs unavailable via zenity.")
         return None
@@ -18,12 +29,13 @@ def _run_zenity(args):
             capture_output=True,
             text=True,
             check=False,
-            env=get_clean_env()
+            env=clean_env
         )
         return result
     except Exception as e:
         logger.error(f"Error running zenity: {e}")
         return None
+
 
 def _run_tkinter_fallback(dialog_type, prompt):
     """Fallback to tkinter if zenity is not installed."""
