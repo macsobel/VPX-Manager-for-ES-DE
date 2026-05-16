@@ -3,10 +3,12 @@ import sys
 import subprocess
 import time
 from typing import List, Dict
+from pathlib import Path
 
 # pyrefly: ignore [missing-import]
 from fastapi import APIRouter
 from backend.core.config import config, LOG_FILE
+from backend.core.utils import get_clean_env
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,7 +22,8 @@ def _get_macos_displays() -> List[Dict]:
         result = subprocess.run(
             ["system_profiler", "SPDisplaysDataType", "-xml"],
             capture_output=True,
-            text=True
+            text=True,
+            env=get_clean_env()
         )
         if result.returncode == 0 and result.stdout:
             # Simple plist parsing (instead of importing plistlib to avoid strict typing issues with deeply nested plists)
@@ -96,7 +99,7 @@ def _get_linux_displays() -> List[Dict]:
 
     # 1. Try xrandr first (it's often available and doesn't require extra python packages)
     try:
-        result = subprocess.run(["xrandr", "--query"], capture_output=True, text=True)
+        result = subprocess.run(["xrandr", "--query"], capture_output=True, text=True, env=get_clean_env())
         if result.returncode == 0:
             import re
             # Match: "DP-1 connected primary 2560x1440+0+0 ..." or "HDMI-1 connected 1920x1080+2560+0 ..."
@@ -138,7 +141,7 @@ try:
 except ImportError:
     pass
         """
-        result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
+        result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, env=get_clean_env())
         if result.returncode == 0:
             x_offset = 0
             for line in result.stdout.strip().splitlines():
@@ -203,7 +206,7 @@ async def identify_displays():
                 cmd.extend(["--identify", str(idx)])
                 
                 logger.info(f"Launching identify overlay: {cmd}")
-                subprocess.Popen(cmd, start_new_session=True)
+                subprocess.Popen(cmd, start_new_session=True, env=get_clean_env())
                 # Small delay to prevent SDL collisions
                 time.sleep(0.3)
 

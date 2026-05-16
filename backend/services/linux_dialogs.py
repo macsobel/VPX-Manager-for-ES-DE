@@ -1,6 +1,7 @@
 import subprocess
 import shutil
 import logging
+from backend.core.utils import get_clean_env
 
 logger = logging.getLogger("vpx_manager.linux_dialogs")
 
@@ -16,7 +17,8 @@ def _run_zenity(args):
             [zenity_path] + args,
             capture_output=True,
             text=True,
-            check=False
+            check=False,
+            env=get_clean_env()
         )
         return result
     except Exception as e:

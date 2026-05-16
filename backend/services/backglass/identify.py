@@ -144,7 +144,8 @@ def identify_screen(display_index):
                 # Use a more robust AppleScript that targets the current process
                 curr_pid = os.getpid()
                 script = f'tell application "System Events" to set frontmost of every process whose unix id is {curr_pid} to true'
-                subprocess.Popen(["osascript", "-e", script])
+                from backend.core.utils import get_clean_env
+                subprocess.Popen(["osascript", "-e", script], env=get_clean_env())
             except Exception:
                 pass
         elif sys.platform == "linux":

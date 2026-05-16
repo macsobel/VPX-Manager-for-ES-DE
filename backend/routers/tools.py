@@ -14,6 +14,7 @@ from fastapi import APIRouter, File, UploadFile
 from pydantic import BaseModel
 
 from backend.core.config import config
+from backend.core.utils import get_clean_env
 
 logger = logging.getLogger(__name__)
 
@@ -406,6 +407,7 @@ echo "Script completed successfully."
                 ["xattr", "-d", "com.apple.quarantine", str(script_path)],
                 stderr=subprocess.DEVNULL,
                 check=False,
+                env=get_clean_env()
             )
 
         # 2. Ensure tables directory exists

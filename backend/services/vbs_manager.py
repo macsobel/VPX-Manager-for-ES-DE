@@ -12,6 +12,7 @@ import httpx
 
 import backend.core.database as db
 from backend.core.config import config
+from backend.core.utils import get_clean_env
 from backend.services.task_registry import task_registry
 
 logger = logging.getLogger(__name__)
@@ -178,7 +179,10 @@ class VBSManagerService:
             logger.info(f"[v2.2.diag] Executing command: {' '.join(cmd)}")
 
             process = await asyncio.create_subprocess_exec(
-                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                *cmd, 
+                stdout=asyncio.subprocess.PIPE, 
+                stderr=asyncio.subprocess.PIPE,
+                env=get_clean_env()
             )
 
             try:
