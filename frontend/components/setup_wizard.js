@@ -519,7 +519,7 @@ class SetupWizard {
                             <h4 style="color: var(--text-primary); margin-top: 0; margin-bottom: 1rem;">Downloading & Installing ES-DE</h4>
                             <ol style="color: var(--text-secondary); line-height: 1.8; margin: 0; padding-left: 1.2rem; font-size: 0.9rem;">
                                 <li>Download the ES-DE frontend from the <a href="https://es-de.org/" target="_blank" style="color: var(--accent-blue);">official website</a>.
-                                    ${isLinux ? '<p style="margin-top: 6px; font-size: 0.85rem; color: var(--text-secondary);">For Linux, download the <strong>.deb</strong> package (Ubuntu/Debian) or the <strong>AppImage</strong>. If using the AppImage, make it executable: <code style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">chmod +x ES-DE_*.AppImage</code></p>' : ''}
+                                    ${isLinux ? '<p style="margin-top: 6px; font-size: 0.85rem; color: var(--text-secondary);">For Linux, download the <strong>.deb</strong> package (Ubuntu/Debian) or the <strong>AppImage</strong>. If using the AppImage, make it executable: <code style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">chmod +x ES-DE_x64.AppImage</code></p>' : ''}
                                 </li>
                                 <li>Install and launch the application once to let it create its default folders.</li>
                             </ol>

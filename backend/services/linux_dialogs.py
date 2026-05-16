@@ -69,6 +69,10 @@ def show_info(title, message):
     res = _run_zenity(["--info", "--title", title, "--text", message, "--no-wrap"])
     if res is None:
         _run_tkinter_fallback("info", (title, message))
+    elif res.returncode != 0:
+        logger.warning(f"zenity info dialog failed (code {res.returncode}): {res.stderr.strip()}")
+        _run_tkinter_fallback("info", (title, message))
+
 
 def ask_yes_no(title, message):
     """Show a question dialog. Returns True for Yes/OK, False otherwise."""

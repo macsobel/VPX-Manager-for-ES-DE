@@ -154,6 +154,13 @@ EOF
     cat > "${APPDIR}/AppRun" <<'EOF'
 #!/bin/bash
 HERE="$(dirname "$(readlink -f "${0}")")"
+
+# Save original environment before we modify it
+# get_clean_env() in Python uses these to restore for system binaries
+export LD_LIBRARY_PATH_ORIG="${LD_LIBRARY_PATH}"
+export GI_TYPELIB_PATH_ORIG="${GI_TYPELIB_PATH}"
+export PATH_ORIG="${PATH}"
+
 export PATH="${HERE}/usr/bin:${PATH}"
 
 # Make bundled GIR typelibs discoverable
@@ -167,6 +174,7 @@ if [ -d "${HERE}/usr/lib/extra" ]; then
 fi
 
 exec "${HERE}/usr/bin/VPX_Manager" "$@"
+
 EOF
     chmod +x "${APPDIR}/AppRun"
 
