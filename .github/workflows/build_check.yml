@@ -25,7 +25,10 @@ jobs:
             display_name: macOS_Apple_Silicon
           - os: ubuntu-22.04
             arch: x86_64
-            display_name: Linux_x64
+            display_name: Linux_x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+            display_name: Linux_ARM64
 
     runs-on: ${{ matrix.os }}
     
@@ -80,7 +83,7 @@ jobs:
         if [ "${{ runner.os }}" == "macOS" ]; then
           zip -r "VPX_Manager_${{ matrix.display_name }}.zip" "VPX Manager for ES-DE.app"
         else
-          zip -j "VPX_Manager_${{ matrix.display_name }}.zip" "VPX_Manager-x86_64.AppImage"
+          zip -j "VPX_Manager_${{ matrix.display_name }}.zip" "VPX_Manager-${{ matrix.arch }}.AppImage"
         fi
 
     - name: Upload Artifact
