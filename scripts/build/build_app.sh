@@ -25,8 +25,8 @@ esac
 ARCH_RAW="$(uname -m)"
 case "${ARCH_RAW}" in
     x86_64)   ARCH="x86_64";;
-    aarch64)  ARCH="aarch64";;
-    arm64)    ARCH="aarch64";;
+    aarch64)  ARCH="arm64";; # Try arm64 alias for appimagetool compatibility
+    arm64)    ARCH="arm64";;
     *)        ARCH="x86_64";;
 esac
 export ARCH="${ARCH}"
@@ -190,10 +190,15 @@ EOF
         chmod +x "${APPIMAGETOOL}"
     fi
 
+    # Diagnostic: Check for mixed architectures
+    echo "Architecture Check (All ELF files in AppDir):"
+    find "${APPDIR}" -type f -exec file {} + | grep "ELF" || true
+    echo "------------------------------------------"
+
     # Generate AppImage
-    echo "Generating AppImage..."
+    echo "Generating AppImage for ${ARCH}..."
     # Explicitly pass ARCH to appimagetool to bypass auto-detection if it gets confused
-    "${APPIMAGETOOL}" --appimage-extract-and-run "${APPDIR}" "${DIST_DIR}/VPX_Manager-${ARCH}.AppImage"
+    env ARCH="${ARCH}" "${APPIMAGETOOL}" --appimage-extract-and-run "${APPDIR}" "${DIST_DIR}/VPX_Manager-${ARCH}.AppImage"
 
     APPIMAGE_BUNDLE="${DIST_DIR}/VPX_Manager-${ARCH}.AppImage"
 
