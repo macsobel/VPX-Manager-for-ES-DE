@@ -6,21 +6,45 @@ from backend.core.utils import get_clean_env
 
 logger = logging.getLogger("vpx_manager.linux_dialogs")
 
-def _run_zenity(args):
-    """Internal helper to run zenity commands."""
+def _find_zenity():
+    """
+    Robustly locate the system zenity binary.
+    Never relies solely on PATH restoration being correct — always checks
+    hardcoded system locations as a guaranteed fallback.
+    """
     clean_env = get_clean_env()
-    
-    # Search for zenity using the clean env's PATH (not the AppImage's internal PATH)
+
+    # 1. Try shutil.which with the restored PATH
     zenity_path = shutil.which("zenity", path=clean_env.get("PATH", ""))
+
+    # 2. Always check hardcoded system locations regardless
+    #    This is the critical fallback when PATH restoration fails from inside an AppImage
+    system_candidates = [
+        "/usr/bin/zenity",
+        "/usr/local/bin/zenity",
+        "/bin/zenity",
+        "/snap/bin/zenity",
+    ]
     if not zenity_path:
-        # Explicit fallback to common system paths
-        for candidate in ["/usr/bin/zenity", "/usr/local/bin/zenity"]:
+        for candidate in system_candidates:
             if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                 zenity_path = candidate
+                logger.debug(f"Found zenity via hardcoded path: {candidate}")
                 break
-    
+
+    if zenity_path:
+        logger.debug(f"Using zenity at: {zenity_path}")
+    else:
+        logger.error("zenity not found in PATH or system locations. Native dialogs unavailable.")
+
+    return zenity_path, clean_env
+
+
+def _run_zenity(args):
+    """Internal helper to run zenity commands."""
+    zenity_path, clean_env = _find_zenity()
+
     if not zenity_path:
-        logger.error("zenity not found. Native dialogs unavailable via zenity.")
         return None
     
     try:
