@@ -20,7 +20,18 @@ case "${OS_TYPE}" in
     Linux*)     PLATFORM="Linux";;
     *)          PLATFORM="Unknown";;
 esac
-echo "Detected Platform: ${PLATFORM}"
+
+# 2. Detect Architecture
+ARCH_RAW="$(uname -m)"
+case "${ARCH_RAW}" in
+    x86_64)   ARCH="x86_64";;
+    aarch64)  ARCH="aarch64";;
+    arm64)    ARCH="aarch64";;
+    *)        ARCH="x86_64";;
+esac
+export ARCH="${ARCH}"
+echo "Detected Platform: ${PLATFORM} (${ARCH})"
+echo "Architecture Raw: ${ARCH_RAW}"
 
 # 2. Ensure Dependencies and Virtual Env
 if [ ! -d "${VENV_DIR}" ]; then
@@ -57,7 +68,9 @@ fi
 # 5. Clean previous build files
 echo "Cleaning old build files..."
 rm -rf "${ROOT_DIR}/build"
-# We don't rm -rf dist because it might contain artifacts we want to keep
+# Clean the specific platform's dist folder to avoid cross-arch pollution
+rm -rf "${DIST_DIR}/VPX_Manager"
+rm -rf "${DIST_DIR}/VPX_Manager.AppDir"
 
 # 6. Build with PyInstaller
 echo "Running PyInstaller..."
@@ -80,16 +93,6 @@ if [ "${PLATFORM}" == "macOS" ]; then
 else
     # For Linux builds
     echo "Creating AppImage (Linux specific)..."
-
-    # Detect Architecture
-    ARCH_RAW="$(uname -m)"
-    case "${ARCH_RAW}" in
-        x86_64)   ARCH="x86_64";;
-        aarch64)  ARCH="aarch64";;
-        arm64)    ARCH="aarch64";;
-        *)        ARCH="x86_64";;
-    esac
-    echo "Detected Architecture: ${ARCH}"
 
     # Setup AppDir
     APPDIR="${DIST_DIR}/VPX_Manager.AppDir"
@@ -189,7 +192,8 @@ EOF
 
     # Generate AppImage
     echo "Generating AppImage..."
-    ARCH="${ARCH}" "${APPIMAGETOOL}" --appimage-extract-and-run "${APPDIR}" "${DIST_DIR}/VPX_Manager-${ARCH}.AppImage"
+    # Explicitly pass ARCH to appimagetool to bypass auto-detection if it gets confused
+    "${APPIMAGETOOL}" --appimage-extract-and-run "${APPDIR}" "${DIST_DIR}/VPX_Manager-${ARCH}.AppImage"
 
     APPIMAGE_BUNDLE="${DIST_DIR}/VPX_Manager-${ARCH}.AppImage"
 
