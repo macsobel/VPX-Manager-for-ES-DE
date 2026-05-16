@@ -230,11 +230,47 @@ async def apply_esde_integration():
         esde_scripts_dir = esde_dir / "scripts"
         esde_scripts_dir.mkdir(parents=True, exist_ok=True)
         (esde_dir / "custom_systems").mkdir(parents=True, exist_ok=True)
-        script_path = esde_scripts_dir / "launch_vpinball.sh"
-
-        # Create game-select script for backglass companion
+        
+        # New event script directories
+        start_script_dir = esde_scripts_dir / "emulationstation-start"
+        exit_script_dir = esde_scripts_dir / "emulationstation-exit"
         game_select_dir = esde_scripts_dir / "game-select"
-        game_select_dir.mkdir(parents=True, exist_ok=True)
+        
+        for d in [start_script_dir, exit_script_dir, game_select_dir]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        script_path = esde_scripts_dir / "launch_vpinball.sh"
+        
+        # Path to this executable
+        this_exe = sys.executable
+        if getattr(sys, 'frozen', False):
+            # If running as AppImage/bundled, use the actual executable
+            manager_cmd = f'"{this_exe}"'
+        else:
+            # If running in dev mode
+            manager_cmd = f'python3 "{Path(__file__).parents[2] / "main.py"}"'
+
+        # 1. emulationstation-start script (Launch Backglass)
+        start_script_path = start_script_dir / "vpx_backglass_start.sh"
+        start_script_content = f"""#!/bin/bash
+# Launch VPX Backglass Companion when ES-DE starts
+{manager_cmd} --backglass &
+"""
+        with open(start_script_path, "w") as f:
+            f.write(start_script_content)
+        os.chmod(start_script_path, os.stat(start_script_path).st_mode | stat.S_IEXEC)
+
+        # 2. emulationstation-exit script (Kill Backglass)
+        exit_script_path = exit_script_dir / "vpx_backglass_stop.sh"
+        exit_script_content = """#!/bin/bash
+# Kill VPX Backglass Companion when ES-DE exits
+pkill -f "--backglass"
+"""
+        with open(exit_script_path, "w") as f:
+            f.write(exit_script_content)
+        os.chmod(exit_script_path, os.stat(exit_script_path).st_mode | stat.S_IEXEC)
+
+        # 3. game-select script (existing logic)
         bg_script_path = game_select_dir / "vpx_backglass.sh"
 
         bg_script_content = """#!/bin/bash
@@ -267,11 +303,14 @@ fi
         # Focus logic for Linux using wmctrl
         linux_focus_logic = """
 # Bring ES-DE back to the front on Linux
-if command -v wmctrl >/dev/null 2>&1; then
-    wmctrl -a "EmulationStation" || wmctrl -a "ES-DE"
-elif command -v xdotool >/dev/null 2>&1; then
-    xdotool search --name "EmulationStation" windowactivate || xdotool search --name "ES-DE" windowactivate
-fi
+# Try various common window titles for ES-DE
+for title in "EmulationStation" "ES-DE" "EmulationStation Desktop Edition"; do
+    if command -v wmctrl >/dev/null 2>&1; then
+        wmctrl -a "$title" && break
+    elif command -v xdotool >/dev/null 2>&1; then
+        xdotool search --name "$title" windowactivate && break
+    fi
+done
 """ if is_linux else ""
 
         # Focus logic for macOS using osascript
