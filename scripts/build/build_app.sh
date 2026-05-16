@@ -99,6 +99,44 @@ else
     # Copy PyInstaller output
     cp -r "${DIST_DIR}/VPX_Manager/"* "${APPDIR}/usr/bin/"
 
+    # Bundle GObject Introspection typelibs and shared libraries for tray icon
+    echo "Bundling GIR typelibs and shared libraries..."
+    TYPELIB_SRC=""
+    for candidate in "/usr/lib/${ARCH_RAW}-linux-gnu/girepository-1.0" "/usr/lib/girepository-1.0"; do
+        if [ -d "$candidate" ]; then
+            TYPELIB_SRC="$candidate"
+            break
+        fi
+    done
+    if [ -n "$TYPELIB_SRC" ]; then
+        mkdir -p "${APPDIR}/usr/lib/girepository-1.0"
+        for typelib in AyatanaAppIndicator3-0.1 AppIndicator3-0.1 Gtk-3.0 Gdk-3.0 \
+                       GdkPixbuf-2.0 Pango-1.0 PangoCairo-1.0 cairo-1.0 \
+                       GObject-2.0 GLib-2.0 Gio-2.0 Atk-1.0 \
+                       Dbusmenu-0.4 DbusmenuGtk3-0.4 GModule-2.0 \
+                       HarfBuzz-0.0 freetype2-2.0 xlib-2.0; do
+            if [ -f "${TYPELIB_SRC}/${typelib}.typelib" ]; then
+                cp "${TYPELIB_SRC}/${typelib}.typelib" "${APPDIR}/usr/lib/girepository-1.0/"
+                echo "  Bundled ${typelib}.typelib"
+            fi
+        done
+    else
+        echo "WARNING: Could not find girepository-1.0 directory"
+    fi
+
+    # Bundle key shared libraries for AppIndicator
+    mkdir -p "${APPDIR}/usr/lib/extra"
+    for lib in libayatana-appindicator3 libayatana-indicator3 libayatana-ido3 \
+               libdbusmenu-glib libdbusmenu-gtk3 libgtk-3 libgdk-3 \
+               libgobject-2.0 libgio-2.0 libglib-2.0; do
+        for so in /usr/lib/${ARCH_RAW}-linux-gnu/${lib}.so* /usr/lib/${ARCH_RAW}-linux-gnu/${lib}-*.so*; do
+            if [ -f "$so" ]; then
+                cp -n "$so" "${APPDIR}/usr/lib/extra/" 2>/dev/null || true
+            fi
+        done
+    done
+    echo "Bundled shared libraries for tray support."
+
     # Create .desktop file
     cat > "${APPDIR}/vpx-manager.desktop" <<EOF
 [Desktop Entry]
@@ -112,14 +150,26 @@ EOF
     # Add icon
     cp "${ROOT_DIR}/resources/icon.png" "${APPDIR}/icon.png"
 
-    # Create AppRun script
+    # Create AppRun script with GI_TYPELIB_PATH for tray icon support
     cat > "${APPDIR}/AppRun" <<'EOF'
 #!/bin/bash
 HERE="$(dirname "$(readlink -f "${0}")")"
 export PATH="${HERE}/usr/bin:${PATH}"
+
+# Make bundled GIR typelibs discoverable
+if [ -d "${HERE}/usr/lib/girepository-1.0" ]; then
+    export GI_TYPELIB_PATH="${HERE}/usr/lib/girepository-1.0${GI_TYPELIB_PATH:+:$GI_TYPELIB_PATH}"
+fi
+
+# Make bundled shared libraries discoverable
+if [ -d "${HERE}/usr/lib/extra" ]; then
+    export LD_LIBRARY_PATH="${HERE}/usr/lib/extra${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+
 exec "${HERE}/usr/bin/VPX_Manager" "$@"
 EOF
     chmod +x "${APPDIR}/AppRun"
+
 
     # Download architecture-appropriate appimagetool if not present
     APPIMAGETOOL="${DIST_DIR}/appimagetool-${ARCH}.AppImage"
