@@ -25,8 +25,8 @@ esac
 ARCH_RAW="$(uname -m)"
 case "${ARCH_RAW}" in
     x86_64)   ARCH="x86_64";;
-    aarch64)  ARCH="arm64";; # Try arm64 alias for appimagetool compatibility
-    arm64)    ARCH="arm64";;
+    aarch64)  ARCH="aarch64";;
+    arm64)    ARCH="aarch64";;
     *)        ARCH="x86_64";;
 esac
 export ARCH="${ARCH}"
@@ -183,10 +183,12 @@ EOF
 
 
     # Download architecture-appropriate appimagetool if not present
+    # NOTE: Using the NEW appimagetool repo (AppImage/appimagetool) instead of
+    # the legacy AppImageKit repo, which had buggy aarch64 architecture detection.
     APPIMAGETOOL="${DIST_DIR}/appimagetool-${ARCH}.AppImage"
     if [ ! -f "${APPIMAGETOOL}" ]; then
         echo "Downloading appimagetool for ${ARCH}..."
-        curl -L "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${ARCH}.AppImage" -o "${APPIMAGETOOL}"
+        curl -L "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${ARCH}.AppImage" -o "${APPIMAGETOOL}"
         chmod +x "${APPIMAGETOOL}"
     fi
 
@@ -196,9 +198,21 @@ EOF
     echo "------------------------------------------"
 
     # Generate AppImage
+    # Extract appimagetool and run the extracted binary directly to ensure
+    # the ARCH environment variable is reliably inherited (avoids issues with
+    # --appimage-extract-and-run losing env vars in some versions).
     echo "Generating AppImage for ${ARCH}..."
-    # Explicitly pass ARCH to appimagetool to bypass auto-detection if it gets confused
-    env ARCH="${ARCH}" "${APPIMAGETOOL}" --appimage-extract-and-run "${APPDIR}" "${DIST_DIR}/VPX_Manager-${ARCH}.AppImage"
+    APPIMAGETOOL_EXTRACT_DIR="${DIST_DIR}/appimagetool_extracted"
+    rm -rf "${APPIMAGETOOL_EXTRACT_DIR}"
+    cd "${DIST_DIR}"
+    "${APPIMAGETOOL}" --appimage-extract > /dev/null 2>&1
+    mv squashfs-root "${APPIMAGETOOL_EXTRACT_DIR}"
+    cd "${ROOT_DIR}"
+
+    env ARCH="${ARCH}" "${APPIMAGETOOL_EXTRACT_DIR}/AppRun" "${APPDIR}" "${DIST_DIR}/VPX_Manager-${ARCH}.AppImage"
+
+    # Cleanup extracted appimagetool
+    rm -rf "${APPIMAGETOOL_EXTRACT_DIR}"
 
     APPIMAGE_BUNDLE="${DIST_DIR}/VPX_Manager-${ARCH}.AppImage"
 
