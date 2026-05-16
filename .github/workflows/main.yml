@@ -62,7 +62,7 @@ jobs:
     
     - name: Install PyGObject for Linux tray
       if: startsWith(matrix.os, 'ubuntu')
-      run: pip install PyGObject
+      run: pip install "PyGObject==3.42.2"
 
         
     - name: Generate Obfuscated Config and Version
