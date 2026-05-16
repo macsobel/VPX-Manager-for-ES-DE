@@ -7,6 +7,7 @@ def get_clean_env():
     Returns a cleaned environment dictionary for subprocesses.
     On Linux, when running inside an AppImage, it removes AppImage-specific
     library paths to prevent conflicts with system binaries like zenity.
+    Also sets GTK theming variables to ensure native dialogs look modern.
     """
     env = os.environ.copy()
     
@@ -60,6 +61,15 @@ def get_clean_env():
                     env["PYTHONPATH"] = ":".join(paths)
                 else:
                     env.pop("PYTHONPATH", None)
+
+        # Ensure modern GTK theming for system dialogs (zenity, etc.)
+        # This ensures consistent Adwaita appearance regardless of host desktop.
+        # Only set if not already configured by the user's environment.
+        if not env.get("GTK_THEME"):
+            env["GTK_THEME"] = "Adwaita"
+        if not env.get("GTK_ICON_THEME"):
+            # Adwaita icons provide the modern blue info/warning icons
+            env["GTK_ICON_THEME"] = "Adwaita"
 
     return env
 

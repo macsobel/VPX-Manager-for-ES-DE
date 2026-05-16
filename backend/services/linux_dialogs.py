@@ -66,7 +66,11 @@ def _run_tkinter_fallback(dialog_type, prompt):
 
 def show_info(title, message):
     """Show an information dialog."""
-    res = _run_zenity(["--info", "--title", title, "--text", message, "--no-wrap"])
+    res = _run_zenity([
+        "--info", "--title", title, "--text", message, "--no-wrap",
+        "--icon-name=dialog-information",
+        "--width=400",
+    ])
     if res is None:
         _run_tkinter_fallback("info", (title, message))
     elif res.returncode != 0:
@@ -76,7 +80,11 @@ def show_info(title, message):
 
 def ask_yes_no(title, message):
     """Show a question dialog. Returns True for Yes/OK, False otherwise."""
-    result = _run_zenity(["--question", "--title", title, "--text", message, "--no-wrap"])
+    result = _run_zenity([
+        "--question", "--title", title, "--text", message, "--no-wrap",
+        "--icon-name=dialog-question",
+        "--width=400",
+    ])
     if result is not None:
         return result.returncode == 0
     return _run_tkinter_fallback("question", (title, message))
