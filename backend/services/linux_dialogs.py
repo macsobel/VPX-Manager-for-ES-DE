@@ -32,9 +32,8 @@ def _run_gtk_dialog_in_thread(dialog_type, title, message, result_holder):
                     flags=0,
                     message_type=Gtk.MessageType.INFO,
                     buttons=Gtk.ButtonsType.OK,
-                    text=title,
+                    text=message,  # body text only — title bar set separately below
                 )
-                dlg.format_secondary_text(message)
                 dlg.set_title(title)
                 dlg.run()
                 dlg.destroy()
@@ -46,9 +45,8 @@ def _run_gtk_dialog_in_thread(dialog_type, title, message, result_holder):
                     flags=0,
                     message_type=Gtk.MessageType.QUESTION,
                     buttons=Gtk.ButtonsType.YES_NO,
-                    text=title,
+                    text=message,  # body text only — title bar set separately below
                 )
-                dlg.format_secondary_text(message)
                 dlg.set_title(title)
                 response = dlg.run()
                 dlg.destroy()
