@@ -145,13 +145,14 @@ else
 [Desktop Entry]
 Name=VPX Manager for ES-DE
 Exec=VPX_Manager
-Icon=icon
+Icon=vpx-manager
 Type=Application
 Categories=Utility;
 EOF
 
     # Add icon
-    cp "${ROOT_DIR}/resources/logo.png" "${APPDIR}/icon.png"
+    cp "${ROOT_DIR}/resources/logo.png" "${APPDIR}/vpx-manager.png"
+    cp "${ROOT_DIR}/resources/logo.png" "${APPDIR}/.DirIcon"
 
     # Create AppRun script with GI_TYPELIB_PATH for tray icon support
     cat > "${APPDIR}/AppRun" <<'EOF'

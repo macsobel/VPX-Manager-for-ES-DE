@@ -22,15 +22,19 @@ jobs:
           - os: macos-15-intel
             arch: x86_64
             display_name: macOS_Intel
+            suffix: zip
           - os: macos-14
             arch: arm64
             display_name: macOS_Apple_Silicon
+            suffix: zip
           - os: ubuntu-22.04
             arch: x86_64
             display_name: Linux_x86_64
+            suffix: AppImage
           - os: ubuntu-24.04-arm
             arch: aarch64
             display_name: Linux_ARM64
+            suffix: AppImage
 
     runs-on: ${{ matrix.os }}
     permissions:
@@ -93,14 +97,13 @@ jobs:
         chmod +x scripts/build/build_app.sh
         ./scripts/build/build_app.sh
         cd dist
-        # zip the AppImage
-        zip -j "VPX_Manager_${{ matrix.display_name }}.zip" "VPX_Manager-${{ matrix.arch }}.AppImage"
+        mv "VPX_Manager-${{ matrix.arch }}.AppImage" "VPX_Manager_${{ matrix.display_name }}.AppImage"
         
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: VPX_Manager_${{ matrix.display_name }}
-        path: dist/VPX_Manager_${{ matrix.display_name }}.zip
+        path: dist/VPX_Manager_${{ matrix.display_name }}.${{ matrix.suffix }}
         
     - name: Get version
       id: get_version
@@ -112,7 +115,9 @@ jobs:
       if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
       uses: softprops/action-gh-release@v2
       with:
-        files: dist/VPX_Manager_*.zip
+        files: |
+          dist/VPX_Manager_*.zip
+          dist/VPX_Manager_*.AppImage
         tag_name: v${{ steps.get_version.outputs.version }}
         name: v${{ steps.get_version.outputs.version }}
         draft: false
