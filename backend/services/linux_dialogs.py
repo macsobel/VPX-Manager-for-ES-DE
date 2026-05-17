@@ -13,7 +13,18 @@ logger = logging.getLogger("vpx_manager.linux_dialogs")
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _run_gtk_dialog_in_thread(dialog_type, title, message, result_holder):
+def _get_logo_path():
+    import sys
+    if hasattr(sys, '_MEIPASS'):
+        base_dir = os.path.join(sys._MEIPASS, 'resources')
+    else:
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'resources'))
+    logo_path = os.path.join(base_dir, 'logo.png')
+    if os.path.isfile(logo_path):
+        return logo_path
+    return None
+
+def _run_gtk_dialog_in_thread(dialog_type, title, message, use_logo, result_holder):
     """
     Show a GTK3 dialog directly via gi.repository.Gtk — no subprocess, no env
     issues. This is the primary path when running from an AppImage because the
@@ -27,15 +38,31 @@ def _run_gtk_dialog_in_thread(dialog_type, title, message, result_holder):
 
         def _show():
             if dialog_type == "info":
+                msg_type = Gtk.MessageType.INFO
+                logo_path = _get_logo_path() if use_logo else None
+                if logo_path:
+                    msg_type = Gtk.MessageType.OTHER
+                
                 dlg = Gtk.MessageDialog(
                     transient_for=None,
                     flags=0,
-                    message_type=Gtk.MessageType.INFO,
+                    message_type=msg_type,
                     buttons=Gtk.ButtonsType.OK,
                     text=None,
                 )
                 dlg.format_secondary_text(message)
                 dlg.set_title(title)
+                
+                if logo_path:
+                    try:
+                        from gi.repository import GdkPixbuf
+                        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(logo_path, 64, 64, True)
+                        image = Gtk.Image.new_from_pixbuf(pixbuf)
+                        image.show()
+                        dlg.set_image(image)
+                    except Exception as e:
+                        logger.error(f"Failed to set logo image: {e}")
+                
                 dlg.run()
                 dlg.destroy()
                 result_holder[0] = True
@@ -94,12 +121,12 @@ def _run_gtk_dialog_in_thread(dialog_type, title, message, result_holder):
         return False
 
 
-def _show_gtk_dialog(dialog_type, title, message=None):
+def _show_gtk_dialog(dialog_type, title, message=None, use_logo=False):
     """Run a GTK3 dialog in a dedicated thread and return the result."""
     result_holder = [None]
     t = threading.Thread(
         target=_run_gtk_dialog_in_thread,
-        args=(dialog_type, title, message, result_holder),
+        args=(dialog_type, title, message, use_logo, result_holder),
         daemon=True,
     )
     t.start()
@@ -192,14 +219,20 @@ def _is_inside_appimage():
 # Public API
 # ---------------------------------------------------------------------------
 
-def show_info(title, message):
+def show_info(title, message, use_logo=False):
     """Show an information dialog."""
     # Try zenity first (best look on systems with zenity 4.x)
-    res = _run_zenity([
-        "--info", "--title", title, "--text", message, "--no-wrap",
-        "--icon-name=dialog-information",
-        "--width=400",
-    ])
+    zenity_args = ["--info", "--title", title, "--text", message, "--no-wrap", "--width=400"]
+    if use_logo:
+        logo_path = _get_logo_path()
+        if logo_path:
+            zenity_args.extend([f"--icon-name={logo_path}", f"--window-icon={logo_path}"])
+        else:
+            zenity_args.append("--icon-name=dialog-information")
+    else:
+        zenity_args.append("--icon-name=dialog-information")
+
+    res = _run_zenity(zenity_args)
     if res is not None and res.returncode == 0:
         return  # success
 
@@ -208,7 +241,7 @@ def show_info(title, message):
 
     # Fall back to bundled GTK3 dialog (avoids tkinter "Dialog" look)
     logger.info("Attempting GTK3 dialog fallback for show_info.")
-    success = _show_gtk_dialog("info", title, message)
+    success = _show_gtk_dialog("info", title, message, use_logo=use_logo)
     if success:
         return
 
@@ -260,3 +293,4 @@ def pick_file(prompt):
             return path
         return _run_tkinter_fallback("file", prompt)
     return None
+

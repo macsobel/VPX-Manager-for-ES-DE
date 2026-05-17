@@ -535,7 +535,7 @@ if __name__ == "__main__":
                         threading.Thread(target=show_info, args=(
                             "About VPX Manager for ES-DE",
                             f"Version {VERSION}\n\nA Visual Pinball file management system for macOS and Linux.\n\nDeveloped by Aaron Sobel"
-                        ), daemon=True).start()
+                        ), kwargs={"use_logo": True}, daemon=True).start()
                     about_item.connect("activate", on_about)
                     menu.append(about_item)
 
@@ -553,7 +553,7 @@ if __name__ == "__main__":
                                 elif result.get("error"):
                                     show_info("Update Check Failed", result["error"])
                                 else:
-                                    show_info("Up to Date", f"You are running the latest version ({VERSION}).")
+                                    show_info("Up to Date", f"You are running the latest version ({VERSION}).", use_logo=True)
                             except Exception as e:
                                 logger.error(f"Error checking for updates: {e}")
                                 show_info("Update Check Failed", str(e))

@@ -151,7 +151,7 @@ Categories=Utility;
 EOF
 
     # Add icon
-    cp "${ROOT_DIR}/resources/icon.png" "${APPDIR}/icon.png"
+    cp "${ROOT_DIR}/resources/logo.png" "${APPDIR}/icon.png"
 
     # Create AppRun script with GI_TYPELIB_PATH for tray icon support
     cat > "${APPDIR}/AppRun" <<'EOF'
