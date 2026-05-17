@@ -1,59 +1,147 @@
 import os
 import subprocess
 import shutil
+import threading
 import logging
+import platform
 from backend.core.utils import get_clean_env
 
 logger = logging.getLogger("vpx_manager.linux_dialogs")
 
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _run_gtk_dialog_in_thread(dialog_type, title, message, result_holder):
+    """
+    Show a GTK3 dialog directly via gi.repository.Gtk — no subprocess, no env
+    issues. This is the primary path when running from an AppImage because the
+    GTK3 typelibs are already bundled inside the AppImage for the tray icon.
+    result_holder is a 1-element list; the result is placed in [0].
+    """
+    try:
+        import gi
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gtk, GLib
+
+        def _show():
+            if dialog_type == "info":
+                dlg = Gtk.MessageDialog(
+                    transient_for=None,
+                    flags=0,
+                    message_type=Gtk.MessageType.INFO,
+                    buttons=Gtk.ButtonsType.OK,
+                    text=title,
+                )
+                dlg.format_secondary_text(message)
+                dlg.set_title(title)
+                dlg.run()
+                dlg.destroy()
+                result_holder[0] = True
+
+            elif dialog_type == "question":
+                dlg = Gtk.MessageDialog(
+                    transient_for=None,
+                    flags=0,
+                    message_type=Gtk.MessageType.QUESTION,
+                    buttons=Gtk.ButtonsType.YES_NO,
+                    text=title,
+                )
+                dlg.format_secondary_text(message)
+                dlg.set_title(title)
+                response = dlg.run()
+                dlg.destroy()
+                result_holder[0] = (response == Gtk.ResponseType.YES)
+
+            elif dialog_type == "folder":
+                dlg = Gtk.FileChooserDialog(
+                    title=title,
+                    action=Gtk.FileChooserAction.SELECT_FOLDER,
+                )
+                dlg.add_buttons(
+                    Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                    Gtk.STOCK_OPEN,   Gtk.ResponseType.OK,
+                )
+                response = dlg.run()
+                path = dlg.get_filename() if response == Gtk.ResponseType.OK else None
+                dlg.destroy()
+                result_holder[0] = path
+
+            elif dialog_type == "file":
+                dlg = Gtk.FileChooserDialog(
+                    title=title,
+                    action=Gtk.FileChooserAction.OPEN,
+                )
+                dlg.add_buttons(
+                    Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                    Gtk.STOCK_OPEN,   Gtk.ResponseType.OK,
+                )
+                response = dlg.run()
+                path = dlg.get_filename() if response == Gtk.ResponseType.OK else None
+                dlg.destroy()
+                result_holder[0] = path
+
+            Gtk.main_quit()
+
+        Gtk.init([])
+        GLib.idle_add(_show)
+        Gtk.main()
+        return True  # success
+
+    except Exception as e:
+        logger.error(f"GTK dialog error: {e}")
+        return False
+
+
+def _show_gtk_dialog(dialog_type, title, message=None):
+    """Run a GTK3 dialog in a dedicated thread and return the result."""
+    result_holder = [None]
+    t = threading.Thread(
+        target=_run_gtk_dialog_in_thread,
+        args=(dialog_type, title, message, result_holder),
+        daemon=True,
+    )
+    t.start()
+    t.join(timeout=120)  # 2-minute max wait
+    return result_holder[0]
+
+
 def _find_zenity():
     """
-    Robustly locate the system zenity binary.
-    Never relies solely on PATH restoration being correct — always checks
-    hardcoded system locations as a guaranteed fallback.
+    Locate the system zenity binary using both PATH and hardcoded locations.
+    Returns (zenity_path, clean_env) or (None, clean_env).
     """
     clean_env = get_clean_env()
 
-    # 1. Try shutil.which with the restored PATH
     zenity_path = shutil.which("zenity", path=clean_env.get("PATH", ""))
-
-    # 2. Always check hardcoded system locations regardless
-    #    This is the critical fallback when PATH restoration fails from inside an AppImage
-    system_candidates = [
-        "/usr/bin/zenity",
-        "/usr/local/bin/zenity",
-        "/bin/zenity",
-        "/snap/bin/zenity",
-    ]
     if not zenity_path:
-        for candidate in system_candidates:
+        for candidate in ["/usr/bin/zenity", "/usr/local/bin/zenity", "/bin/zenity"]:
             if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                 zenity_path = candidate
-                logger.debug(f"Found zenity via hardcoded path: {candidate}")
                 break
 
     if zenity_path:
-        logger.debug(f"Using zenity at: {zenity_path}")
+        logger.debug(f"Found zenity at: {zenity_path}")
     else:
-        logger.error("zenity not found in PATH or system locations. Native dialogs unavailable.")
+        logger.warning("zenity not found on this system.")
 
     return zenity_path, clean_env
 
 
 def _run_zenity(args):
-    """Internal helper to run zenity commands."""
+    """Run zenity as a subprocess with a clean environment."""
     zenity_path, clean_env = _find_zenity()
-
     if not zenity_path:
         return None
-    
+
     try:
         result = subprocess.run(
             [zenity_path] + args,
             capture_output=True,
             text=True,
             check=False,
-            env=clean_env
+            env=clean_env,
         )
         return result
     except Exception as e:
@@ -62,7 +150,7 @@ def _run_zenity(args):
 
 
 def _run_tkinter_fallback(dialog_type, prompt):
-    """Fallback to tkinter if zenity is not installed."""
+    """Last-resort fallback using tkinter (shows ugly 'Dialog' windows)."""
     try:
         import tkinter as tk
         from tkinter import filedialog, messagebox
@@ -85,54 +173,90 @@ def _run_tkinter_fallback(dialog_type, prompt):
         root.destroy()
         return result
     except Exception as e:
-        logger.error(f"Error running tkinter fallback: {e}")
+        logger.error(f"tkinter fallback error: {e}")
         return None
+
+
+# ---------------------------------------------------------------------------
+# Priority order for dialogs (when running on Linux inside an AppImage):
+#   1. Zenity subprocess  — gives the native system look (zenity 4.x = beautiful)
+#   2. GTK3 via gi        — bundled in AppImage, consistent look, no subprocess issues
+#   3. tkinter            — last resort (shows "Dialog" title bar, avoid if possible)
+# ---------------------------------------------------------------------------
+
+def _is_inside_appimage():
+    return bool(os.environ.get("APPDIR"))
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
 
 def show_info(title, message):
     """Show an information dialog."""
+    # Try zenity first (best look on systems with zenity 4.x)
     res = _run_zenity([
         "--info", "--title", title, "--text", message, "--no-wrap",
         "--icon-name=dialog-information",
         "--width=400",
     ])
-    if res is None:
-        _run_tkinter_fallback("info", (title, message))
-    elif res.returncode != 0:
-        logger.warning(f"zenity info dialog failed (code {res.returncode}): {res.stderr.strip()}")
-        _run_tkinter_fallback("info", (title, message))
+    if res is not None and res.returncode == 0:
+        return  # success
+
+    if res is not None and res.returncode != 0:
+        logger.warning(f"zenity failed (code {res.returncode}): {res.stderr.strip()}")
+
+    # Fall back to bundled GTK3 dialog (avoids tkinter "Dialog" look)
+    logger.info("Attempting GTK3 dialog fallback for show_info.")
+    success = _show_gtk_dialog("info", title, message)
+    if success:
+        return
+
+    # Last resort
+    _run_tkinter_fallback("info", (title, message))
 
 
 def ask_yes_no(title, message):
-    """Show a question dialog. Returns True for Yes/OK, False otherwise."""
-    result = _run_zenity([
+    """Show a yes/no question dialog. Returns True for Yes, False otherwise."""
+    res = _run_zenity([
         "--question", "--title", title, "--text", message, "--no-wrap",
         "--icon-name=dialog-question",
         "--width=400",
     ])
+    if res is not None:
+        return res.returncode == 0
+
+    logger.info("Attempting GTK3 dialog fallback for ask_yes_no.")
+    result = _show_gtk_dialog("question", title, message)
     if result is not None:
-        return result.returncode == 0
+        return result
+
     return _run_tkinter_fallback("question", (title, message))
 
+
 def pick_folder(prompt):
-    """Open a folder selection dialog."""
+    """Open a folder-selection dialog. Returns path string or None."""
     result = _run_zenity(["--file-selection", "--directory", "--title", prompt])
     if result and result.returncode == 0:
         return result.stdout.strip()
-    
-    # If zenity was absent (result is None) or failed with an error (returncode != 1 which is cancel)
-    # then we try the tkinter fallback.
-    if result is None or (result and result.returncode != 1):
-        logger.info(f"Zenity failed or missing (code {result.returncode if result else 'N/A'}), trying tkinter fallback.")
+    if result is None or result.returncode not in (0, 1):
+        logger.info("Attempting GTK3 dialog fallback for pick_folder.")
+        path = _show_gtk_dialog("folder", prompt)
+        if path is not None:
+            return path
         return _run_tkinter_fallback("folder", prompt)
     return None
 
+
 def pick_file(prompt):
-    """Open a file selection dialog."""
+    """Open a file-selection dialog. Returns path string or None."""
     result = _run_zenity(["--file-selection", "--title", prompt])
     if result and result.returncode == 0:
         return result.stdout.strip()
-    
-    if result is None or (result and result.returncode != 1):
-        logger.info(f"Zenity failed or missing (code {result.returncode if result else 'N/A'}), trying tkinter fallback.")
+    if result is None or result.returncode not in (0, 1):
+        logger.info("Attempting GTK3 dialog fallback for pick_file.")
+        path = _show_gtk_dialog("file", prompt)
+        if path is not None:
+            return path
         return _run_tkinter_fallback("file", prompt)
     return None
