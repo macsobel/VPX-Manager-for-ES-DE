@@ -205,9 +205,14 @@ class VBSManagerService:
                 logger.error(
                     f"[v2.2.diag] Extraction failed with code {process.returncode}. Stderr: {error_msg}"
                 )
+                import platform
+                if platform.system() == "Darwin":
+                    tip = f" Please ensure your VPX application is cleared from macOS quarantine using: xattr -rc '{config.vpx_standalone_app_path}'"
+                else:
+                    tip = f" Please ensure your VPX application is executable (chmod +x) and matches your system architecture (e.g., x86_64 vs aarch64/ARM64) at: '{config.vpx_standalone_app_path}'"
                 return {
                     "success": False,
-                    "error": f"Extraction Failed [v2.2.diag]. Stderr: {error_msg}. Please ensure your VPX application is cleared from macOS quarantine using: xattr -rc '{config.vpx_standalone_app_path}'",
+                    "error": f"Extraction Failed [v2.2.diag]. Stderr: {error_msg}.{tip}",
                 }
 
             vbs_path = vpx_path.with_suffix(".vbs")
@@ -239,9 +244,14 @@ class VBSManagerService:
                 }
         except PermissionError as e:
             logger.error(f"[v2.2.diag] PermissionError: {e}")
+            import platform
+            if platform.system() == "Darwin":
+                tip = f" Please ensure your VPX application is cleared from macOS quarantine and is executable: xattr -rc '{config.vpx_standalone_app_path}'"
+            else:
+                tip = f" Please ensure your VPX application is executable: chmod +x '{config.vpx_standalone_app_path}'"
             return {
                 "success": False,
-                "error": f"Permission denied [v2.2.diag] (PermissionError: {e}). Please ensure your VPX application is cleared from macOS quarantine and is executable: xattr -rc '{config.vpx_standalone_app_path}'",
+                "error": f"Permission denied [v2.2.diag] (PermissionError: {e}).{tip}",
             }
         except Exception as e:
             logger.exception(f"[v2.2.diag] Unexpected error during extraction")

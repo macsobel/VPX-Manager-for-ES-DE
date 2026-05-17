@@ -427,14 +427,31 @@ if __name__ == "__main__":
 
                 def open_es(self, sender):
                     from backend.core.config import config
-
-                    es_path = config.esde_app_path
+                    import os
+                    import shutil
                     try:
-                        import subprocess
+                        es_path = os.path.expanduser(config.esde_app_path) if config.esde_app_path else ""
+                        if not es_path:
+                            raise ValueError("Emulation Station path is empty or not configured in settings.")
+                        
+                        resolved = shutil.which(es_path)
+                        if resolved:
+                            es_path = resolved
 
-                        subprocess.run(["open", es_path], check=False)
+                        if not os.path.exists(es_path):
+                            raise FileNotFoundError(f"Application/Executable not found at: {es_path}")
+                        
+                        import subprocess
+                        if os.path.isdir(es_path):
+                            subprocess.run(["open", es_path], check=False)
+                        else:
+                            subprocess.Popen([es_path])
                     except Exception as e:
                         logger.error(f"Failed to open Emulation Station: {e}")
+                        rumps.alert(
+                            title="Failed to Launch",
+                            message=f"Could not launch Emulation Station:\n\n{str(e)}"
+                        )
 
                 def restart(self, sender):
                     try:
@@ -582,11 +599,29 @@ if __name__ == "__main__":
                     es_item = Gtk.MenuItem(label="Open Emulation Station")
                     def on_open_es(w):
                         from backend.core.config import config
+                        import os
+                        import shutil
                         try:
+                            es_path = os.path.expanduser(config.esde_app_path) if config.esde_app_path else ""
+                            if not es_path:
+                                raise ValueError("Emulation Station path is empty or not configured in settings.")
+                            
+                            resolved = shutil.which(es_path)
+                            if resolved:
+                                es_path = resolved
+
+                            if not os.path.exists(es_path):
+                                raise FileNotFoundError(f"Application/Executable not found at: {es_path}")
+                            
+                            if not os.path.isdir(es_path) and not os.access(es_path, os.X_OK):
+                                raise PermissionError(f"File is not executable: {es_path}. Please make it executable.")
+
                             import subprocess
-                            subprocess.Popen([config.esde_app_path])
+                            subprocess.Popen([es_path])
                         except Exception as e:
                             logger.error(f"Failed to open Emulation Station: {e}")
+                            from backend.services.linux_dialogs import show_info
+                            show_info("Failed to Launch", f"Could not launch Emulation Station:\n\n{str(e)}")
                     es_item.connect("activate", on_open_es)
                     menu.append(es_item)
                     menu.append(Gtk.SeparatorMenuItem())
