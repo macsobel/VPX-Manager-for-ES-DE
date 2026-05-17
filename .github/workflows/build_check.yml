@@ -20,11 +20,11 @@ jobs:
           - os: macos-15-intel
             arch: x86_64
             display_name: macOS_Intel
-            suffix: zip
+            suffix: dmg
           - os: macos-14
             arch: arm64
             display_name: macOS_Apple_Silicon
-            suffix: zip
+            suffix: dmg
           - os: ubuntu-22.04
             arch: x86_64
             display_name: Linux_x86_64
@@ -85,7 +85,19 @@ jobs:
         ./scripts/build/build_app.sh
         cd dist
         if [ "${{ runner.os }}" == "macOS" ]; then
-          zip -r "VPX_Manager_${{ matrix.display_name }}.zip" "VPX Manager for ES-DE.app"
+          brew install create-dmg
+          mkdir dmg_source
+          cp -R "VPX Manager for ES-DE.app" dmg_source/
+          create-dmg \
+            --volname "VPX Manager Installer" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "VPX Manager for ES-DE.app" 175 190 \
+            --hide-extension "VPX Manager for ES-DE.app" \
+            --app-drop-link 425 190 \
+            "VPX_Manager_${{ matrix.display_name }}.dmg" \
+            "dmg_source/"
         else
           mv "VPX_Manager-${{ matrix.arch }}.AppImage" "VPX_Manager_${{ matrix.display_name }}.AppImage"
         fi
