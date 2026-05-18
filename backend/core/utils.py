@@ -17,6 +17,8 @@ def get_clean_env():
     
     # In frozen builds, strip virtualenv variables to prevent the child process
     # from incorrectly loading packages from a local developer virtual environment.
+    meipass = getattr(sys, "_MEIPASS", "")
+    
     if getattr(sys, "frozen", False):
         env.pop("VIRTUAL_ENV", None)
         env.pop("PYTHONPATH", None)
@@ -28,37 +30,32 @@ def get_clean_env():
             env["PATH"] = os.pathsep.join(cleaned_paths)
             
     if platform.system() == "Linux":
-        appdir = env.get("APPDIR")
-        if appdir:
-            # --- Restore LD_LIBRARY_PATH ---
-            if "LD_LIBRARY_PATH_ORIG" in env:
-                orig = env["LD_LIBRARY_PATH_ORIG"]
-                if orig:
-                    env["LD_LIBRARY_PATH"] = orig
+        appdir = env.get("APPDIR", "")
+        
+        # Aggressively filter out any paths related to the AppImage or PyInstaller extraction payload
+        for env_var in ["LD_LIBRARY_PATH", "LD_LIBRARY_PATH_ORIG", "GI_TYPELIB_PATH", "GI_TYPELIB_PATH_ORIG", "XDG_DATA_DIRS"]:
+            if env_var in env:
+                current_path = env.get(env_var, "")
+                cleaned = []
+                for p in current_path.split(":"):
+                    if not p: continue
+                    # If it's part of the AppImage FUSE mount or PyInstaller tmp payload, discard it
+                    if appdir and p.startswith(appdir): continue
+                    if meipass and p.startswith(meipass): continue
+                    cleaned.append(p)
+                
+                if cleaned:
+                    env[env_var] = ":".join(cleaned)
                 else:
-                    env.pop("LD_LIBRARY_PATH", None)
-            else:
-                ld_path = env.get("LD_LIBRARY_PATH", "")
-                paths = [p for p in ld_path.split(":") if p and appdir not in p]
-                if paths:
-                    env["LD_LIBRARY_PATH"] = ":".join(paths)
-                else:
-                    env.pop("LD_LIBRARY_PATH", None)
-
-            # --- Restore GI_TYPELIB_PATH ---
-            if "GI_TYPELIB_PATH_ORIG" in env:
-                orig = env["GI_TYPELIB_PATH_ORIG"]
-                if orig:
-                    env["GI_TYPELIB_PATH"] = orig
-                else:
-                    env.pop("GI_TYPELIB_PATH", None)
-            else:
-                gi_path = env.get("GI_TYPELIB_PATH", "")
-                paths = [p for p in gi_path.split(":") if p and appdir not in p]
-                if paths:
-                    env["GI_TYPELIB_PATH"] = ":".join(paths)
-                else:
-                    env.pop("GI_TYPELIB_PATH", None)
+                    env.pop(env_var, None)
+                    
+        # If PyInstaller saved the original LD path before it injected its own, it was already
+        # filtered by the loop above. We can safely overwrite the active LD_LIBRARY_PATH with it.
+        if "LD_LIBRARY_PATH_ORIG" in env:
+            env["LD_LIBRARY_PATH"] = env["LD_LIBRARY_PATH_ORIG"]
+            
+        if "GI_TYPELIB_PATH_ORIG" in env:
+            env["GI_TYPELIB_PATH"] = env["GI_TYPELIB_PATH_ORIG"]
 
             # --- Restore PATH ---
             # CRITICAL: Never leave PATH empty — always include system bin dirs
