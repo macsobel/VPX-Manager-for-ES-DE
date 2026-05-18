@@ -165,6 +165,27 @@ class BackglassCompanion:
                 idx = self.screen_index if self.screen_index < num_displays else 0
                 W, H = desktop_sizes[idx]
                 logger.info(f"Target display {idx} resolution: {W}x{H}")
+                
+                if platform.system() == "Linux":
+                    try:
+                        import subprocess
+                        from backend.core.utils import get_clean_env
+                        out = subprocess.check_output(["xrandr"], text=True, env=get_clean_env())
+                        connected = [line for line in out.splitlines() if " connected " in line]
+                        if idx < len(connected):
+                            parts = connected[idx].split()
+                            for p in parts:
+                                if "x" in p and "+" in p:
+                                    geom = p.split("+")
+                                    if len(geom) >= 3:
+                                        x = geom[1]
+                                        y = geom[2]
+                                        os.environ["SDL_VIDEO_WINDOW_POS"] = f"{x},{y}"
+                                        logger.info(f"Forced Linux window pos to {x},{y}")
+                                    break
+                    except Exception as e:
+                        logger.warning(f"Failed to get xrandr bounds: {e}")
+                        
             except Exception as e:
                 logger.warning(f"Could not get desktop sizes: {e}")
                 idx = 0

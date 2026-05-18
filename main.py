@@ -583,7 +583,7 @@ if __name__ == "__main__":
                         from backend.core.utils import get_clean_env
                         def _open():
                             try:
-                                subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=get_clean_env())
+                                subprocess.run(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=get_clean_env(), check=False)
                             except Exception as e:
                                 logger.error(f"Failed to open URL {url}: {e}")
                         threading.Thread(target=_open, daemon=True).start()
