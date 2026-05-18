@@ -24,6 +24,23 @@ def _get_logo_path():
         return logo_path
     return None
 
+def _trigger_focus_after_delay(window_name, delay_seconds=0.3):
+    """Start a background thread that attempts to focus a window after a brief delay."""
+    if not window_name:
+        return
+    def target():
+        import time
+        from backend.services.linux_focus import focus_window
+        # Sleep a tiny bit first to let the window draw
+        time.sleep(0.05)
+        # Try multiple times over a short window in case the OS takes a moment to map the window
+        for _ in range(8):
+            if focus_window(window_name):
+                break
+            time.sleep(delay_seconds / 8)
+    t = threading.Thread(target=target, daemon=True)
+    t.start()
+
 def _run_gtk_dialog_in_thread(dialog_type, title, message, use_logo, result_holder):
     """
     Show a GTK3 dialog directly via gi.repository.Gtk — no subprocess, no env
@@ -221,6 +238,7 @@ def _is_inside_appimage():
 
 def show_info(title, message, use_logo=False):
     """Show an information dialog."""
+    _trigger_focus_after_delay(title)
     # Try zenity first (best look on systems with zenity 4.x)
     zenity_args = ["--info", "--title", title, "--text", message, "--no-wrap", "--width=400"]
     if use_logo:
@@ -251,6 +269,7 @@ def show_info(title, message, use_logo=False):
 
 def ask_yes_no(title, message):
     """Show a yes/no question dialog. Returns True for Yes, False otherwise."""
+    _trigger_focus_after_delay(title)
     res = _run_zenity([
         "--question", "--title", title, "--text", message, "--no-wrap",
         "--icon-name=dialog-question",
@@ -269,6 +288,7 @@ def ask_yes_no(title, message):
 
 def pick_folder(prompt):
     """Open a folder-selection dialog. Returns path string or None."""
+    _trigger_focus_after_delay(prompt)
     result = _run_zenity(["--file-selection", "--directory", "--title", prompt])
     if result and result.returncode == 0:
         return result.stdout.strip()
@@ -283,6 +303,7 @@ def pick_folder(prompt):
 
 def pick_file(prompt):
     """Open a file-selection dialog. Returns path string or None."""
+    _trigger_focus_after_delay(prompt)
     result = _run_zenity(["--file-selection", "--title", prompt])
     if result and result.returncode == 0:
         return result.stdout.strip()
