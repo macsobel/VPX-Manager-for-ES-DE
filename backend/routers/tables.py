@@ -569,6 +569,7 @@ async def launch_table(table_id: int):
     """Launch the table via the standalone app."""
     import subprocess
     from pathlib import Path
+    from backend.core.utils import get_clean_env
 
     table = await db.get_table(table_id)
     if not table:
@@ -625,6 +626,7 @@ async def launch_table(table_id: int):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 start_new_session=True,
+                env=get_clean_env(),
             )
         else:
             cmd = [exec_path, "-play", str(table_path)]
@@ -636,6 +638,7 @@ async def launch_table(table_id: int):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 start_new_session=True,
+                env=get_clean_env(),
             )
 
         return {"success": True, "message": "Launched successfully"}
@@ -922,6 +925,7 @@ async def download_mobile_export(filename: str):
 async def reveal_builds_folder():
     """Open the Mobile Builds folder in Finder (macOS)."""
     import subprocess
+    from backend.core.utils import get_clean_env
 
     mobile_builds_dir = APP_SUPPORT_DIR / "Mobile Builds"
     mobile_builds_dir.mkdir(parents=True, exist_ok=True)
@@ -934,9 +938,9 @@ async def reveal_builds_folder():
         logger.info("Executing 'open' command...")
 
         if sys.platform == "darwin":
-            subprocess.Popen(["open", str(mobile_builds_dir)])
+            subprocess.Popen(["open", str(mobile_builds_dir)], env=get_clean_env())
         elif sys.platform == "linux":
-            subprocess.Popen(["xdg-open", str(mobile_builds_dir)])
+            subprocess.Popen(["xdg-open", str(mobile_builds_dir)], env=get_clean_env())
 
         return {"success": True}
     except Exception as e:

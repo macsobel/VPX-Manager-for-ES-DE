@@ -442,10 +442,11 @@ if __name__ == "__main__":
                             raise FileNotFoundError(f"Application/Executable not found at: {es_path}")
                         
                         import subprocess
+                        from backend.core.utils import get_clean_env
                         if os.path.isdir(es_path):
-                            subprocess.run(["open", es_path], check=False)
+                            subprocess.run(["open", es_path], check=False, env=get_clean_env())
                         else:
-                            subprocess.Popen([es_path])
+                            subprocess.Popen([es_path], env=get_clean_env())
                     except Exception as e:
                         logger.error(f"Failed to open Emulation Station: {e}")
                         rumps.alert(
@@ -580,9 +581,10 @@ if __name__ == "__main__":
 
                     def open_url(url):
                         import subprocess
+                        from backend.core.utils import get_clean_env
                         def _open():
                             try:
-                                subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=get_clean_env())
                             except Exception as e:
                                 logger.error(f"Failed to open URL {url}: {e}")
                         threading.Thread(target=_open, daemon=True).start()
@@ -617,7 +619,8 @@ if __name__ == "__main__":
                                 raise PermissionError(f"File is not executable: {es_path}. Please make it executable.")
 
                             import subprocess
-                            subprocess.Popen([es_path])
+                            from backend.core.utils import get_clean_env
+                            subprocess.Popen([es_path], env=get_clean_env())
                         except Exception as e:
                             logger.error(f"Failed to open Emulation Station: {e}")
                             from backend.services.linux_dialogs import show_info
