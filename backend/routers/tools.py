@@ -390,6 +390,18 @@ if [ -d "$VP_DIR" ]; then
     cd "$VP_DIR" || exit 1
 fi
 
+# Focus logic for Linux to bring VPX to front when it starts
+if [ "$(uname)" != "Darwin" ]; then
+    (
+        sleep 2
+        if command -v wmctrl >/dev/null 2>&1; then
+            wmctrl -a "Visual Pinball" || wmctrl -a "VPinballX"
+        elif command -v xdotool >/dev/null 2>&1; then
+            xdotool search --name "Visual Pinball" windowactivate || xdotool search --class "VPinballX" windowactivate
+        fi
+    ) &
+fi
+
 # Call binary directly — bash waits for it to exit before continuing
 "$VP_BIN" -play "$TABLE_PATH"
 

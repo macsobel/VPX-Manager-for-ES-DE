@@ -193,14 +193,24 @@ class BackglassCompanion:
                 W, H = 800, 600
 
             # Try multiple flag combinations for stability
-            attempt_modes = [
-                # 1. True Fullscreen (Required on macOS to cover the system menu bar)
-                (0, 0, pygame.NOFRAME | pygame.FULLSCREEN),
-                # 2. Borderless Window fallback
-                (W, H, pygame.NOFRAME),
-                # 3. Standard Window fallback
-                (W, H, 0),
-            ]
+            if platform.system() == "Linux":
+                attempt_modes = [
+                    # 1. Borderless Window (Required on Linux to respect SDL_VIDEO_WINDOW_POS and map to xrandr bounds)
+                    (W, H, pygame.NOFRAME),
+                    # 2. True Fullscreen fallback
+                    (0, 0, pygame.NOFRAME | pygame.FULLSCREEN),
+                    # 3. Standard Window fallback
+                    (W, H, 0),
+                ]
+            else:
+                attempt_modes = [
+                    # 1. True Fullscreen (Required on macOS to cover the system menu bar)
+                    (0, 0, pygame.NOFRAME | pygame.FULLSCREEN),
+                    # 2. Borderless Window fallback
+                    (W, H, pygame.NOFRAME),
+                    # 3. Standard Window fallback
+                    (W, H, 0),
+                ]
             
             screen = None
             for w, h, flags in attempt_modes:

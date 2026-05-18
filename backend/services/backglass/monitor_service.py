@@ -6,6 +6,7 @@ import signal
 import logging
 import platform
 import psutil
+import shlex
 from pathlib import Path
 from backend.core.config import config
 from backend.core.utils import get_clean_env
@@ -55,8 +56,18 @@ class BackglassMonitor:
                             continue
                             
                         # INCLUSION FILTER: If it contains ES-DE or EmulationStation and isn't us or VPX, it's likely ES-DE
-                        if any(sig in cmd_line for sig in ["ES-DE", "es-de", "EmulationStation"]):
-                            return pid_int
+                        # Fix: Check that the executable itself is named es-de or ES-DE, not just matching a path like /home/user/ES-DE/VPX-Manager
+                        import shlex
+                        try:
+                            cmd_parts = shlex.split(cmd_line)
+                            if cmd_parts:
+                                exe_name = Path(cmd_parts[0]).name.lower()
+                                if exe_name in ["es-de", "emulationstation"]:
+                                    return pid_int
+                        except:
+                            # Fallback if shlex fails to parse
+                            if any(sig in cmd_line.lower() for sig in ["es-de", "emulationstation"]):
+                                return pid_int
                     except:
                         continue
             except:
