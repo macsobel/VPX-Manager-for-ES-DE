@@ -167,6 +167,7 @@ class BackglassCompanion:
                 logger.info(f"Target display {idx} resolution: {W}x{H}")
                 
                 if platform.system() == "Linux":
+                    os.environ["SDL_VIDEODRIVER"] = "x11"
                     try:
                         import subprocess
                         from backend.core.utils import get_clean_env
