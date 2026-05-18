@@ -51,7 +51,7 @@ class BackglassMonitor:
                         cmd_line = subprocess.check_output(["ps", "-p", p, "-o", "command="]).decode().strip()
                         
                         # EXCLUSION FILTER: Must not contain our manager's signature or Visual Pinball
-                        if any(sig in cmd_line for sig in ["VPX-Manager", "VPX Manager", "backglass_companion", "antigravity", "VPinballX", "vpx-wrapper", "./es-de 100"]):
+                        if any(sig in cmd_line for sig in ["VPX-Manager", "VPX Manager", "backglass_companion", "antigravity", "VPinballX", "vpx-wrapper", "./es-de 100", "launch_vpinball", "vpx_backglass"]):
                             continue
                             
                         # INCLUSION FILTER: If it contains ES-DE or EmulationStation and isn't us or VPX, it's likely ES-DE

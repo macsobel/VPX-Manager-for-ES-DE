@@ -255,7 +255,11 @@ async def apply_esde_integration():
         start_script_path = start_script_dir / "vpx_backglass_start.sh"
         start_script_content = f"""#!/bin/bash
 # Launch VPX Backglass Companion when ES-DE starts
-{manager_cmd} --backglass &
+if [ "$(uname)" = "Linux" ]; then
+    env -u LD_LIBRARY_PATH -u APPDIR {manager_cmd} --backglass &
+else
+    {manager_cmd} --backglass &
+fi
 """
         with open(start_script_path, "w") as f:
             f.write(start_script_content)
@@ -304,14 +308,13 @@ fi
         # Focus logic for Linux using wmctrl
         linux_focus_logic = """
 # Bring ES-DE back to the front on Linux
-# Try various common window titles for ES-DE
-for title in "EmulationStation" "ES-DE" "EmulationStation Desktop Edition"; do
-    if command -v wmctrl >/dev/null 2>&1; then
-        wmctrl -a "$title" && break
-    elif command -v xdotool >/dev/null 2>&1; then
-        xdotool search --name "$title" windowactivate && break
-    fi
-done
+# Wait a moment for VPX to fully close its window before attempting focus
+sleep 1
+if command -v wmctrl >/dev/null 2>&1; then
+    wmctrl -x -a "es-de" || wmctrl -a "EmulationStation" || wmctrl -a "ES-DE"
+elif command -v xdotool >/dev/null 2>&1; then
+    xdotool search --class "es-de" windowactivate || xdotool search --name "EmulationStation" windowactivate
+fi
 """ if is_linux else ""
 
         # Focus logic for macOS using osascript
