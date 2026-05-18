@@ -15,6 +15,18 @@ def get_clean_env():
     """
     env = os.environ.copy()
     
+    # In frozen builds, strip virtualenv variables to prevent the child process
+    # from incorrectly loading packages from a local developer virtual environment.
+    if getattr(sys, "frozen", False):
+        env.pop("VIRTUAL_ENV", None)
+        env.pop("PYTHONPATH", None)
+        env.pop("PYTHONHOME", None)
+        path = env.get("PATH", "")
+        if path:
+            paths = path.split(os.pathsep)
+            cleaned_paths = [p for p in paths if ".venv" not in p and "venv" not in p]
+            env["PATH"] = os.pathsep.join(cleaned_paths)
+            
     if platform.system() == "Linux":
         appdir = env.get("APPDIR")
         if appdir:

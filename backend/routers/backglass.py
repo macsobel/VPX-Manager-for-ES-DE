@@ -83,11 +83,26 @@ async def update_settings(settings: BackglassSettings):
 @router.get("/status")
 async def get_status():
     from backend.services.backglass.monitor_service import backglass_monitor
+    import psutil
     is_running = False
     pid = None
     if backglass_monitor._companion_process and backglass_monitor._companion_process.poll() is None:
         is_running = True
         pid = backglass_monitor._companion_process.pid
+    else:
+        # Fallback to global process check to handle Uvicorn worker process separation
+        try:
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    cmd_line = " ".join(proc.info.get('cmdline') or [])
+                    if "--backglass" in cmd_line and not any(sig in cmd_line for sig in ["antigravity", "grep"]):
+                        is_running = True
+                        pid = proc.pid
+                        break
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    continue
+        except Exception:
+            pass
     
     bg_display = next((d for d in config.displays if d.get("role") == "Backglass"), None)
     

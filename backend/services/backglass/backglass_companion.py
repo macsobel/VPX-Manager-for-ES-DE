@@ -17,6 +17,7 @@ os.environ["SDL_JOYSTICK_DISABLED"] = "1"
 os.environ["SDL_HINT_JOYSTICK_HIDAPI"] = "0"
 os.environ["SDL_HINT_NO_SIGNAL_HANDLERS"] = "1"
 
+# pyrefly: ignore [missing-import]
 import pygame
 import logging
 
@@ -121,8 +122,8 @@ class BackglassCompanion:
             try:
                 line = sys.stdin.readline()
                 if not line:
-                    time.sleep(0.1)
-                    continue
+                    logger.info("📴 Parent process stdin closed. Exiting companion...")
+                    os._exit(0)
                 line = line.strip()
                 if line.startswith("GAME:"):
                     game_name = line[5:]
@@ -171,12 +172,12 @@ class BackglassCompanion:
 
             # Try multiple flag combinations for stability
             attempt_modes = [
-                # 1. Borderless Window (Most stable on macOS secondaries)
+                # 1. True Fullscreen (Required on macOS to cover the system menu bar)
+                (0, 0, pygame.NOFRAME | pygame.FULLSCREEN),
+                # 2. Borderless Window fallback
                 (W, H, pygame.NOFRAME),
-                # 2. Standard Window fallback
+                # 3. Standard Window fallback
                 (W, H, 0),
-                # 3. Fullscreen Scaled
-                (W, H, pygame.FULLSCREEN | pygame.SCALED),
             ]
             
             screen = None
@@ -184,14 +185,11 @@ class BackglassCompanion:
                 try:
                     mode_name = "FULLSCREEN" if flags & pygame.FULLSCREEN else "WINDOWED"
                     if flags & pygame.NOFRAME: mode_name = "BORDERLESS"
+                    if (flags & pygame.NOFRAME) and (flags & pygame.FULLSCREEN): mode_name = "TRUE FULLSCREEN"
                     if flags & pygame.SCALED: mode_name += " | SCALED"
                     
-                    # macOS: Use NOFRAME + Always on Top (0x00008000 is the SDL flag for ALWAYS_ON_TOP)
-                    # We also add SHOWN to be explicit.
-                    full_flags = flags | 0x00008000 | pygame.SHOWN
-                    
-                    logger.info(f"Attempting {mode_name} at {w}x{h} on display {idx} with flags {hex(full_flags)}...")
-                    screen = pygame.display.set_mode((w, h), full_flags, display=idx)
+                    logger.info(f"Attempting {mode_name} at {w if w else W}x{h if h else H} on display {idx}...")
+                    screen = pygame.display.set_mode((w, h), flags, display=idx)
                     
                     if screen:
                         W, H = screen.get_size()

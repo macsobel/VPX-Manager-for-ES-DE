@@ -8,6 +8,7 @@ import platform
 import psutil
 from pathlib import Path
 from backend.core.config import config
+from backend.core.utils import get_clean_env
 
 logger = logging.getLogger("backglass_monitor")
 
@@ -17,50 +18,51 @@ class BackglassMonitor:
         self._stop_event = threading.Event()
         self._companion_process = None
         self._is_monitoring = False
+        self._ignored_esde_pid = None
 
     def get_esde_pid(self):
-        """Find the REAL ES-DE process using psutil with strict filtering."""
-        try:
-            me = psutil.Process()
-            my_pids = {me.pid}
-            for child in me.children(recursive=True):
-                my_pids.add(child.pid)
-        except Exception:
-            my_pids = {os.getpid()}
-
-        # Strict patterns for the executable name itself
-        strict_names = ["es-de", "EmulationStation", "EmulationStation-DE"]
+        """Find the REAL ES-DE process, checking multiple possible names."""
+        my_pid = os.getpid()
+        # Common macOS/Linux process names for ES-DE
+        patterns = ["ES-DE", "es-de", "EmulationStation"]
         
-        try:
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                try:
-                    if proc.pid in my_pids:
-                        continue
-                        
-                    pname = proc.info.get('name') or ""
-                    cmd_line_list = proc.info.get('cmdline', [])
-                    cmd_line = " ".join(cmd_line_list)
-
-                    # 1. Check strict process names first (most reliable)
-                    if any(sn.lower() == pname.lower() for sn in strict_names):
-                        # Double check it's not us by path
-                        if any(sig in cmd_line for sig in ["VPX-Manager", "antigravity", "backglass_companion"]):
-                            continue
-                        return proc.pid
-
-                    # 2. Fallback to cmdline check but with VERY strict exclusions
-                    if any(sig in cmd_line for sig in ["ES-DE", "EmulationStation"]):
-                        # If it contains our manager's signature, it's definitely not the target
-                        if any(sig in cmd_line for sig in ["VPX Manager", "VPX-Manager-for-ES-DE", "backglass_companion", "antigravity", "python", "main.py"]):
-                            continue
-                        return proc.pid
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+        for pattern in patterns:
+            try:
+                output = subprocess.check_output(["pgrep", "-f", pattern]).decode().strip()
+                if not output:
                     continue
-        except Exception as e:
-            logger.debug(f"Error checking processes: {e}")
-
+                
+                pids = output.split('\n')
+                for p in pids:
+                    try:
+                        pid_int = int(p)
+                        if pid_int == my_pid:
+                            continue
+                            
+                        # Skip zombie/defunct/idle processes
+                        try:
+                            proc = psutil.Process(pid_int)
+                            if proc.status() in [psutil.STATUS_ZOMBIE, psutil.STATUS_IDLE]:
+                                continue
+                        except Exception:
+                            pass
+                            
+                        # Get command line to verify it's not our own manager, script, or Visual Pinball
+                        cmd_line = subprocess.check_output(["ps", "-p", p, "-o", "command="]).decode().strip()
+                        
+                        # EXCLUSION FILTER: Must not contain our manager's signature or Visual Pinball
+                        if any(sig in cmd_line for sig in ["VPX-Manager", "VPX Manager", "backglass_companion", "antigravity", "VPinballX", "vpx-wrapper", "./es-de 100"]):
+                            continue
+                            
+                        # INCLUSION FILTER: If it contains ES-DE or EmulationStation and isn't us or VPX, it's likely ES-DE
+                        if any(sig in cmd_line for sig in ["ES-DE", "es-de", "EmulationStation"]):
+                            return pid_int
+                    except:
+                        continue
+            except:
+                pass
+        
         # If we got here, we didn't find anything
-        logger.debug("ES-DE process not found in any common pattern.")
         return None
 
     def _get_paths(self):
@@ -108,6 +110,7 @@ class BackglassMonitor:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
+                env=get_clean_env(),
                 start_new_session=True,
                 text=True,
                 bufsize=1 # Line buffered
@@ -152,20 +155,28 @@ class BackglassMonitor:
     def stop_companion(self):
         if self._companion_process and self._companion_process.poll() is None:
             logger.info("Stopping Backglass Companion...")
+            pid = self._companion_process.pid
             try:
-                os.kill(self._companion_process.pid, signal.SIGTERM)
+                # Send the signal to the entire process group to ensure the PyInstaller 
+                # bootloader and the actual Pygame display payload process quit together cleanly.
+                os.killpg(pid, signal.SIGTERM)
                 self._companion_process.wait(timeout=2)
-            except:
+            except Exception:
                 try:
-                    os.kill(self._companion_process.pid, signal.SIGKILL)
-                except:
-                    pass
+                    os.killpg(pid, signal.SIGKILL)
+                except Exception:
+                    # Fallback to single PID termination if PGID operations fail
+                    try:
+                        os.kill(pid, signal.SIGTERM)
+                    except Exception:
+                        pass
             self._companion_process = None
 
     def _monitor_loop(self):
         logger.info("Backglass Auto-Monitor started.")
         last_game = None
         cached_esde_pid = None
+        last_lsof_time = 0.0
         
         while not self._stop_event.is_set():
             # Check if companion has died on its own
@@ -173,16 +184,32 @@ class BackglassMonitor:
                 logger.info("Backglass Companion process ended.")
                 self._companion_process = None
                 last_game = None
+                
+                if cached_esde_pid:
+                    logger.info("Companion was closed while ES-DE is running. Ignoring this ES-DE session until restart.")
+                    self._ignored_esde_pid = cached_esde_pid
+                    cached_esde_pid = None
 
             # Only do something if the feature is enabled in settings
             if config.backglass_enabled:
                 if cached_esde_pid is not None:
-                    # Very fast check if the process is still alive
-                    if not psutil.pid_exists(cached_esde_pid):
+                    # Very fast, robust check if the process is still alive and not a zombie
+                    try:
+                        proc = psutil.Process(cached_esde_pid)
+                        if proc.status() == psutil.STATUS_ZOMBIE:
+                            cached_esde_pid = None
+                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                         cached_esde_pid = None
 
                 if cached_esde_pid is None:
-                    cached_esde_pid = self.get_esde_pid()
+                    new_pid = self.get_esde_pid()
+                    if new_pid and new_pid == self._ignored_esde_pid:
+                        # User manually closed the companion for this session, ignore it
+                        pass
+                    elif new_pid:
+                        # New ES-DE session started!
+                        self._ignored_esde_pid = None
+                        cached_esde_pid = new_pid
 
                 esde_pid = cached_esde_pid
                 
@@ -216,46 +243,49 @@ class BackglassMonitor:
                             pass
 
                     if not game_name:
-                        try:
-                            cmd = ["lsof", "-p", str(esde_pid), "-Fn"]
-                            output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode()
-                            # Look for any media file in the vpinball downloaded_media directory
-                            # We search for "downloaded_media" or the user's media dir
-                            media_root = "downloaded_media"
-                            lines = output.split('\n')
-                            
-                            found_media = []
-                            for line in lines:
-                                if line.startswith('n') and media_root in line and 'vpinball' in line:
-                                    # Filter for common image AND video extensions
-                                    # We include videos because ES-DE keeps them open while they play,
-                                    # making them a much more reliable trigger than images on fast Macs.
-                                    if any(ext in line.lower() for ext in ['.png', '.jpg', '.jpeg', '.webp', '.mp4', '.mkv', '.avi', '.mov']):
-                                        found_media.append(line[1:])
-                            
-                            if found_media:
-                                # Priority: 
-                                # 1. Videos (very reliable)
-                                # 2. Covers/Wheels (Instant signal when scrolling)
-                                # 3. Fanart
-                                videos = [f for f in found_media if any(v in f.lower() for v in ['.mp4', '.mkv', '.avi', '.mov'])]
-                                covers = [f for f in found_media if '/covers/' in f or '/wheel/' in f or '/marquees/' in f]
-                                fanart = [f for f in found_media if '/fanart/' in f]
+                        now = time.time()
+                        if now - last_lsof_time >= 1.0: # Check at most once per second to prevent high CPU and hanging
+                            last_lsof_time = now
+                            try:
+                                cmd = ["lsof", "-p", str(esde_pid), "-Fn"]
+                                output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=0.5).decode()
+                                # Look for any media file in the vpinball downloaded_media directory
+                                # We search for "downloaded_media" or the user's media dir
+                                media_root = "downloaded_media"
+                                lines = output.split('\n')
                                 
-                                if videos:
-                                    selection = videos[0]
-                                elif covers:
-                                    # If we found a cover, it's likely an instant scroll event
-                                    selection = covers[0]
-                                elif fanart:
-                                    selection = fanart[0]
-                                else:
-                                    selection = found_media[0]
+                                found_media = []
+                                for line in lines:
+                                    if line.startswith('n') and media_root in line and 'vpinball' in line:
+                                        # Filter for common image AND video extensions
+                                        # We include videos because ES-DE keeps them open while they play,
+                                        # making them a much more reliable trigger than images on fast Macs.
+                                        if any(ext in line.lower() for ext in ['.png', '.jpg', '.jpeg', '.webp', '.mp4', '.mkv', '.avi', '.mov']):
+                                            found_media.append(line[1:])
+                                
+                                if found_media:
+                                    # Priority: 
+                                    # 1. Videos (very reliable)
+                                    # 2. Covers/Wheels (Instant signal when scrolling)
+                                    # 3. Fanart
+                                    videos = [f for f in found_media if any(v in f.lower() for v in ['.mp4', '.mkv', '.avi', '.mov'])]
+                                    covers = [f for f in found_media if '/covers/' in f or '/wheel/' in f or '/marquees/' in f]
+                                    fanart = [f for f in found_media if '/fanart/' in f]
                                     
-                                game_name = Path(selection).stem
-                                logger.debug(f"Sniffer detected game: {game_name}")
-                        except Exception:
-                            pass
+                                    if videos:
+                                        selection = videos[0]
+                                    elif covers:
+                                        # If we found a cover, it's likely an instant scroll event
+                                        selection = covers[0]
+                                    elif fanart:
+                                        selection = fanart[0]
+                                    else:
+                                        selection = found_media[0]
+                                        
+                                    game_name = Path(selection).stem
+                                    logger.debug(f"Sniffer detected game: {game_name}")
+                            except Exception:
+                                pass
 
                     # 3. Update companion if game changed
                     if game_name and game_name != last_game:
