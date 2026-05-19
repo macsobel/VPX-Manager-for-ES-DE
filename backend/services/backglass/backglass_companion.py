@@ -152,51 +152,56 @@ class BackglassCompanion:
     def run_display(self):
         try:
             logger.info("Initializing Pygame...")
-            
+            idx = self.screen_index
+            W, H = 800, 600
+
+            # --- LINUX PRE-INIT ---
+            # Environment variables like SDL_VIDEO_WINDOW_POS MUST be set before pygame.display.init()
+            if platform.system() == "Linux":
+                os.environ["SDL_VIDEODRIVER"] = "x11"
+                try:
+                    import subprocess
+                    from backend.core.utils import get_clean_env
+                    out = subprocess.check_output(["xrandr"], text=True, env=get_clean_env())
+                    connected = [line for line in out.splitlines() if " connected " in line]
+                    if idx < len(connected):
+                        parts = connected[idx].split()
+                        for p in parts:
+                            if "x" in p and "+" in p:
+                                geom = p.split("+")
+                                if len(geom) >= 3:
+                                    x = geom[1]
+                                    y = geom[2]
+                                    os.environ["SDL_VIDEO_WINDOW_POS"] = f"{x},{y}"
+                                    logger.info(f"Forced Linux window pos to {x},{y}")
+                                    
+                                    # Also override W, H directly from xrandr to be 100% sure
+                                    size_parts = geom[0].split("x")
+                                    if len(size_parts) == 2:
+                                        W, H = int(size_parts[0]), int(size_parts[1])
+                                        logger.info(f"Forced Linux window size to {W}x{H}")
+                                break
+                except Exception as e:
+                    logger.warning(f"Failed to get xrandr bounds: {e}")
+
             # Only init the subsystems we actually need (display)
             pygame.display.init()
             logger.info("Pygame initialized (display only, HID disabled).")
             
+            # --- MACOS / FALLBACK POST-INIT ---
             # On macOS, native fullscreen (0,0) can segfault on secondary monitors.
             # We try to get explicit dimensions first.
-            try:
-                desktop_sizes = pygame.display.get_desktop_sizes()
-                num_displays = len(desktop_sizes)
-                idx = self.screen_index if self.screen_index < num_displays else 0
-                W, H = desktop_sizes[idx]
-                logger.info(f"Target display {idx} resolution: {W}x{H}")
-                
-                if platform.system() == "Linux":
-                    os.environ["SDL_VIDEODRIVER"] = "x11"
-                    try:
-                        import subprocess
-                        from backend.core.utils import get_clean_env
-                        out = subprocess.check_output(["xrandr"], text=True, env=get_clean_env())
-                        connected = [line for line in out.splitlines() if " connected " in line]
-                        if idx < len(connected):
-                            parts = connected[idx].split()
-                            for p in parts:
-                                if "x" in p and "+" in p:
-                                    geom = p.split("+")
-                                    if len(geom) >= 3:
-                                        x = geom[1]
-                                        y = geom[2]
-                                        os.environ["SDL_VIDEO_WINDOW_POS"] = f"{x},{y}"
-                                        logger.info(f"Forced Linux window pos to {x},{y}")
-                                        
-                                        # Also override W, H directly from xrandr to be 100% sure
-                                        size_parts = geom[0].split("x")
-                                        if len(size_parts) == 2:
-                                            W, H = int(size_parts[0]), int(size_parts[1])
-                                            logger.info(f"Forced Linux window size to {W}x{H}")
-                                    break
-                    except Exception as e:
-                        logger.warning(f"Failed to get xrandr bounds: {e}")
-                        
-            except Exception as e:
-                logger.warning(f"Could not get desktop sizes: {e}")
-                idx = 0
-                W, H = 800, 600
+            if platform.system() != "Linux":
+                try:
+                    desktop_sizes = pygame.display.get_desktop_sizes()
+                    num_displays = len(desktop_sizes)
+                    idx = self.screen_index if self.screen_index < num_displays else 0
+                    W, H = desktop_sizes[idx]
+                    logger.info(f"Target display {idx} resolution: {W}x{H}")
+                except Exception as e:
+                    logger.warning(f"Could not get desktop sizes: {e}")
+                    idx = 0
+                    W, H = 800, 600
 
             # Try multiple flag combinations for stability
             if platform.system() == "Linux":
@@ -228,9 +233,12 @@ class BackglassCompanion:
                     
                     logger.info(f"Attempting {mode_name} at {w if w else W}x{h if h else H} on display {idx}...")
                     
-                    # On Linux, setting display=idx alongside SDL_VIDEO_WINDOW_POS can cause SDL2 to offset twice or ignore coordinates.
-                    target_display = 0 if platform.system() == "Linux" else idx
-                    screen = pygame.display.set_mode((w, h), flags, display=target_display)
+                    # On Linux, setting display=... alongside SDL_VIDEO_WINDOW_POS can cause SDL2 to override the environment variable.
+                    # We omit the display kwarg on Linux to guarantee SDL_VIDEO_WINDOW_POS is respected.
+                    if platform.system() == "Linux":
+                        screen = pygame.display.set_mode((w, h), flags)
+                    else:
+                        screen = pygame.display.set_mode((w, h), flags, display=idx)
                     
                     if screen:
                         W, H = screen.get_size()
