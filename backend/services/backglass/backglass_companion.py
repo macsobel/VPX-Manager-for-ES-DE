@@ -183,6 +183,12 @@ class BackglassCompanion:
                                         y = geom[2]
                                         os.environ["SDL_VIDEO_WINDOW_POS"] = f"{x},{y}"
                                         logger.info(f"Forced Linux window pos to {x},{y}")
+                                        
+                                        # Also override W, H directly from xrandr to be 100% sure
+                                        size_parts = geom[0].split("x")
+                                        if len(size_parts) == 2:
+                                            W, H = int(size_parts[0]), int(size_parts[1])
+                                            logger.info(f"Forced Linux window size to {W}x{H}")
                                     break
                     except Exception as e:
                         logger.warning(f"Failed to get xrandr bounds: {e}")
@@ -221,7 +227,10 @@ class BackglassCompanion:
                     if flags & pygame.SCALED: mode_name += " | SCALED"
                     
                     logger.info(f"Attempting {mode_name} at {w if w else W}x{h if h else H} on display {idx}...")
-                    screen = pygame.display.set_mode((w, h), flags, display=idx)
+                    
+                    # On Linux, setting display=idx alongside SDL_VIDEO_WINDOW_POS can cause SDL2 to offset twice or ignore coordinates.
+                    target_display = 0 if platform.system() == "Linux" else idx
+                    screen = pygame.display.set_mode((w, h), flags, display=target_display)
                     
                     if screen:
                         W, H = screen.get_size()

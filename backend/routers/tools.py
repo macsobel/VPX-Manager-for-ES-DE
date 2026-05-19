@@ -10,7 +10,9 @@ from pathlib import Path
 import platform
 import sys
 
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, File, UploadFile
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 
 from backend.core.config import config
@@ -309,11 +311,11 @@ fi
         linux_focus_logic = """
 # Bring ES-DE back to the front on Linux
 # Wait a moment for VPX to fully close its window before attempting focus
-sleep 1
+sleep 2
 if command -v wmctrl >/dev/null 2>&1; then
-    wmctrl -x -a "es-de" || wmctrl -a "EmulationStation" || wmctrl -a "ES-DE"
+    wmctrl -a "ES-DE" || wmctrl -x -a "es-de" || wmctrl -a "EmulationStation" || wmctrl -a "es-de"
 elif command -v xdotool >/dev/null 2>&1; then
-    xdotool search --class "es-de" windowactivate || xdotool search --name "EmulationStation" windowactivate
+    xdotool search --name "ES-DE" windowactivate || xdotool search --class "es-de" windowactivate || xdotool search --name "EmulationStation" windowactivate
 fi
 """ if is_linux else ""
 
