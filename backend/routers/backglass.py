@@ -2,7 +2,9 @@ import os
 import subprocess
 import signal
 from typing import Optional
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, HTTPException
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 from pathlib import Path
 from backend.core.config import config, save_config
@@ -43,6 +45,7 @@ def get_displays():
     # Fallback if no displays found or not on macOS
     if not displays:
         try:
+            # pyrefly: ignore [missing-import]
             import pygame
             if not pygame.display.get_init():
                 pygame.display.init()

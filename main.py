@@ -137,6 +137,7 @@ logger.info("VPX Manager for ES-DE starting up...")
 
 # Try to set the process name for Activity Monitor / macOS UI
 try:
+    # pyrefly: ignore [missing-import]
     import setproctitle
 
     setproctitle.setproctitle("VPX Manager for ES-DE")
@@ -510,8 +511,10 @@ if __name__ == "__main__":
 
         # --- Attempt 1 & 2: AppIndicator (Wayland Compatible) ---
         try:
+            # pyrefly: ignore [missing-import]
             import gi
             gi.require_version('Gtk', '3.0')
+            # pyrefly: ignore [missing-import]
             from gi.repository import Gtk, GLib
 
             indicator_ns = None
@@ -682,8 +685,10 @@ if __name__ == "__main__":
         # --- Attempt 3: GTK StatusIcon (X11 Fallback) ---
         if not tray_started and os.environ.get("XDG_SESSION_TYPE") != "wayland":
             try:
+                # pyrefly: ignore [missing-import]
                 import gi
                 gi.require_version('Gtk', '3.0')
+                # pyrefly: ignore [missing-import]
                 from gi.repository import Gtk, GLib
                 Gtk.init(None)
                 print("DEBUG: Falling back to GTK StatusIcon")
@@ -738,6 +743,7 @@ if __name__ == "__main__":
         if not tray_started:
             try:
                 print("DEBUG: Falling back to pystray")
+                # pyrefly: ignore [missing-import]
                 from PIL import Image
                 # pyrefly: ignore [missing-import]
                 import pystray
