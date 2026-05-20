@@ -156,60 +156,42 @@ class BackglassCompanion:
             W, H = 800, 600
 
             # --- LINUX PRE-INIT ---
-            # Environment variables like SDL_VIDEO_WINDOW_POS MUST be set before pygame.display.init()
+            # On Linux, only force x11 if the session is actually X11.
+            # On Wayland, let SDL2 use its native Wayland backend where display=idx works properly.
+            # SDL_VIDEO_WINDOW_POS is ignored on Wayland and unreliable on X11 — use display=idx instead.
             if platform.system() == "Linux":
-                os.environ["SDL_VIDEODRIVER"] = "x11"
-                try:
-                    import subprocess
-                    from backend.core.utils import get_clean_env
-                    out = subprocess.check_output(["xrandr"], text=True, env=get_clean_env())
-                    connected = [line for line in out.splitlines() if " connected " in line]
-                    if idx < len(connected):
-                        parts = connected[idx].split()
-                        for p in parts:
-                            if "x" in p and "+" in p:
-                                geom = p.split("+")
-                                if len(geom) >= 3:
-                                    x = geom[1]
-                                    y = geom[2]
-                                    os.environ["SDL_VIDEO_WINDOW_POS"] = f"{x},{y}"
-                                    logger.info(f"Forced Linux window pos to {x},{y}")
-                                    
-                                    # Also override W, H directly from xrandr to be 100% sure
-                                    size_parts = geom[0].split("x")
-                                    if len(size_parts) == 2:
-                                        W, H = int(size_parts[0]), int(size_parts[1])
-                                        logger.info(f"Forced Linux window size to {W}x{H}")
-                                break
-                except Exception as e:
-                    logger.warning(f"Failed to get xrandr bounds: {e}")
+                session_type = os.environ.get("XDG_SESSION_TYPE", "").lower()
+                if session_type == "x11":
+                    os.environ["SDL_VIDEODRIVER"] = "x11"
+                    logger.info("Detected X11 session, forcing SDL_VIDEODRIVER=x11")
+                else:
+                    logger.info(f"Detected session type '{session_type}', letting SDL2 auto-detect video driver")
 
             # Only init the subsystems we actually need (display)
             pygame.display.init()
             logger.info("Pygame initialized (display only, HID disabled).")
             
-            # --- MACOS / FALLBACK POST-INIT ---
-            # On macOS, native fullscreen (0,0) can segfault on secondary monitors.
-            # We try to get explicit dimensions first.
-            if platform.system() != "Linux":
-                try:
-                    desktop_sizes = pygame.display.get_desktop_sizes()
-                    num_displays = len(desktop_sizes)
-                    idx = self.screen_index if self.screen_index < num_displays else 0
-                    W, H = desktop_sizes[idx]
-                    logger.info(f"Target display {idx} resolution: {W}x{H}")
-                except Exception as e:
-                    logger.warning(f"Could not get desktop sizes: {e}")
-                    idx = 0
-                    W, H = 800, 600
+            # --- POST-INIT: Get target display dimensions ---
+            # Use SDL2's display enumeration to get the correct resolution for the target monitor.
+            # This works on both X11 and Wayland, and matches the macOS code path.
+            try:
+                desktop_sizes = pygame.display.get_desktop_sizes()
+                num_displays = len(desktop_sizes)
+                idx = self.screen_index if self.screen_index < num_displays else 0
+                W, H = desktop_sizes[idx]
+                logger.info(f"Target display {idx} resolution: {W}x{H} (of {num_displays} displays)")
+            except Exception as e:
+                logger.warning(f"Could not get desktop sizes: {e}")
+                idx = 0
+                W, H = 800, 600
 
             # Try multiple flag combinations for stability
             if platform.system() == "Linux":
                 attempt_modes = [
-                    # 1. Borderless Window (Required on Linux to respect SDL_VIDEO_WINDOW_POS and map to xrandr bounds)
-                    (W, H, pygame.NOFRAME),
-                    # 2. True Fullscreen fallback
+                    # 1. True Fullscreen on target display (most reliable on both X11 and Wayland)
                     (0, 0, pygame.NOFRAME | pygame.FULLSCREEN),
+                    # 2. Borderless Window fallback
+                    (W, H, pygame.NOFRAME),
                     # 3. Standard Window fallback
                     (W, H, 0),
                 ]
@@ -233,12 +215,9 @@ class BackglassCompanion:
                     
                     logger.info(f"Attempting {mode_name} at {w if w else W}x{h if h else H} on display {idx}...")
                     
-                    # On Linux, setting display=... alongside SDL_VIDEO_WINDOW_POS can cause SDL2 to override the environment variable.
-                    # We omit the display kwarg on Linux to guarantee SDL_VIDEO_WINDOW_POS is respected.
-                    if platform.system() == "Linux":
-                        screen = pygame.display.set_mode((w, h), flags)
-                    else:
-                        screen = pygame.display.set_mode((w, h), flags, display=idx)
+                    # Use display=idx on ALL platforms to target the correct monitor.
+                    # This is the SDL2-blessed approach that works on X11, Wayland, and macOS.
+                    screen = pygame.display.set_mode((w, h), flags, display=idx)
                     
                     if screen:
                         W, H = screen.get_size()
