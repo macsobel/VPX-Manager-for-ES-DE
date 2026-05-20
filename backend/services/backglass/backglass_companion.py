@@ -188,10 +188,10 @@ class BackglassCompanion:
             # Try multiple flag combinations for stability
             if platform.system() == "Linux":
                 attempt_modes = [
-                    # 1. True Fullscreen on target display (most reliable on both X11 and Wayland)
-                    (0, 0, pygame.NOFRAME | pygame.FULLSCREEN),
-                    # 2. Borderless Window fallback
+                    # 1. Borderless Window (Highly reliable for targeting correct display on Linux X11/Wayland)
                     (W, H, pygame.NOFRAME),
+                    # 2. True Fullscreen fallback
+                    (0, 0, pygame.NOFRAME | pygame.FULLSCREEN),
                     # 3. Standard Window fallback
                     (W, H, 0),
                 ]
