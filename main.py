@@ -26,7 +26,8 @@ load_dotenv()
 if len(sys.argv) > 1:
     if "--backglass" in sys.argv:
         from backend.services.backglass.backglass_companion import BackglassCompanion
-        s_idx = int(sys.argv[2]) if len(sys.argv) > 2 else 1
+        bg_idx = sys.argv.index("--backglass")
+        s_idx = int(sys.argv[bg_idx + 1]) if len(sys.argv) > bg_idx + 1 else 1
         companion = BackglassCompanion(screen_index=s_idx)
         companion.run()
         sys.exit(0)

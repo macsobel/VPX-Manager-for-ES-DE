@@ -253,14 +253,21 @@ async def apply_esde_integration():
             # If running in dev mode
             manager_cmd = f'python3 "{Path(__file__).parents[2] / "main.py"}"'
 
+        # Resolve backglass screen index from user's display config
+        bg_screen_index = 1  # Fallback
+        saved_displays = getattr(config, "displays", [])
+        bg_display = next((d for d in saved_displays if d.get("role") == "Backglass"), None)
+        if bg_display and "index" in bg_display:
+            bg_screen_index = bg_display["index"]
+
         # 1. emulationstation-start script (Launch Backglass)
         start_script_path = start_script_dir / "vpx_backglass_start.sh"
         start_script_content = f"""#!/bin/bash
 # Launch VPX Backglass Companion when ES-DE starts
 if [ "$(uname)" = "Linux" ]; then
-    env -u LD_LIBRARY_PATH -u APPDIR {manager_cmd} --backglass &
+    env -u LD_LIBRARY_PATH -u APPDIR {manager_cmd} --backglass {bg_screen_index} &
 else
-    {manager_cmd} --backglass &
+    {manager_cmd} --backglass {bg_screen_index} &
 fi
 """
         with open(start_script_path, "w") as f:
@@ -313,9 +320,14 @@ fi
 # Wait a moment for VPX to fully close its window before attempting focus
 sleep 2
 if command -v wmctrl >/dev/null 2>&1; then
-    wmctrl -a "ES-DE" || wmctrl -x -a "es-de" || wmctrl -a "EmulationStation" || wmctrl -a "es-de"
+    wmctrl -a "ES-DE" || wmctrl -a "EmulationStation" || wmctrl -x -a "es-de"
+    echo "Attempted to restore ES-DE focus using wmctrl."
 elif command -v xdotool >/dev/null 2>&1; then
-    xdotool search --name "ES-DE" windowactivate || xdotool search --class "es-de" windowactivate || xdotool search --name "EmulationStation" windowactivate
+    xdotool search --name "ES-DE" windowactivate || xdotool search --name "EmulationStation" windowactivate || xdotool search --class "es-de" windowactivate
+    echo "Attempted to restore ES-DE focus using xdotool."
+else
+    echo "WARNING: Neither 'wmctrl' nor 'xdotool' found. Cannot automatically restore window focus to ES-DE."
+    echo "Please install wmctrl (e.g., sudo apt-get install wmctrl) for automatic focus management."
 fi
 """ if is_linux else ""
 

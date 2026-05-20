@@ -154,7 +154,8 @@ class BackglassMonitor:
                 elif platform.system() == "Linux":
                     try:
                         from backend.services.linux_focus import focus_window
-                        focus_window("EmulationStation")
+                        if not focus_window("ES-DE"):
+                            focus_window("EmulationStation")
                     except Exception as e:
                         logger.debug(f"Linux focus return failed: {e}")
             

@@ -9,14 +9,14 @@ def focus_window(window_name: str):
     Attempts to bring a window to the front on Linux using wmctrl or xdotool.
     """
     # Try wmctrl first
-    wmctrl = shutil.which("wmctrl")
-    if wmctrl:
+    wmctrl_cmd = shutil.which("wmctrl")
+    if wmctrl_cmd:
         try:
             # -a: activate (bring to front)
-            # Use partial matching for the window name
-            subprocess.run([wmctrl, "-a", window_name], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            logger.info(f"Used wmctrl to focus '{window_name}'")
-            return True
+            res = subprocess.run([wmctrl_cmd, "-a", window_name], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if res.returncode == 0:
+                logger.info(f"Used wmctrl to focus '{window_name}'")
+                return True
         except Exception as e:
             logger.debug(f"wmctrl focus failed: {e}")
 
@@ -25,11 +25,12 @@ def focus_window(window_name: str):
     if xdotool:
         try:
             # search for window and activate it
-            subprocess.run([xdotool, "search", "--name", window_name, "windowactivate"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            logger.info(f"Used xdotool to focus '{window_name}'")
-            return True
+            res = subprocess.run([xdotool, "search", "--name", window_name, "windowactivate"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if res.returncode == 0:
+                logger.info(f"Used xdotool to focus '{window_name}'")
+                return True
         except Exception as e:
             logger.debug(f"xdotool focus failed: {e}")
 
-    logger.warning("No Linux window management tools (wmctrl, xdotool) found to manage focus.")
+    logger.warning(f"Failed to focus '{window_name}' using available Linux tools.")
     return False
