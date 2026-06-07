@@ -44,7 +44,7 @@ It automates scraping metadata and media from sources like [ScreenScraper](https
 - Patches table scripts automatically using jsm174's [standalone script repository](https://github.com/jsm174/vpx-standalone-scripts) so older tables work on macOS and Linux.
 - Automatically installs NVRAM files for Bally MPU 6803 and Gottlieb System 3 tables so they boot correctly.
 - Built-in settings editor for VPX config files (VBS, INI).
-- Runs natively on macOS (available now) and Linux (coming soon).
+- Runs natively on macOS and Linux.
 - Interface optimized for desktop and mobile
 
 ---
@@ -109,7 +109,7 @@ VPX Manager requires the following components have been installed and opened at 
 
 ---
 
-### 🐧 Linux *(Beta Coming Soon)*
+### 🐧 Linux *(Beta)*
 
 1. Download the Linux app from the [Releases](https://github.com/macsobel/VPX-Manager-for-ES-DE/releases) page and extract it.
 
@@ -160,6 +160,7 @@ Thanks to the community members who make this hobby possible:
 - **@dekay** for the [Unofficial VPinball Wiki](https://github.com/dekay/vpinball-wiki/wiki).
 - **@MajorFrenchy** for his [virtual pinball tutorials and guides](https://www.majorfrenchy.com/).
 - **The ES-DE Team** for the [EmulationStation Desktop Edition](https://es-de.org/) frontend that ties it all together.
+- **Google AntiGravity** was the main IDE used to build this passion project. I'm a hobbyist, not a professional. I made this for myself and I took the effort to provide this to others in case they may find it useful as well.
 
 ---
 ## System Requirements
