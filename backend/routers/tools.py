@@ -314,20 +314,64 @@ fi
         else:
             vpx_bin = vpx_path
 
-        # Focus logic for Linux using wmctrl
         linux_focus_logic = """
-# Bring ES-DE back to the front on Linux
-# Wait a moment for VPX to fully close its window before attempting focus
-sleep 2
-if command -v wmctrl >/dev/null 2>&1; then
-    wmctrl -a "ES-DE" || wmctrl -a "EmulationStation" || wmctrl -x -a "es-de"
-    echo "Attempted to restore ES-DE focus using wmctrl."
-elif command -v xdotool >/dev/null 2>&1; then
-    xdotool search --name "ES-DE" windowactivate || xdotool search --name "EmulationStation" windowactivate || xdotool search --class "es-de" windowactivate
-    echo "Attempted to restore ES-DE focus using xdotool."
+# Bring ES-DE back to the front on Linux after VPX exits.
+# Strategy 1 (preferred): PID-based focus — immune to window title changes.
+# Strategy 2 (fallback): WM_CLASS and title name matching.
+sleep 1
+_esde_focused=0
+
+# Find ES-DE's PID using the stable binary name. The binary is always "es-de"
+# regardless of version, even if the window title changes (e.g. "ES-DE 3.x.x").
+_esde_pid=$(pgrep -x "es-de" 2>/dev/null | head -1)
+[ -z "$_esde_pid" ] && _esde_pid=$(pgrep -x "emulationstation" 2>/dev/null | head -1)
+
+for _attempt in 1 2 3; do
+    # ── PID-based focus (most reliable) ──────────────────────────────────
+    if [ -n "$_esde_pid" ]; then
+        if command -v wmctrl >/dev/null 2>&1; then
+            # Map PID to window ID, then activate by ID (not by name)
+            _wid=$(wmctrl -l -p 2>/dev/null | awk -v pid="$_esde_pid" '$3==pid {print $1; exit}')
+            if [ -n "$_wid" ]; then
+                wmctrl -i -a "$_wid" 2>/dev/null && _esde_focused=1 && break
+            fi
+        fi
+        if command -v xdotool >/dev/null 2>&1; then
+            _wid=$(xdotool search --onlyvisible --pid "$_esde_pid" 2>/dev/null | head -1)
+            if [ -n "$_wid" ]; then
+                xdotool windowactivate --sync "$_wid" 2>/dev/null
+                xdotool windowfocus --sync "$_wid" 2>/dev/null
+                _esde_focused=1
+                break
+            fi
+        fi
+    fi
+
+    # ── Name/class-based fallback ─────────────────────────────────────────
+    if command -v wmctrl >/dev/null 2>&1; then
+        # wmctrl -a does substring title match; -x does WM_CLASS match.
+        # WM_CLASS "es-de" is stable even when the title includes a version string.
+        wmctrl -x -a "es-de" 2>/dev/null && _esde_focused=1 && break
+        wmctrl -a "ES-DE" 2>/dev/null && _esde_focused=1 && break
+        wmctrl -a "EmulationStation" 2>/dev/null && _esde_focused=1 && break
+    fi
+    if command -v xdotool >/dev/null 2>&1; then
+        _wid=$(xdotool search --onlyvisible --classname "es-de" 2>/dev/null | head -1)
+        [ -z "$_wid" ] && _wid=$(xdotool search --onlyvisible --name "ES-DE" 2>/dev/null | head -1)
+        [ -z "$_wid" ] && _wid=$(xdotool search --onlyvisible --name "EmulationStation" 2>/dev/null | head -1)
+        if [ -n "$_wid" ]; then
+            xdotool windowactivate --sync "$_wid" 2>/dev/null
+            xdotool windowfocus --sync "$_wid" 2>/dev/null
+            _esde_focused=1
+            break
+        fi
+    fi
+    sleep 1
+done
+if [ "$_esde_focused" -eq 1 ]; then
+    echo "Restored ES-DE focus."
 else
-    echo "WARNING: Neither 'wmctrl' nor 'xdotool' found. Cannot automatically restore window focus to ES-DE."
-    echo "Please install wmctrl (e.g., sudo apt-get install wmctrl) for automatic focus management."
+    echo "WARNING: Could not restore ES-DE focus. Install wmctrl or xdotool for automatic focus management."
 fi
 """ if is_linux else ""
 

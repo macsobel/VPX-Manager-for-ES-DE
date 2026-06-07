@@ -140,26 +140,33 @@ class BackglassMonitor:
             
             threading.Thread(target=log_companion, args=(self._companion_process,), daemon=True).start()
             
-            # macOS/Linux: Return focus to ES-DE after a brief delay to allow the window to open
+            # macOS/Linux: Return focus to ES-DE after the companion window has opened.
+            # Capture the ES-DE PID now so focus_esde() can use PID-based focusing,
+            # which is immune to window title changes across ES-DE updates.
+            esde_pid_snapshot = self.get_esde_pid()
+
             def return_focus():
-                time.sleep(1.0)
                 if platform.system() == "Darwin":
+                    time.sleep(1.0)
                     try:
                         # Only activate if it's already running to prevent unexpected launches
                         script = 'if application "ES-DE" is running then activate application "ES-DE"'
-                        subprocess.run(["osascript", "-e", script], 
+                        subprocess.run(["osascript", "-e", script],
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     except:
                         pass
                 elif platform.system() == "Linux":
                     try:
-                        from backend.services.linux_focus import focus_window
-                        if not focus_window("ES-DE"):
-                            focus_window("EmulationStation")
+                        # Pass the known PID so focus is PID-based (name-change-proof).
+                        # Falls back to name/class search if PID approach fails.
+                        from backend.services.linux_focus import focus_esde
+                        if not focus_esde(pid=esde_pid_snapshot, delay=1.5, retries=3, retry_delay=0.75):
+                            logger.debug("Linux focus return to ES-DE failed after all attempts")
                     except Exception as e:
                         logger.debug(f"Linux focus return failed: {e}")
-            
+
             threading.Thread(target=return_focus, daemon=True).start()
+
 
         except Exception as e:
             logger.error(f"Failed to start companion: {e}")
