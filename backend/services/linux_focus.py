@@ -6,6 +6,83 @@ import time
 logger = logging.getLogger(__name__)
 
 
+def wait_for_pid_window(
+    pid: int,
+    timeout: float = 15.0,
+    poll_interval: float = 0.5,
+) -> bool:
+    """
+    Block until a visible window owned by `pid` appears in the window manager,
+    or until `timeout` seconds have elapsed.
+
+    This is necessary for cold-start launches where the process exists (pgrep
+    finds it) but the window has not been mapped yet by X11/the WM. Without
+    this wait, wmctrl and xdotool find zero windows for the PID and every
+    focus attempt silently fails.
+
+    Args:
+        pid: Process ID to wait for.
+        timeout: Maximum seconds to wait before giving up.
+        poll_interval: How often (in seconds) to re-check.
+
+    Returns:
+        True if a window for the PID was found before the timeout.
+    """
+    wmctrl_cmd = shutil.which("wmctrl")
+    xdotool_cmd = shutil.which("xdotool")
+    deadline = time.monotonic() + timeout
+
+    while time.monotonic() < deadline:
+        # Strategy 1: wmctrl -l -p
+        if wmctrl_cmd:
+            try:
+                result = subprocess.run(
+                    [wmctrl_cmd, "-l", "-p"],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=2,
+                )
+                for line in result.stdout.splitlines():
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        try:
+                            if int(parts[2]) == pid:
+                                logger.debug(
+                                    f"wait_for_pid_window: window found for PID {pid} via wmctrl"
+                                )
+                                return True
+                        except ValueError:
+                            continue
+            except Exception:
+                pass
+
+        # Strategy 2: xdotool search --pid
+        if xdotool_cmd:
+            try:
+                result = subprocess.run(
+                    [xdotool_cmd, "search", "--onlyvisible", "--pid", str(pid)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=2,
+                )
+                if result.stdout.strip():
+                    logger.debug(
+                        f"wait_for_pid_window: window found for PID {pid} via xdotool"
+                    )
+                    return True
+            except Exception:
+                pass
+
+        time.sleep(poll_interval)
+
+    logger.warning(
+        f"wait_for_pid_window: no window appeared for PID {pid} within {timeout}s"
+    )
+    return False
+
+
 def focus_window_by_pid(pid: int, retries: int = 3, retry_delay: float = 0.75) -> bool:
     """
     Focus the window belonging to a specific PID.
@@ -243,6 +320,7 @@ def focus_esde(
     delay: float = 1.5,
     retries: int = 3,
     retry_delay: float = 0.75,
+    window_wait_timeout: float = 15.0,
 ) -> bool:
     """
     Restore keyboard focus to ES-DE on Linux.
@@ -252,17 +330,40 @@ def focus_esde(
     to name-based strategies using all known ES-DE window title / WM class
     variants if the PID approach fails or no PID is provided.
 
+    On a cold-start launch ES-DE's process exists before its window is mapped.
+    This function waits up to `window_wait_timeout` seconds for the window to
+    actually appear before attempting to activate it, which prevents all focus
+    attempts from silently failing on slow-loading / freshly-launched ES-DE.
+
     Args:
         pid: The ES-DE process ID (preferred). Pass None to skip PID-based focus.
         delay: Seconds to wait before the first attempt (allows triggering
                windows like the backglass companion to finish opening/closing).
         retries: Passed through to the underlying focus functions.
         retry_delay: Passed through to the underlying focus functions.
+        window_wait_timeout: Maximum seconds to wait for ES-DE's window to be
+               mapped before attempting focus. Covers slow/cold-start launches.
+               Set to 0 to disable the wait (e.g. when ES-DE is already fully
+               running and its window is guaranteed to be visible).
 
     Returns:
         True if focus was successfully restored, False otherwise.
     """
     time.sleep(delay)
+
+    # ── Wait for ES-DE's window to be mapped (cold-start guard) ───────────
+    # When ES-DE is freshly launched it can take several seconds for its window
+    # to appear. We poll the WM until the window is visible so that the focus
+    # attempt below has something to activate. If the window is already up
+    # (e.g. returning focus after VPX closes) this returns almost instantly.
+    if pid is not None and window_wait_timeout > 0:
+        if not wait_for_pid_window(pid, timeout=window_wait_timeout):
+            # Window never appeared — fall through to name-based focus which
+            # has its own retry loop and may still succeed.
+            logger.debug(
+                f"focus_esde: ES-DE window (PID {pid}) never appeared within "
+                f"{window_wait_timeout}s, trying name-based focus."
+            )
 
     # ── Primary: PID-based focus (name-change-proof) ───────────────────────
     if pid is not None:

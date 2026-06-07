@@ -160,7 +160,7 @@ class BackglassMonitor:
                         # Pass the known PID so focus is PID-based (name-change-proof).
                         # Falls back to name/class search if PID approach fails.
                         from backend.services.linux_focus import focus_esde
-                        if not focus_esde(pid=esde_pid_snapshot, delay=1.5, retries=3, retry_delay=0.75):
+                        if not focus_esde(pid=esde_pid_snapshot, delay=0.5, retries=3, retry_delay=0.75, window_wait_timeout=15.0):
                             logger.debug("Linux focus return to ES-DE failed after all attempts")
                     except Exception as e:
                         logger.debug(f"Linux focus return failed: {e}")
