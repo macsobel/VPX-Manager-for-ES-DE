@@ -109,12 +109,18 @@ class BackglassMonitor:
 
         screen = str(screen_index)
 
-        logger.info(f"Starting Backglass Companion on screen {screen}...")
+        # Pass the user-configured media directory so the companion uses the
+        # correct path on all platforms rather than a hardcoded platform guess.
+        media_dir = str(getattr(config, "esde_media_dir", ""))
+
+        logger.info(f"Starting Backglass Companion on screen {screen} (media_dir={media_dir})...")
         try:
             cmd = [python]
             if script:
                 cmd.append(str(script))
             cmd.extend(["--backglass", screen])
+            if media_dir:
+                cmd.extend(["--media-dir", media_dir])
 
             self._companion_process = subprocess.Popen(
                 cmd,

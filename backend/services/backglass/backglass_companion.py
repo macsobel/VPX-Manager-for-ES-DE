@@ -33,8 +33,13 @@ logger = logging.getLogger("backglass_companion")
 # ─────────────────────────────────────────────────────────────────────────────
 
 if platform.system() == "Linux":
-    ESDE_DIR = Path(os.path.expanduser("~/.emulationstation"))
-    # Check if ~/ROMs/vpinball exists, otherwise fallback to ~/.emulationstation/roms/vpinball
+    # Modern ES-DE on Linux uses ~/ES-DE (same as macOS).
+    # ~/.emulationstation is the legacy EmulationStation path and is kept only
+    # as a fallback so we don't break setups that haven't migrated.
+    _esde_modern = Path(os.path.expanduser("~/ES-DE"))
+    _esde_legacy = Path(os.path.expanduser("~/.emulationstation"))
+    ESDE_DIR = _esde_modern if _esde_modern.exists() else _esde_legacy
+    # Check if ~/ROMs/vpinball exists, otherwise fallback to <ESDE_DIR>/roms/vpinball
     TABLES_DIR = Path(os.path.expanduser("~/ROMs/vpinball"))
     if not TABLES_DIR.exists():
         TABLES_DIR = ESDE_DIR / "roms" / "vpinball"
@@ -108,11 +113,22 @@ def find_backglass(game_name: str) -> Path:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class BackglassCompanion:
-    def __init__(self, screen_index=1):
+    def __init__(self, screen_index=1, media_dir=None):
         self.screen_index = screen_index
         self.last_game = None
         self.display_queue = queue.Queue()
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Resolve the fanart directory.
+        # Priority: explicit media_dir argument (passed from monitor_service via config)
+        # → module-level default derived from platform detection above.
+        if media_dir:
+            base = Path(media_dir).expanduser()
+            self.fanart_dir = base / "fanart"
+            logger.info(f"BackglassCompanion using media_dir from config: {base}")
+        else:
+            self.fanart_dir = FANART_DIR
+            logger.info(f"BackglassCompanion using default fanart_dir: {FANART_DIR}")
 
     def stdin_reader(self):
         """Read game names from standard input sent by the monitor service."""
@@ -129,7 +145,7 @@ class BackglassCompanion:
                     game_name = line[5:]
                     if game_name != self.last_game:
                         logger.info(f"🎯 New Selection: {game_name}")
-                        bg_path = find_backglass(game_name)
+                        bg_path = self._find_backglass(game_name)
                         self.display_queue.put(bg_path)
                         self.last_game = game_name
                 elif line == "DISCONNECT":
@@ -299,7 +315,36 @@ class BackglassCompanion:
             pygame.quit()
 
 
+    def _find_backglass(self, game_name: str) -> Path:
+        """
+        Instance-level backglass resolver that uses self.fanart_dir, which
+        respects the media_dir passed from the monitor service (i.e. the user's
+        configured esde_media_dir). Falls back to the module-level find_backglass
+        if the instance directory is unset.
+        """
+        fanart_dir = self.fanart_dir
+        if fanart_dir.exists():
+            for ext in (".png", ".jpg", ".jpeg", ".webp", ".tiff"):
+                f = fanart_dir / f"{game_name}{ext}"
+                logger.info(f"Checking fanart path: {f}")
+                if f.exists():
+                    logger.info(f"✅ Found backglass: {f.name}")
+                    return f
+                f_sub = fanart_dir / game_name / f"{game_name}{ext}"
+                logger.info(f"Checking fanart path: {f_sub}")
+                if f_sub.exists():
+                    logger.info(f"✅ Found backglass: {f_sub.name}")
+                    return f_sub
+
+        logger.info(f"No fanart found for {game_name} in {fanart_dir}, falling back to generic.")
+        return get_random_backglass()
+
+
 if __name__ == "__main__":
     s_idx = int(sys.argv[1]) if len(sys.argv) > 1 else 1
-    companion = BackglassCompanion(screen_index=s_idx)
+    media_dir = None
+    if "--media-dir" in sys.argv:
+        md_idx = sys.argv.index("--media-dir")
+        media_dir = sys.argv[md_idx + 1] if len(sys.argv) > md_idx + 1 else None
+    companion = BackglassCompanion(screen_index=s_idx, media_dir=media_dir)
     companion.run()

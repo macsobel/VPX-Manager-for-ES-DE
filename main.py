@@ -28,7 +28,12 @@ if len(sys.argv) > 1:
         from backend.services.backglass.backglass_companion import BackglassCompanion
         bg_idx = sys.argv.index("--backglass")
         s_idx = int(sys.argv[bg_idx + 1]) if len(sys.argv) > bg_idx + 1 else 1
-        companion = BackglassCompanion(screen_index=s_idx)
+        # Optional: --media-dir <path> overrides the hardcoded platform guess
+        media_dir = None
+        if "--media-dir" in sys.argv:
+            md_idx = sys.argv.index("--media-dir")
+            media_dir = sys.argv[md_idx + 1] if len(sys.argv) > md_idx + 1 else None
+        companion = BackglassCompanion(screen_index=s_idx, media_dir=media_dir)
         companion.run()
         sys.exit(0)
     
