@@ -324,13 +324,21 @@ class BackglassMonitor:
                     
                     time.sleep(0.01) # 10ms ultra-turbo polling for instant detection
                 else:
-                    time.sleep(2) # Slow poll when ES-DE is not running
+                    # Slow poll when ES-DE is not running
+                    for _ in range(20):
+                        if self._stop_event.is_set():
+                            break
+                        time.sleep(0.1)
             else:
                 # If disabled in settings but process is running, stop it
                 if self._companion_process:
                     self.stop_companion()
                     last_game = None
-                time.sleep(2)
+                # Slow poll when backglass is disabled
+                for _ in range(20):
+                    if self._stop_event.is_set():
+                        break
+                    time.sleep(0.1)
 
 
     def start(self):

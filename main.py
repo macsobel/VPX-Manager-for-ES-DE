@@ -306,7 +306,7 @@ if __name__ == "__main__":
         if server_instance:
             server_instance.should_exit = True
         if server_thread.is_alive():
-            server_thread.join(timeout=2.0)
+            server_thread.join(timeout=5.0)
 
     # Launch System Tray / Menu Bar based on OS
     if platform.system() == "Darwin":
@@ -488,6 +488,7 @@ if __name__ == "__main__":
 
             # Run the app
             VPXMenuBarApp().run()
+            os._exit(0)
 
         except ImportError:
             # Fallback if rumps is missing
@@ -682,6 +683,7 @@ if __name__ == "__main__":
                 logger.info(f"Started {indicator_ns} tray icon.")
                 tray_started = True
                 Gtk.main()
+                os._exit(0)
 
         except Exception as e:
             logger.error(f"AppIndicator attempt failed: {e}")
@@ -721,7 +723,10 @@ if __name__ == "__main__":
                     menu.append(Gtk.SeparatorMenuItem())
                     
                     quit_item = Gtk.MenuItem(label="Quit")
-                    quit_item.connect("activate", lambda w: Gtk.main_quit())
+                    def on_quit_fallback(w):
+                        _shutdown_server()
+                        GLib.idle_add(Gtk.main_quit)
+                    quit_item.connect("activate", on_quit_fallback)
                     menu.append(quit_item)
                     menu.show_all()
                     return menu
@@ -741,6 +746,7 @@ if __name__ == "__main__":
                 logger.info("Started GTK StatusIcon tray icon.")
                 tray_started = True
                 Gtk.main()
+                os._exit(0)
                 
             except Exception as e:
                 logger.debug(f"StatusIcon attempt failed: {e}")
@@ -799,6 +805,7 @@ if __name__ == "__main__":
                 logger.info("Started pystray tray icon fallback.")
                 tray_started = True
                 icon.run()
+                os._exit(0)
             except Exception as e:
                 logger.error(f"All tray backends failed: {e}")
 
