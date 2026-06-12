@@ -18,6 +18,11 @@ class SetupWizard {
     static async show() {
         try {
             this.state.config = await apiFetch('/api/settings');
+            try {
+                this.state.sysStatus = await apiFetch('/api/system/status');
+            } catch(e) {
+                this.state.sysStatus = null;
+            }
             this.state.currentStep = 1;
             this.render();
 
@@ -544,6 +549,20 @@ class SetupWizard {
                                 Folder containing your VPX tables
                             </p>
                         </div>
+                        
+                        ${this.state.sysStatus && this.state.sysStatus.has_flat_layout ? `
+                        <div style="background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.4); border-left: 4px solid #eab308; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; color: var(--text-primary);">
+                            <h4 style="color: #eab308; margin-top: 0; margin-bottom: 0.5rem; font-size: 0.95rem;">⚠️ Legacy File Layout Detected</h4>
+                            <p style="font-size: 0.85rem; line-height: 1.5; margin-bottom: 1rem;">
+                                Your tables directory uses the older "flat" layout (all .vpx files mixed together). VPX Manager is designed for the modern per-table-folder layout. 
+                                <br><br>
+                                We can automatically reorganize your files into subfolders. Your original files will be safely copied, not moved, so you can manually delete the old duplicates later.
+                            </p>
+                            <button id="wiz-btn-migrate-layout" class="btn btn-secondary" style="font-size: 0.85rem; padding: 6px 12px; border-color: rgba(234, 179, 8, 0.5);">
+                                Migrate to Per-Table Folders
+                            </button>
+                        </div>
+                        ` : ''}
 
                         <div class="input-group" style="margin-bottom: 1.5rem;">
                             <label class="input-label">Media Storage Strategy</label>
@@ -605,6 +624,34 @@ class SetupWizard {
                             } finally {
                                 integrateBtn.disabled = false;
                                 integrateBtn.style.opacity = '1';
+                            }
+                        };
+                    }
+                    
+                    const migrateBtn = document.getElementById('wiz-btn-migrate-layout');
+                    if (migrateBtn) {
+                        migrateBtn.onclick = async () => {
+                            if (migrateBtn.disabled) return;
+                            migrateBtn.disabled = true;
+                            migrateBtn.style.opacity = '0.7';
+                            Toast.info('Migrating tables to folders, please wait... (This may take a minute)', 5000);
+                            try {
+                                const res = await fetch('/api/tools/migrate-flat-layout', { method: 'POST' });
+                                const data = await res.json();
+                                if (data.success) {
+                                    Toast.success(data.message);
+                                    // Refresh status
+                                    this.state.sysStatus = await apiFetch('/api/system/status');
+                                    this.render(); // re-render to hide banner
+                                } else {
+                                    Toast.error(data.error || 'Migration failed');
+                                    migrateBtn.disabled = false;
+                                    migrateBtn.style.opacity = '1';
+                                }
+                            } catch (e) {
+                                Toast.error('Migration failed: ' + e.message);
+                                migrateBtn.disabled = false;
+                                migrateBtn.style.opacity = '1';
                             }
                         };
                     }

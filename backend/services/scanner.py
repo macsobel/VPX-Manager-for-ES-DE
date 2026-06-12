@@ -196,6 +196,28 @@ async def scan_tables_directory() -> dict:
                             has_altsound = True
                             break
 
+                    # Fallbacks using global pinmame for flat layouts
+                    if not has_rom or not has_altcolor or not has_altsound:
+                        from backend.core.config import config
+                        from backend.services.vpx_parser import VPXParser
+                        
+                        global_pinmame = Path(config.expanded_global_pinmame_dir)
+                        if global_pinmame.exists():
+                            vps_id = existing_info[2] if existing_info else None
+                            rom_name = VPXParser.detect_rom(vpx_path, vps_id=vps_id)
+                            if rom_name:
+                                rom_name_lower = rom_name.lower()
+                                if not has_rom and (global_pinmame / "roms" / f"{rom_name_lower}.zip").exists():
+                                    has_rom = True
+                                if not has_altcolor:
+                                    altcolor_path = global_pinmame / "altcolor" / rom_name_lower
+                                    if altcolor_path.exists() and altcolor_path.is_dir() and any(altcolor_path.iterdir()):
+                                        has_altcolor = True
+                                if not has_altsound:
+                                    altsound_path = global_pinmame / "altsound" / rom_name_lower
+                                    if altsound_path.exists() and altsound_path.is_dir() and any(altsound_path.iterdir()):
+                                        has_altsound = True
+
                     # Check for Music
                     has_music = (
                         (folder_path / "music").exists()

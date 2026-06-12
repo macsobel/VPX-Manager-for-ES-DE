@@ -188,6 +188,9 @@ class AppConfig(BaseModel):
     esde_media_dir: str = "~/ES-DE/downloaded_media/vpinball"
     # New: Separate directory for ES-DE gamelists (typically ~/ES-DE/gamelists/vpinball)
     esde_gamelists_dir: str = ""
+    # Global/fallback PinMAME directory for legacy flat layouts
+    global_pinmame_dir: str = "~/.pinmame"
+    
     # ScreenScraper integration
     screenscraper_username: str = ""
     screenscraper_password: str = ""  # This will be encoded in the JSON
@@ -240,6 +243,7 @@ class AppConfig(BaseModel):
         "esde_app_path",
         "esde_media_dir",
         "esde_gamelists_dir",
+        "global_pinmame_dir",
         pre=True,
         always=True,
     )
@@ -301,6 +305,11 @@ class AppConfig(BaseModel):
         if self.media_storage_mode == "portable":
             return self.expanded_tables_dir / "media"
         return self.expanded_esde_media_dir
+
+    @property
+    def expanded_global_pinmame_dir(self) -> Path:
+        """Dynamically resolved global PinMAME directory."""
+        return Path(self.global_pinmame_dir).expanduser()
 
     def get_gamelist_xml_path(self) -> Path:
         """Get the full path to the gamelist.xml file."""

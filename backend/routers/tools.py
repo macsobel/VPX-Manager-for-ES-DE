@@ -690,3 +690,92 @@ echo "Script completed successfully."
     except Exception as e:
         logger.error(f"Error applying ES-DE integration: {e}")
         return ESDEIntegrationResponse(success=False, message=str(e))
+
+@router.post("/migrate-flat-layout")
+async def migrate_flat_layout():
+    """
+    Migrates tables from a flat layout to a per-table-folder layout.
+    It copies .vpx, .directb2s, .vbs, and .ini files into new folders.
+    It also copies matching ROMs, altcolor, altsound, and nvram from the global_pinmame_dir.
+    """
+    from backend.services.vpx_parser import VPXParser
+    
+    tables_dir = Path(config.expanded_tables_dir)
+    global_pinmame_dir = Path(config.expanded_global_pinmame_dir)
+    
+    if not tables_dir.exists():
+        return {"success": False, "error": "Tables directory does not exist."}
+        
+    flat_vpx_files = [f for f in tables_dir.iterdir() if f.is_file() and f.suffix.lower() == ".vpx"]
+    
+    if not flat_vpx_files:
+        return {"success": True, "migrated_count": 0, "message": "No flat tables found."}
+        
+    migrated_count = 0
+    failures = []
+    
+    for vpx_file in flat_vpx_files:
+        try:
+            # Create subfolder based on the .vpx file name
+            table_folder = tables_dir / vpx_file.stem
+            table_folder.mkdir(parents=True, exist_ok=True)
+            
+            # Copy main table file
+            shutil.copy2(vpx_file, table_folder / vpx_file.name)
+            
+            # Copy companion files from the same flat directory
+            for ext in [".directb2s", ".vbs", ".ini", ".res"]:
+                companion_file = tables_dir / f"{vpx_file.stem}{ext}"
+                if companion_file.exists() and companion_file.is_file():
+                    shutil.copy2(companion_file, table_folder / companion_file.name)
+            
+            # Try to detect ROM name to copy PinMAME files from global_pinmame_dir
+            rom_name = VPXParser.detect_rom(vpx_file)
+            
+            if rom_name and global_pinmame_dir.exists():
+                rom_name_lower = rom_name.lower()
+                
+                # 1. Copy ROM
+                global_roms_dir = global_pinmame_dir / "roms"
+                if global_roms_dir.exists():
+                    rom_zip = global_roms_dir / f"{rom_name_lower}.zip"
+                    if rom_zip.exists():
+                        target_rom_dir = table_folder / "pinmame" / "roms"
+                        target_rom_dir.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(rom_zip, target_rom_dir / rom_zip.name)
+                
+                # 2. Copy NVRAM
+                global_nvram_dir = global_pinmame_dir / "nvram"
+                if global_nvram_dir.exists():
+                    nv_file = global_nvram_dir / f"{rom_name_lower}.nv"
+                    if nv_file.exists():
+                        target_nv_dir = table_folder / "pinmame" / "nvram"
+                        target_nv_dir.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(nv_file, target_nv_dir / nv_file.name)
+                        
+                # 3. Copy AltColor
+                global_altcolor_dir = global_pinmame_dir / "altcolor" / rom_name_lower
+                if global_altcolor_dir.exists() and global_altcolor_dir.is_dir():
+                    target_altcolor_dir = table_folder / "pinmame" / "altcolor" / rom_name_lower
+                    if not target_altcolor_dir.exists():
+                        shutil.copytree(global_altcolor_dir, target_altcolor_dir)
+                
+                # 4. Copy AltSound
+                global_altsound_dir = global_pinmame_dir / "altsound" / rom_name_lower
+                if global_altsound_dir.exists() and global_altsound_dir.is_dir():
+                    target_altsound_dir = table_folder / "pinmame" / "altsound" / rom_name_lower
+                    if not target_altsound_dir.exists():
+                        shutil.copytree(global_altsound_dir, target_altsound_dir)
+                        
+            migrated_count += 1
+        except Exception as e:
+            logger.error(f"Failed to migrate {vpx_file.name}: {e}")
+            failures.append(f"{vpx_file.name}: {str(e)}")
+            
+    return {
+        "success": True, 
+        "migrated_count": migrated_count,
+        "failures": failures,
+        "message": f"Successfully migrated {migrated_count} tables to per-table folders. Your original files have been left in place."
+    }
+

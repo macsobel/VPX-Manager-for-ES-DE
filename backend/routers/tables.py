@@ -676,12 +676,46 @@ async def get_table_inventory(table_id: int):
             return []
         return [f.name for f in path.glob(glob) if not f.name.startswith(".")]
 
+    rom_files = get_files(table_dir / "pinmame" / "roms", "*.zip")
+    altsound_files = (
+        [f.name for f in (table_dir / "pinmame" / "altsound").iterdir() if not f.name.startswith(".")]
+        if (table_dir / "pinmame" / "altsound").exists()
+        else []
+    )
+    altcolor_files = (
+        [f.name for f in (table_dir / "pinmame" / "altcolor").iterdir() if not f.name.startswith(".")]
+        if (table_dir / "pinmame" / "altcolor").exists()
+        else []
+    )
+
+    # Check global fallbacks for flat layout
+    if not rom_files or not altsound_files or not altcolor_files:
+        global_pinmame = Path(config.expanded_global_pinmame_dir)
+        if global_pinmame.exists():
+            from backend.services.vpx_parser import VPXParser
+            vpx_files = get_files(table_dir, "*.vpx")
+            if vpx_files:
+                vps_id = table.get("vps_id")
+                rom_name = VPXParser.detect_rom(table_dir / vpx_files[0], vps_id=vps_id)
+                if rom_name:
+                    rom_name_lower = rom_name.lower()
+                    if not rom_files and (global_pinmame / "roms" / f"{rom_name_lower}.zip").exists():
+                        rom_files = [f"{rom_name_lower}.zip (Global)"]
+                    if not altsound_files:
+                        global_altsound = global_pinmame / "altsound" / rom_name_lower
+                        if global_altsound.exists() and global_altsound.is_dir() and any(global_altsound.iterdir()):
+                            altsound_files = [f"{rom_name_lower} (Global)"]
+                    if not altcolor_files:
+                        global_altcolor = global_pinmame / "altcolor" / rom_name_lower
+                        if global_altcolor.exists() and global_altcolor.is_dir() and any(global_altcolor.iterdir()):
+                            altcolor_files = [f"{rom_name_lower} (Global)"]
+
     inventory = {
         "vpx": get_files(table_dir, "*.vpx"),
         "backglass": get_files(table_dir, "*.directb2s"),
         "vbs": get_files(table_dir, "*.vbs"),
         "ini": get_files(table_dir, "*.ini"),
-        "rom": get_files(table_dir / "pinmame" / "roms", "*.zip"),
+        "rom": rom_files,
         "puppack": (
             [d.name for d in (table_dir / "pupvideos").iterdir() if d.is_dir()]
             if (table_dir / "pupvideos").exists()
@@ -696,24 +730,8 @@ async def get_table_inventory(table_id: int):
             if (table_dir / "music").exists()
             else []
         ),
-        "altsound": (
-            [
-                f.name
-                for f in (table_dir / "pinmame" / "altsound").iterdir()
-                if not f.name.startswith(".")
-            ]
-            if (table_dir / "pinmame" / "altsound").exists()
-            else []
-        ),
-        "altcolor": (
-            [
-                f.name
-                for f in (table_dir / "pinmame" / "altcolor").iterdir()
-                if not f.name.startswith(".")
-            ]
-            if (table_dir / "pinmame" / "altcolor").exists()
-            else []
-        ),
+        "altsound": altsound_files,
+        "altcolor": altcolor_files,
         "flexdmd": (
             [table_dir.name]
             if (table_dir / table_dir.name).exists() and (table_dir / table_dir.name).is_dir()

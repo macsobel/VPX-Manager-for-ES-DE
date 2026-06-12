@@ -90,6 +90,16 @@ const SettingsPage = {
                     </div>
                 </div>
             </div>
+            
+            <div class="settings-section">
+                <div class="settings-section-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    Storage Management
+                </div>
+                <div class="card" id="storage-management-card">
+                    <div style="text-align: center;"><div class="spinner"></div></div>
+                </div>
+            </div>
 
             <div class="settings-section">
                 <div class="settings-section-title">
@@ -387,7 +397,15 @@ const SettingsPage = {
                         </div>
 
                     </div>
+                </div>
 
+                <div style="grid-column: 1 / -1; margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--border-subtle);">
+                    <div style="font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: var(--space-xs); margin-bottom: var(--space-sm);">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                        Legacy File Layout Support
+                    </div>
+                    <div style="display: grid; gap: var(--space-md);">
+                        ${this._renderDirInput('setting-global-pinmame-dir', 'Global PinMAME Directory', data.global_pinmame_dir || '~/.pinmame', 'Fallback folder used to locate ROMs, AltColor, and AltSound for tables not in per-table folders.', false, data.is_local)}
                     </div>
                 </div>
 
@@ -588,6 +606,7 @@ const SettingsPage = {
                 display_count: parseInt(getVal('setting-display-count')) || 2,
                 screenscraper_username: getVal('setting-ss-user'),
                 screenscraper_password: getVal('setting-ss-pass'),
+                global_pinmame_dir: getVal('setting-global-pinmame-dir'),
             };
 
             await fetch('/api/settings', {
@@ -672,6 +691,58 @@ const SettingsPage = {
                     </div>
                 </div>
             `;
+
+            // Render Storage Management
+            const storageCard = document.getElementById('storage-management-card');
+            if (storageCard) {
+                if (info.has_flat_layout) {
+                    storageCard.innerHTML = `
+                        <div style="background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.4); border-left: 4px solid #eab308; padding: 1rem; border-radius: 6px; color: var(--text-primary);">
+                            <h4 style="color: #eab308; margin-top: 0; margin-bottom: 0.5rem; font-size: 0.95rem;">⚠️ Legacy File Layout Detected</h4>
+                            <p style="font-size: 0.85rem; line-height: 1.5; margin-bottom: 1rem;">
+                                Your tables directory contains <strong>${info.counts.flat_vpx_files}</strong> tables using the older "flat" layout (all .vpx files mixed together). VPX Manager requires tables to be in their own subfolders to support media, wheel art, and gamelists properly.
+                                <br><br>
+                                We can automatically reorganize your files into subfolders. Your original files will be safely copied, not moved. After verifying everything works, you can delete your old duplicates in the global PinMAME folder to reclaim disk space.
+                            </p>
+                            <button id="btn-migrate-layout" class="btn btn-secondary" style="font-size: 0.85rem; padding: 6px 12px; border-color: rgba(234, 179, 8, 0.5);">
+                                <i class="fas fa-folder-tree" style="margin-right: 6px;"></i> Migrate to Per-Table Folders
+                            </button>
+                        </div>
+                    `;
+                    document.getElementById('btn-migrate-layout').onclick = async () => {
+                        const btn = document.getElementById('btn-migrate-layout');
+                        btn.disabled = true;
+                        btn.style.opacity = '0.7';
+                        Toast.info('Migrating tables to folders, please wait... (This may take a minute)', 5000);
+                        try {
+                            const res = await fetch('/api/tools/migrate-flat-layout', { method: 'POST' });
+                            const data = await res.json();
+                            if (data.success) {
+                                Toast.success(data.message);
+                                this.loadSystemStatus();
+                            } else {
+                                Toast.error(data.error || 'Migration failed');
+                                btn.disabled = false;
+                                btn.style.opacity = '1';
+                            }
+                        } catch (e) {
+                            Toast.error('Migration failed: ' + e.message);
+                            btn.disabled = false;
+                            btn.style.opacity = '1';
+                        }
+                    };
+                } else {
+                    storageCard.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 12px; color: var(--text-secondary);">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-emerald)" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            <div>
+                                <div style="font-weight: 500; color: var(--text-primary);">Optimal File Layout</div>
+                                <div style="font-size: 0.85rem; margin-top: 2px;">All tables are properly organized in per-table subfolders.</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
         } catch (e) {
             document.getElementById('system-status-card').innerHTML = `<span style="color: var(--accent-red);">Failed to load system status</span>`;
         }
@@ -787,7 +858,7 @@ const SettingsPage = {
                 if (result.update_available) {
                     Modal.confirm(
                         'Update Available',
-                        `A new version (${result.latest_version}) is available. Would you like to open the release page?\n\n${result.body.substring(0, 200)}${result.body.length > 200 ? '...' : ''}`,
+                        `A new version (${result.latest_version}) is available. Would you like to open the release page?\n\n${(result.body || '').substring(0, 200)}${(result.body || '').length > 200 ? '...' : ''}`,
                         () => {
                             window.open(result.download_url, '_blank');
                         }

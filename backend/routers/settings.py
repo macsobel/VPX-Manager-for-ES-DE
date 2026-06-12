@@ -52,6 +52,7 @@ class SettingsUpdate(BaseModel):
     media_storage_mode: Optional[str] = None
     esde_media_dir: Optional[str] = None
     esde_gamelists_dir: Optional[str] = None
+    global_pinmame_dir: Optional[str] = None
     screenscraper_username: Optional[str] = None
     screenscraper_password: Optional[str] = None
     screenscraper_devid: Optional[str] = None
@@ -163,6 +164,7 @@ async def system_status(request: Request):
 
     # Count files and track sizes separately
     vpx_count = 0
+    flat_vpx_count = 0
     b2s_count = 0
     rom_count = 0
     media_count = 0
@@ -175,6 +177,10 @@ async def system_status(request: Request):
                 fsize = f.stat().st_size
                 ext = f.suffix.lower()
                 parent_name = f.parent.name.lower()
+                
+                # If a .vpx file is directly in the tables_dir root, it's a flat layout file
+                if ext == ".vpx" and f.parent == tables_dir:
+                    flat_vpx_count += 1
 
                 # Classify as media or table content
                 is_media = parent_name == "medias" or parent_name in (
@@ -221,11 +227,13 @@ async def system_status(request: Request):
         },
         "counts": {
             "vpx_files": vpx_count,
+            "flat_vpx_files": flat_vpx_count,
             "b2s_files": b2s_count,
             "rom_files": rom_count,
             "media_files": media_count,
             "db_tables": db_tables,
         },
+        "has_flat_layout": flat_vpx_count > 0,
         "storage": {
             "tables_size_mb": round(table_size / (1024 * 1024), 1),
             "media_size_mb": round(media_size / (1024 * 1024), 1),
