@@ -52,7 +52,7 @@ class SettingsUpdate(BaseModel):
     media_storage_mode: Optional[str] = None
     esde_media_dir: Optional[str] = None
     esde_gamelists_dir: Optional[str] = None
-    global_pinmame_dir: Optional[str] = None
+
     screenscraper_username: Optional[str] = None
     screenscraper_password: Optional[str] = None
     screenscraper_devid: Optional[str] = None

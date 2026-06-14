@@ -49,6 +49,9 @@ else:
 CONFIG_FILE = APP_SUPPORT_DIR / "vpx_manager.json"
 LOG_FILE = APP_SUPPORT_DIR / "vpx_manager.log"
 
+# Global/fallback PinMAME directory (not user-configurable)
+DEFAULT_GLOBAL_PINMAME_DIR = "~/.pinmame"
+
 
 def _scramble(data: str) -> str:
     """XOR-based scrambling with a fixed key."""
@@ -188,8 +191,7 @@ class AppConfig(BaseModel):
     esde_media_dir: str = "~/ES-DE/downloaded_media/vpinball"
     # New: Separate directory for ES-DE gamelists (typically ~/ES-DE/gamelists/vpinball)
     esde_gamelists_dir: str = ""
-    # Global/fallback PinMAME directory for legacy flat layouts
-    global_pinmame_dir: str = "~/.pinmame"
+
     
     # ScreenScraper integration
     screenscraper_username: str = ""
@@ -243,7 +245,6 @@ class AppConfig(BaseModel):
         "esde_app_path",
         "esde_media_dir",
         "esde_gamelists_dir",
-        "global_pinmame_dir",
         pre=True,
         always=True,
     )
@@ -308,8 +309,8 @@ class AppConfig(BaseModel):
 
     @property
     def expanded_global_pinmame_dir(self) -> Path:
-        """Dynamically resolved global PinMAME directory."""
-        return Path(self.global_pinmame_dir).expanduser()
+        """Resolved global PinMAME directory (hardcoded constant)."""
+        return Path(DEFAULT_GLOBAL_PINMAME_DIR).expanduser()
 
     def get_gamelist_xml_path(self) -> Path:
         """Get the full path to the gamelist.xml file."""

@@ -400,16 +400,6 @@ const SettingsPage = {
                 </div>
 
                 <div style="grid-column: 1 / -1; margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--border-subtle);">
-                    <div style="font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: var(--space-xs); margin-bottom: var(--space-sm);">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-                        Legacy File Layout Support
-                    </div>
-                    <div style="display: grid; gap: var(--space-md);">
-                        ${this._renderDirInput('setting-global-pinmame-dir', 'Global PinMAME Directory', data.global_pinmame_dir || '~/.pinmame', 'Fallback folder used to locate ROMs, AltColor, and AltSound for tables not in per-table folders.', false, data.is_local)}
-                    </div>
-                </div>
-
-                <div style="grid-column: 1 / -1; margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--border-subtle);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
                         <div style="font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: var(--space-xs);">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
@@ -606,7 +596,7 @@ const SettingsPage = {
                 display_count: parseInt(getVal('setting-display-count')) || 2,
                 screenscraper_username: getVal('setting-ss-user'),
                 screenscraper_password: getVal('setting-ss-pass'),
-                global_pinmame_dir: getVal('setting-global-pinmame-dir'),
+
             };
 
             await fetch('/api/settings', {
