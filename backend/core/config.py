@@ -15,6 +15,7 @@ from typing import Optional
 
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, validator
+# pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
 
 # Load environment variables early for dev secrets

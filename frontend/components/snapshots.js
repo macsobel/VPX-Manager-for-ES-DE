@@ -180,6 +180,9 @@ const SnapshotsDrawer = {
         document.getElementById('btn-create-snapshot').onclick = () => {
             Modal.prompt('New Snapshot', 'Enter a label for this snapshot:', 'Manual Backup', async (label) => {
                 try {
+                    this._prevStatus = 'running';
+                    this.renderProgress({ status: 'running', message: 'Creating backup...', current: 0, total: 0 });
+                    
                     const res = await fetch(`/api/tables/${this.state.tableId}/snapshots`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -187,12 +190,15 @@ const SnapshotsDrawer = {
                     });
                     const data = await res.json();
                     if (data.success) {
-                        this._prevStatus = 'running';
                         this.startPolling();
                     } else {
+                        const progressContainer = document.getElementById('snapshot-progress-container');
+                        if (progressContainer) progressContainer.remove();
                         Toast.error(data.error || 'Failed to start snapshot');
                     }
                 } catch (e) {
+                    const progressContainer = document.getElementById('snapshot-progress-container');
+                    if (progressContainer) progressContainer.remove();
                     Toast.error('Error starting snapshot');
                 }
             });
@@ -245,17 +251,23 @@ const SnapshotsDrawer = {
 
     async performRestore(snapshotId) {
         try {
+            this._prevStatus = 'running';
+            this.renderProgress({ status: 'running', message: 'Initiating restore...', current: 0, total: 0 });
+            
             const res = await fetch(`/api/tables/${this.state.tableId}/snapshots/${snapshotId}/restore`, {
                 method: 'POST'
             });
             const data = await res.json();
             if (data.success) {
-                this._prevStatus = 'running';
                 this.startPolling();
             } else {
+                const progressContainer = document.getElementById('snapshot-progress-container');
+                if (progressContainer) progressContainer.remove();
                 Toast.error(data.error || 'Restore failed');
             }
         } catch (e) {
+            const progressContainer = document.getElementById('snapshot-progress-container');
+            if (progressContainer) progressContainer.remove();
             Toast.error('Restore error');
         }
     },
@@ -276,7 +288,8 @@ const SnapshotsDrawer = {
             body.prepend(progressContainer);
         }
 
-        const percent = status.total > 0 ? Math.round((status.current / status.total) * 100) : 0;
+        const isIndeterminate = !status.total || status.total <= 0;
+        const percent = isIndeterminate ? 0 : Math.round((status.current / status.total) * 100);
         
         progressContainer.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
@@ -284,12 +297,15 @@ const SnapshotsDrawer = {
                     <div class="spinner-sm"></div>
                     <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">${status.message || 'Processing...'}</span>
                 </div>
-                <span style="font-size: 0.85rem; color: var(--accent-blue); font-weight: 700;">${percent}%</span>
+                ${!isIndeterminate ? `<span style="font-size: 0.85rem; color: var(--accent-blue); font-weight: 700;">${percent}%</span>` : ''}
             </div>
             <div style="width: 100%; background: rgba(0,0,0,0.3); height: 8px; border-radius: 4px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05);">
-                <div style="width: ${percent}%; height: 100%; background: linear-gradient(90deg, var(--accent-blue), #60a5fa); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative;">
-                    <div class="progress-shimmer" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0;"></div>
-                </div>
+                ${isIndeterminate 
+                    ? `<div style="width: 100%; height: 100%; background: linear-gradient(90deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.6), rgba(59, 130, 246, 0.2)); background-size: 200% 100%; animation: progress-shimmer 1.5s infinite linear;"></div>`
+                    : `<div style="width: ${percent}%; height: 100%; background: linear-gradient(90deg, var(--accent-blue), #60a5fa); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative;">
+                           <div class="progress-shimmer" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0;"></div>
+                       </div>`
+                }
             </div>
         `;
     },

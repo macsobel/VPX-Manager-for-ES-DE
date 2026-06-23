@@ -1,3 +1,4 @@
+from backend.services import vps_matcher
 import os
 import sys
 
@@ -10,8 +11,11 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+# pyrefly: ignore [missing-import]
 from fastapi.responses import FileResponse
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 
 import backend.core.database as db
