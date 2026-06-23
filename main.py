@@ -67,6 +67,7 @@ from backend.routers import (
     puppack,
     displays,
     snapshots,
+    vpx_snapshots,
 )
 from backend.services.esde_sync_service import esde_sync
 import socket
@@ -213,6 +214,7 @@ app.include_router(backglass.router)
 app.include_router(puppack.router)
 app.include_router(displays.router)
 app.include_router(snapshots.router)
+app.include_router(vpx_snapshots.router)
 
 # ── Static Frontend ─────────────────────────────────────────────────
 from backend.core.config import APP_SUPPORT_DIR

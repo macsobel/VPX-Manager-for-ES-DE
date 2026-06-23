@@ -119,6 +119,10 @@ const SettingsPage = {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
                         Check for Updates
                     </button>
+                    <button class="btn btn-secondary" id="btn-vpx-backup" title="Backup Visual Pinball application and settings">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                        Backup VPX App
+                    </button>
                     <button class="btn btn-danger" id="btn-delete-backups">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         Delete Backups
@@ -867,19 +871,27 @@ const SettingsPage = {
         };
         
         document.getElementById('btn-delete-backups').onclick = () => {
-            Modal.confirm('Delete All Backups', 'Are you sure you want to delete all snapshots for all tables? This cannot be undone.', async () => {
+            Modal.confirm('Delete All Backups', 'Are you sure you want to delete all snapshots for all tables, as well as any VPX application backups? This cannot be undone.', async () => {
                 try {
-                    const res = await fetch('/api/tables/all/delete', { method: 'DELETE' });
-                    if (res.ok) {
+                    const [resTables, resVpx] = await Promise.all([
+                        fetch('/api/tables/all/delete', { method: 'DELETE' }),
+                        fetch('/api/vpx-snapshots/all/delete', { method: 'DELETE' })
+                    ]);
+                    
+                    if (resTables.ok && resVpx.ok) {
                         Toast.success('All backups deleted');
                         this.loadSystemStatus();
                     } else {
-                        Toast.error('Failed to delete backups');
+                        Toast.error('Failed to delete some or all backups');
                     }
                 } catch (e) {
                     Toast.error('Failed to initiate deletion');
                 }
             });
+        };
+
+        document.getElementById('btn-vpx-backup').onclick = () => {
+            VpxSnapshotsDrawer.show();
         };
     },
 };
