@@ -43,7 +43,7 @@ git push origin main
 echo "📦 Creating GitHub release ${TAG}..."
 gh release create "${TAG}" \
     --title "${TAG}" \
-    --generate-notes
+    --notes-file "${ROOT_DIR}/release_notes.md"
 
 echo "✅ GitHub release created: https://github.com/macsobel/VPX-Manager-for-ES-DE/releases/tag/${TAG}"
 
