@@ -187,6 +187,7 @@ const SnapshotsDrawer = {
                     });
                     const data = await res.json();
                     if (data.success) {
+                        this._prevStatus = 'running';
                         this.startPolling();
                     } else {
                         Toast.error(data.error || 'Failed to start snapshot');
@@ -249,6 +250,7 @@ const SnapshotsDrawer = {
             });
             const data = await res.json();
             if (data.success) {
+                this._prevStatus = 'running';
                 this.startPolling();
             } else {
                 Toast.error(data.error || 'Restore failed');
@@ -301,28 +303,41 @@ const SnapshotsDrawer = {
                 
                 if (status.status === 'running') {
                     this.renderProgress(status);
+                    this._prevStatus = 'running';
                 } else if (status.status === 'completed') {
                     clearInterval(this._polling);
                     this._polling = null;
                     const progressContainer = document.getElementById('snapshot-progress-container');
                     if (progressContainer) progressContainer.remove();
                     
-                    Toast.success(status.message || 'Operation complete');
-                    
-                    // Refresh snapshots list
-                    await this.loadSnapshots();
-                    this.render();
+                    if (this._prevStatus === 'running') {
+                        Toast.success(status.message || 'Operation complete');
+                        
+                        // Refresh snapshots list
+                        await this.loadSnapshots();
+                        this.render();
 
-                    // If it was a restore, we might want to refresh the main table list too
-                    if (status.id.includes('restore') && typeof TablesPage !== 'undefined' && TablesPage.loadTables) {
-                        TablesPage.loadTables();
+                        // If it was a restore, we might want to refresh the main table list too
+                        if (status.id.includes('restore') && typeof TablesPage !== 'undefined' && TablesPage.loadTables) {
+                            TablesPage.loadTables();
+                        }
                     }
+                    this._prevStatus = 'completed';
                 } else if (status.status === 'failed') {
                     clearInterval(this._polling);
                     this._polling = null;
                     const progressContainer = document.getElementById('snapshot-progress-container');
                     if (progressContainer) progressContainer.remove();
-                    Toast.error(status.error || 'Operation failed');
+                    
+                    if (this._prevStatus === 'running') {
+                        Toast.error(status.error || 'Operation failed');
+                    }
+                    this._prevStatus = 'failed';
+                } else {
+                    // idle or other inactive states
+                    clearInterval(this._polling);
+                    this._polling = null;
+                    this._prevStatus = status.status;
                 }
             } catch (e) {
                 console.error('Polling error:', e);

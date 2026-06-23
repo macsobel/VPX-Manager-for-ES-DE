@@ -341,12 +341,15 @@ const VpxSnapshotsDrawer = {
 
     startPolling() {
         if (this._polling) clearInterval(this._polling);
+        let wasRunning = false;
+        
         this._polling = setInterval(async () => {
             try {
                 const res = await fetch('/api/vpx-snapshots/status');
                 const status = await res.json();
                 
                 if (status.status === 'running') {
+                    wasRunning = true;
                     this.renderProgress(status);
                 } else if (status.status === 'completed') {
                     clearInterval(this._polling);
@@ -354,16 +357,18 @@ const VpxSnapshotsDrawer = {
                     const progressContainer = document.getElementById('vpx-snapshot-progress-container');
                     if (progressContainer) progressContainer.remove();
                     
-                    Toast.success(status.message || 'Operation complete');
-                    
-                    // Refresh snapshots list
-                    await this.loadSnapshots();
-                    this.render();
+                    if (wasRunning) {
+                        Toast.success(status.message || 'Operation complete');
+                        
+                        // Refresh snapshots list
+                        await this.loadSnapshots();
+                        this.render();
 
-                    // Show post-backup dialog if this was a create operation
-                    if (this._pendingPostBackup) {
-                        this._pendingPostBackup = false;
-                        this.showPostBackupDialog();
+                        // Show post-backup dialog if this was a create operation
+                        if (this._pendingPostBackup) {
+                            this._pendingPostBackup = false;
+                            this.showPostBackupDialog();
+                        }
                     }
                 } else if (status.status === 'failed') {
                     clearInterval(this._polling);
@@ -371,7 +376,12 @@ const VpxSnapshotsDrawer = {
                     this._pendingPostBackup = false;
                     const progressContainer = document.getElementById('vpx-snapshot-progress-container');
                     if (progressContainer) progressContainer.remove();
-                    Toast.error(status.error || 'Operation failed');
+                    if (wasRunning) {
+                        Toast.error(status.error || 'Operation failed');
+                    }
+                } else {
+                    clearInterval(this._polling);
+                    this._polling = null;
                 }
             } catch (e) {
                 console.error('VPX snapshot polling error:', e);
